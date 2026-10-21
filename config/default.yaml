@@ -60,8 +60,11 @@ sources:
 
   hf_daily:
     enabled: true
-    availability: always
-    availability_reason: 官方开放 API，本地与 Actions 均可达；无需认证
+    # ★ 实测依据：本地 WSL 连接超时（ConnectTimeout）；GitHub Actions 手动触发
+    #   ci.yml 的 probe job 实测 HTTP 200 / 50 条 ⇒ 分级 `actions_only`。
+    #   若你的网络能直连官方端点，把这里改回 always 即可。
+    availability: actions_only
+    availability_reason: 官方开放 API，无需认证；本地 WSL 实测不可达，Actions 实测可达
     rate_limit: 10/1s
     time_semantics: discovery
     endpoint: https://huggingface.co/api/daily_papers

@@ -289,8 +289,8 @@ async def probe_hf(
     else:
         official_result.availability = "actions_only"
         official_result.availability_reason = (
-            "官方开放 API，无需认证；**本环境（本地 WSL）实测不可达**，"
-            "按 aipulse 的既有经验 Actions 环境通常可达（待 CI 验证）"
+            "官方开放 API，无需认证；**本环境（本地 WSL）实测不可达**；"
+            "Actions 环境另测（ci.yml 的 probe job，结论见 `docs/开发日志.md`）"
         )
     results.append(official_result)
     if not official_result.ok and mirror:
@@ -413,7 +413,22 @@ def render_markdown(
             lines.append("响应片段：未获得。")
             lines.append("")
 
-    lines.append("## 3. 失效降级路径")
+    lines.append("## 3. 环境分级结论")
+    lines.append("")
+    lines.append("| 源 | 分级 | 依据 |")
+    lines.append("|---|---|---|")
+    for r in results:
+        lines.append(f"| `{r.name}` | `{r.availability}` | {r.availability_reason} |")
+    lines.append("")
+    lines.append(
+        "- `always`：本地与 Actions 都采。\n"
+        "- `actions_only`：本地跳过且**不计失败**，只在 `AI_SCHOLAR_ENV=actions` 时采集。\n"
+        "- 本文件由**本地（WSL）**生成，`actions_only` 的源需另行在 Actions 验证："
+        "`gh workflow run ci.yml`（ci.yml 的 probe job，手动触发，不回写仓库）。"
+    )
+    lines.append("")
+
+    lines.append("## 4. 失效降级路径")
     lines.append("")
     lines.append(
         "- **arXiv**：主端点 `http://export.arxiv.org/api/query`。"
