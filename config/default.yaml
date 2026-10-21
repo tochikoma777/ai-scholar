@@ -1,0 +1,76 @@
+# AI Scholar 主配置。
+#
+# ★ 凡是"环境开关"（api_key / base_url / 运行档位）**必须**写成 `${ENV}` 占位符：
+#   `load_settings()` 用 `Settings(**yaml)` 构造，init kwargs 优先级高于环境变量，
+#   写成字面量会把环境变量静默压掉（aipulse 踩过的坑）。
+#   算法阈值 / 规模参数可以留字面量。
+
+app:
+  name: ai-scholar
+  timezone: Asia/Shanghai          # 存储统一 UTC，仅渲染层转此时区
+  data_dir: data
+  log_level: ${AI_SCHOLAR_LOG_LEVEL:-INFO}
+
+# 三档运行模式：off = 零 API 花费；fast = 便宜档；strong = 推理档
+# ★ 缺 api_key（或 base_url）时自动降级 off，不报错退出（退出码 0）
+mode: ${AI_SCHOLAR_MODE:-fast}
+
+llm:
+  enabled: ${AI_SCHOLAR_LLM__ENABLED:-true}
+  provider: deepseek
+  base_url: ${AI_SCHOLAR_LLM__BASE_URL}
+  api_key: ${AI_SCHOLAR_LLM__API_KEY}
+  fast_model: ${AI_SCHOLAR_LLM__FAST_MODEL:-deepseek-chat}
+  strong_model: ${AI_SCHOLAR_LLM__STRONG_MODEL:-deepseek-reasoner}
+  temperature: 0.3
+  # strong 档走思维链，比 fast 慢得多，故分开设超时
+  timeout_s: ${AI_SCHOLAR_LLM__TIMEOUT_S:-120}
+  timeout_strong_s: ${AI_SCHOLAR_LLM__TIMEOUT_STRONG_S:-180}
+  max_tokens_fast: ${AI_SCHOLAR_LLM__MAX_TOKENS_FAST:-4000}
+  max_tokens_strong: ${AI_SCHOLAR_LLM__MAX_TOKENS_STRONG:-8000}
+  max_retries: 3
+
+budget:
+  daily_limit_cny: ${AI_SCHOLAR_BUDGET__DAILY_LIMIT_CNY:-2.0}
+  price_fast_cny_per_1m: 1.0       # 成本估算单价（元/百万 token），可调
+  price_strong_cny_per_1m: 4.0
+
+http:
+  timeout_connect_s: 5.0
+  timeout_read_s: 20.0             # arXiv 单次返回较大，20s 起
+  max_concurrency: 6
+  max_retries: 3
+  user_agent: "ai-scholar/0.1 (+https://github.com/tochikoma777/ai-scholar)"
+
+collect:
+  arxiv_max_results: 200
+  hf_days: 1
+  deep_dive_top_n: 5               # ★ 通道 A 立刻执行，不看 Tier
+
+sources:
+  arxiv:
+    enabled: true
+    availability: always
+    availability_reason: 官方开放 API，本地与 Actions 均可达；无需认证
+    rate_limit: 1/3s               # ★ arXiv 官方要求约 1 req / 3s
+    time_semantics: discovery      # ★ 索引滞后数天，必须用 first_seen 过滤
+    # ★ 实测：http:// 会 301 且在本环境连接更慢，统一用 https
+    endpoint: https://export.arxiv.org/api/query
+    categories: [cs.AI, cs.CL, cs.LG]
+
+  hf_daily:
+    enabled: true
+    availability: always
+    availability_reason: 官方开放 API，本地与 Actions 均可达；无需认证
+    rate_limit: 10/1s
+    time_semantics: discovery
+    endpoint: https://huggingface.co/api/daily_papers
+
+  # L1+ 才启用（引用 / 施引数据）。★ 必须走 POST /graph/v1/paper/batch，禁止逐篇 GET
+  semantic_scholar:
+    enabled: false
+    availability: always
+    availability_reason: 公开 API；无 key 时限速较严，逐篇 GET 会直接被限流
+    rate_limit: 1/1s
+    time_semantics: state
+    endpoint: https://api.semanticscholar.org/graph/v1/paper/batch

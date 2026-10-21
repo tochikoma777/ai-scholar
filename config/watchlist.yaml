@@ -1,0 +1,24 @@
+# watchlist —— 通用示例，只含中立主题，**入仓**。
+#
+# 匹配：title 或 abstract，word-boundary，大小写不敏感
+# 命中【布尔】→ 决定是否触发；命中【分】= Σ(命中组权重)，同组多次命中只计一次 → 仅用于排序
+# default_threshold: 0.9 = 任一命中即触发
+#
+# ★ 想填自己的方向：复制本文件为 `watchlist.local.yaml`（`ai-scholar init` 会自动做），
+#   改那份。local 深合并覆盖本文件（同名组整体覆盖），且**不会入仓**（.gitignore 已排除）。
+
+default_threshold: 0.9
+
+groups:
+  - name: multimodal
+    weight: 1.0
+    keywords: [multimodal, video understanding, spatial reasoning, vision-language-action, embodied]
+  - name: efficient-inference
+    weight: 1.0
+    keywords: [on-device, edge inference, quantization, distillation, speculative decoding, KV cache]
+  - name: ai-safety
+    weight: 1.0
+    keywords: [reward hacking, sandbagging, scalable oversight, deceptive alignment]
+  - name: eval-benchmark
+    weight: 0.9
+    keywords: [benchmark, evaluation]

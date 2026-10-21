@@ -1,0 +1,62 @@
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint-and-test:
+    # ★ CI 必须在**无密钥环境**全绿：本 job 不读取任何 secrets
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.11
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --frozen || uv sync
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Mypy
+        run: uv run mypy src/ai_scholar
+
+      - name: Pytest
+        run: uv run pytest
+
+  # 手动触发时实跑一次数据源探测：用于确认各源在 Actions 环境的真实可达性
+  # （本地 WSL 对 huggingface.co 不可达，环境分级只能靠这里取证）。不回写仓库。
+  probe:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      AI_SCHOLAR_ENV: actions
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.11
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --frozen || uv sync
+
+      - name: Probe sources
+        run: uv run python scripts/probe_sources.py --arxiv-max 400

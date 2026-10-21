@@ -1,0 +1,90 @@
+[project]
+name = "ai-scholar"
+version = "0.1.0"
+description = "AI Scholar：采集 / 关联 / 推演 / 沉淀 AI 文献，输出自包含 Markdown 的 Obsidian 知识库"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "ai-scholar contributors" }]
+keywords = ["ai", "llm", "arxiv", "obsidian", "knowledge-base", "papers"]
+classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+]
+dependencies = [
+    "typer>=0.12",
+    "rich>=13.7",
+    "httpx>=0.27",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.2",
+    "sqlmodel>=0.0.16",
+    "alembic>=1.13",
+    "tenacity>=8.3",
+    "jinja2>=3.1",
+    "structlog>=24.1",
+    "python-dotenv>=1.0",
+    # YAML 是配置层的载体（config/*.yaml + watchlist 双文件），必须显式声明：
+    # 不能指望它作为别的包的传递依赖存在，否则换个解析环境就直接 ImportError。
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+ai-scholar = "ai_scholar.cli:app"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "respx>=0.21",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_scholar"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests", "scripts"]
+extend-exclude = [".venv", "data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# 探测脚本要向终端打印实测结论（T201 不在 select 里，此处仅为未来加 S/T 规则时留位）
+"scripts/*" = ["T201"]
+# typer 的惯用写法就是在参数默认值里调 typer.Option()，B008 对它属于误报
+"src/ai_scholar/cli.py" = ["B008"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+plugins = []
+exclude = ["build/"]
+
+[[tool.mypy.overrides]]
+# CLI 子命令骨架与工具层存在 NotImplementedError 占位 / 动态签名，暂不要求完整类型
+module = ["ai_scholar.cli.*", "ai_scholar.utils.*"]
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+module = ["respx.*", "yaml.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.coverage.run]
+source = ["src/ai_scholar"]
