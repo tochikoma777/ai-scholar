@@ -7,10 +7,14 @@
 
 ---
 
-## ★ 当前阶段：L0-A（仓库创建 + 骨架 + 配置层 + 数据源探测）—— 未开工
+## ★ 当前阶段：L0-B（DB schema + 采集器 + 三级去重 + first_seen）—— 已完成
 
-代码基线：无（新仓库）。`docs/设计方案.md` 与 `docs/执行手册.md` 由项目负责人维护，
-**Agent 只读**；当前阶段以任务卡为准。
+已完成：`data/ai_scholar.db` 六张表（alembic 迁移）、arXiv + HF 采集器、
+三级去重（身份 upsert / 跨源只补 hf_score / 别名归一）、`data/first_seen.jsonl`。
+`collect` 真实跑通；`export` / `list` **仍为刻意占位**（属 L0-C）。
+
+`docs/设计方案.md` 与 `docs/执行手册.md` 由项目负责人维护，**Agent 只读**；
+当前阶段以任务卡为准。
 
 ---
 
@@ -110,6 +114,15 @@ vault 由本地 `export` 写入。任何"让 Actions 写 private vault"的设计
     prompt 明令禁止以"可能 / 有望"填充。
 11. ❌ **输出单一综合评分** —— 客观信号与 LLM 判断**分列**，由人自己权衡。
 12. ❌ **SOTA / first / breakthrough 等论文自述当作定级证据** —— 硬约束。
+13. ❌ **把 watchlist 当入口过滤器** —— watchlist **只做三件事**：① 打 ★ ② 触发通道 A
+    深度分析 ③ 参与排序。**永远不决定论文是否入库**。
+    领域过滤 = cs.AI/CL/LG，**已在 arXiv 查询的 `cat:` 里施加过**，不要再滤第二遍。
+    > ⚠️ **本项目已犯两次同类层次混淆**（另一次是把定级硬约束搬进 `exclude_penalty`）：
+    > 把上层（意图 / 定级）规则搬到下层（采集 / 入口）。`N_enter` 会随
+    > `watchlist.local.yaml` 漂移而**不可复现**，且关联图会只剩我关心的方向 ——
+    > 直接背叛动机「没看完的东西以后还能用」。
+    > 守这条的测试：`test_pipeline_never_imports_watchlist`（源码级断言
+    > 采集编排不得引用 watchlist）。
 
 ---
 
@@ -137,6 +150,9 @@ uv sync                          # 安装依赖（含 dev）
 uv run ai-scholar --help         # 命令树
 uv run ai-scholar init           # 目录骨架 + watchlist.local.yaml + .env 骨架
 uv run ai-scholar doctor         # 环境体检（无 key 时提示降级 off，退出码 0）
+uv run ai-scholar collect --days 2 [--source arxiv|hf_daily] [--dry-run]
+                                 # 采集（★ 单源失败只 warning，退出码 0）
+uv run alembic upgrade head      # 建库（★ 空 data/ 目录也能跑）
 
 uv run python scripts/probe_sources.py        # 数据源探测（需联网，产出 docs/数据源手册.md）
 
@@ -157,6 +173,9 @@ uv run mypy src/ai_scholar
 | `utils/http.py` | `pytest -k http` + `pytest -k respx`（off 档断言 0 请求） |
 | `scripts/probe_sources.py` | 实跑一次 + 检查 `docs/数据源手册.md`；不可达时确认是 skip 不是伪造 |
 | `cli.py` | `pytest -k cli` + `uv run ai-scholar --help` |
+| `store/hash.py`（content_hash） | `pytest -k content_hash`（★ 三条硬约束） |
+| `store/first_seen.py` | `pytest -k first_seen`（append-only / 幂等） |
+| `pipeline/collect.py` | `pytest -k collect` + 实跑 `ai-scholar collect --days 2` |
 | **任何涉及 LLM 路径的改动** | 上面全绿也不算数 —— 配 key 实跑一次 |
 
 ---
