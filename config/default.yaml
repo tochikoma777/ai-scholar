@@ -43,7 +43,8 @@ http:
   user_agent: "ai-scholar/0.1 (+https://github.com/tochikoma777/ai-scholar)"
 
 collect:
-  arxiv_max_results: 200
+  # ★ 单日实测 465 条（§12），200 会把当天截断 —— 取 600 留余量（3 页 × 1 req/3s）
+  arxiv_max_results: 600
   hf_days: 1
   deep_dive_top_n: 5               # ★ 通道 A 立刻执行，不看 Tier
 

@@ -216,10 +216,53 @@ def doctor(
 # ── 以下子命令为 L0-A 的**刻意占位** ──────────────────────────────────────
 @app.command()
 def collect(
-    since: str = typer.Option("24h", "--since", help="回溯窗口，如 24h / 7d"),
+    days: int = typer.Option(1, "--days", "-d", help="回溯天数（按天查 submittedDate）"),
+    source: str | None = typer.Option(None, "--source", "-s", help="只采一个源：arxiv | hf_daily"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="只统计，不写库 / 不写 JSONL"),
 ) -> None:
-    """采集：从 arXiv / HF Daily Papers 拉取新论文并去重入库（L0-B 实现）。"""
-    raise NotImplementedError(f"collect(since={since}) 将在 L0-B（DB schema + 采集器）实现")
+    """采集：arXiv + HF Daily Papers → 三级去重 → 入库 + `first_seen.jsonl`。
+
+    ★ 单源失败只 warning（写进 `runs.degraded_json`），**退出码仍为 0**。
+    """
+    from ai_scholar.pipeline.collect import run_collect
+
+    if source is not None and source not in ("arxiv", "hf_daily"):
+        console.print(f"[red]未知源[/]：{source}（可选 arxiv / hf_daily）")
+        raise typer.Exit(2)
+
+    report = asyncio.run(run_collect(days=days, source=source, dry_run=dry_run))
+
+    table = Table(
+        title=f"collect · run {report.run_id}" + ("（dry-run）" if dry_run else ""),
+        title_justify="left",
+    )
+    table.add_column("源")
+    table.add_column("fetched")
+    table.add_column("new")
+    table.add_column("updated")
+    table.add_column("deduped")
+    table.add_column("状态")
+    for outcome in report.outcomes:
+        state = f"[yellow]warning {outcome.degraded}[/]" if outcome.failed else "[green]OK[/]"
+        table.add_row(
+            outcome.name,
+            str(outcome.fetched),
+            str(outcome.new),
+            str(outcome.updated),
+            str(outcome.deduped),
+            state,
+        )
+    console.print(table)
+    console.print(
+        f"合计 fetched={report.fetched} new={report.new} "
+        f"updated={report.updated} deduped={report.deduped}"
+    )
+    console.print(f"first_seen.jsonl 新增 {report.first_seen_new} 行（append-only，已存在不覆盖）")
+    if not dry_run:
+        console.print(f"db：{report.db_path}")
+    if report.degraded:
+        console.print("[yellow]提示[/]：部分源降级（已写入 runs.degraded_json），不影响退出码。")
+    raise typer.Exit(0)
 
 
 @app.command()

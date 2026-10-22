@@ -26,7 +26,7 @@ def test_help_lists_five_commands() -> None:
         assert name in result.output, f"{name} 未在 --help 中出现"
 
 
-@pytest.mark.parametrize("name", ["collect", "export", "list"])
+@pytest.mark.parametrize("name", ["export", "list"])
 def test_placeholder_commands_raise_not_implemented(name: str) -> None:
     result = runner.invoke(app, [name])
     assert isinstance(result.exception, NotImplementedError)
@@ -107,6 +107,52 @@ def test_doctor_reports_watchlist_counts(
     result = runner.invoke(app, ["doctor", "--skip-healthcheck"], env={"COLUMNS": "200"})
     assert result.exit_code == 0
     assert "5 组" in result.output  # 4 个示例组 + 1 个自己的组
+
+
+# ── collect ─────────────────────────────────────────────────────────────
+
+
+def test_collect_unknown_source_exits_2() -> None:
+    result = runner.invoke(app, ["collect", "--source", "bogus"], env={"COLUMNS": "200"})
+    assert result.exit_code == 2
+
+
+def test_collect_cli_reports_counts(monkeypatch: pytest.MonkeyPatch) -> None:
+    """collect 打印 fetched/new/updated/deduped 四数 + first_seen 新增行数，退出码 0。"""
+    import ai_scholar.pipeline.collect as pc
+
+    report = pc.CollectReport(dry_run=False, run_id="abc123")
+    report.outcomes = [pc.SourceOutcome(name="arxiv", fetched=10, new=8, updated=1, deduped=1)]
+    report.first_seen_new = 8
+
+    async def fake(**_kwargs: object) -> pc.CollectReport:
+        return report
+
+    monkeypatch.setattr(pc, "run_collect", fake)
+    result = runner.invoke(app, ["collect", "--days", "2"], env={"COLUMNS": "200"})
+    assert result.exit_code == 0, result.output
+    assert "fetched=10" in result.output
+    assert "new=8" in result.output
+    assert "first_seen.jsonl 新增 8 行" in result.output
+
+
+def test_collect_cli_degraded_still_exit_zero(monkeypatch: pytest.MonkeyPatch) -> None:
+    """★ 单源降级：仍退出码 0，并提示已写 runs.degraded_json。"""
+    import ai_scholar.pipeline.collect as pc
+
+    report = pc.CollectReport(dry_run=False, run_id="abc124")
+    hf = pc.SourceOutcome(name="hf_daily", degraded="RuntimeError: ConnectTimeout", failed=True)
+    report.outcomes = [pc.SourceOutcome(name="arxiv", fetched=5, new=5), hf]
+    report.degraded = {"hf_daily": "RuntimeError: ConnectTimeout"}
+
+    async def fake(**_kwargs: object) -> pc.CollectReport:
+        return report
+
+    monkeypatch.setattr(pc, "run_collect", fake)
+    result = runner.invoke(app, ["collect"], env={"COLUMNS": "200"})
+    assert result.exit_code == 0, result.output
+    assert "warning" in result.output
+    assert "degraded_json" in result.output
 
 
 # ── doctor 的 healthcheck 分支（覆盖非 skip 路径，提升 cli 覆盖率）──────────
