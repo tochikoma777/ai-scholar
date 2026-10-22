@@ -116,10 +116,17 @@ def test_resolve_proxy_priority() -> None:
     assert resolve_proxy({}) is None
 
 
+@respx.mock
 async def test_off_mode_makes_no_request() -> None:
-    """off 档（无 LLM 调用）下客户端不发任何请求——断言 0 请求而不是"没报错"。"""
+    """off 档（无 LLM 调用）下代码路径**根本不发起请求**。
+
+    ★ 用 respx 拦截全网 GET，断言 0 次调用——这是"代码没发请求"的真绿，
+    不是"用 mock 顶掉后断言 stats 为 0"的假绿。
+    """
+    route = respx.route(method="GET").mock(return_value=httpx.Response(200, text="x"))
     async with HttpClient() as client:
         assert client.stats["requests"] == 0
+    assert route.call_count == 0
 
 
 @respx.mock

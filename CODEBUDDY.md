@@ -166,7 +166,7 @@ uv run mypy src/ai_scholar
 | 源 | 可用性 | 说明 |
 |---|---|---|
 | arXiv API | `always` | 限速约 1 req / 3s |
-| HF Daily Papers | `always` | |
+| HF Daily Papers | `always` | ★ availability 描述"源本身是否公开可用"，**不是**"从某台机器能不能访问"；本地 WSL 连不上官方域名是**网络环境问题**，配 `hf_base_url`（镜像）即可解，不可达只 warning + 跳过、**不计失败** |
 | Semantic Scholar（L1+） | `always` | 只走 `POST /graph/v1/paper/batch` |
 | OpenReview（L1，可选增强） | **`optional_enrich`** | ★ 国内访问不稳定是**已知预期**；失败只写 warning、字段留空，**不影响退出码**，不作为 bug 排查 |
 

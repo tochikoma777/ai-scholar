@@ -76,6 +76,45 @@ def test_sources_config_loaded_from_repo() -> None:
     assert settings.source("hf_daily") is not None
 
 
+def test_hf_availability_is_always() -> None:
+    """★ HF 的 availability 描述"源本身是否公开可用"，必须 always（不能因本地网络不稳而降级）。"""
+    hf = load_settings().source("hf_daily")
+    assert hf is not None
+    assert hf.availability == "always"
+
+
+def test_hf_base_url_defaults_to_official(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("AI_SCHOLAR_SOURCES__HF_DAILY__HF_BASE_URL", raising=False)
+    cfg = tmp_path / "default.yaml"
+    cfg.write_text(
+        "sources:\n  hf_daily:\n"
+        "    hf_base_url: ${AI_SCHOLAR_SOURCES__HF_DAILY__HF_BASE_URL"
+        ":-https://huggingface.co/api/daily_papers}\n",
+        encoding="utf-8",
+    )
+    assert (
+        load_settings(cfg).source("hf_daily").hf_url() == "https://huggingface.co/api/daily_papers"
+    )
+
+
+def test_hf_base_url_overridable_by_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """★ 断言实际收到的值：hf_base_url 可被环境变量覆盖（填镜像），不是只"加载成功"。"""
+    cfg = tmp_path / "default.yaml"
+    cfg.write_text(
+        "sources:\n  hf_daily:\n"
+        "    hf_base_url: ${AI_SCHOLAR_SOURCES__HF_DAILY__HF_BASE_URL"
+        ":-https://huggingface.co/api/daily_papers}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv(
+        "AI_SCHOLAR_SOURCES__HF_DAILY__HF_BASE_URL",
+        "https://hf-mirror.com/api/daily_papers",
+    )
+    assert (
+        load_settings(cfg).source("hf_daily").hf_url() == "https://hf-mirror.com/api/daily_papers"
+    )
+
+
 def test_project_root_honors_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AI_SCHOLAR_ROOT", str(tmp_path))
     assert project_root() == tmp_path.resolve()

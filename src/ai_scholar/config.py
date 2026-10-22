@@ -121,6 +121,12 @@ class SourceSettings(BaseModel):
     # ★ 时间语义三态：arXiv / HF 索引滞后数天，必须用 discovery（first_seen）过滤
     time_semantics: TimeSemantics = "event"
     endpoint: str = ""
+    # ★ HF 专用：实际请求端点（默认官方，可被镜像覆盖）。写成 ${ENV} 占位符。
+    hf_base_url: str = ""
+
+    def hf_url(self) -> str:
+        """HF 实际请求端点：优先 `hf_base_url`，回落 `endpoint`（兼容旧配置）。"""
+        return self.hf_base_url or self.endpoint
 
     def is_available(self, env: Mapping[str, str] | None = None) -> bool:
         """当前环境下该源是否应采集。"""

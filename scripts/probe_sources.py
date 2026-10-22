@@ -229,8 +229,11 @@ async def probe_arxiv_by_ids(client: HttpClient, ids: list[str], endpoint: str) 
 async def probe_hf_once(
     client: HttpClient, day: date, endpoint: str, label: str
 ) -> tuple[SourceProbeResult, list[PaperItem]]:
-    """对一个 HF 端点发一次真实请求（官方端点失败就是失败，不掩盖）。"""
-    url = f"{endpoint.rstrip('/')}/api/daily_papers"
+    """对一个 HF 端点发一次真实请求（官方端点失败就是失败，不掩盖）。
+
+    `endpoint` 是**完整端点**（含 `/api/daily_papers`），调用方负责拼好。
+    """
+    url = endpoint.rstrip("/")
     params = {"date": day.isoformat()}
     console.print(f"[cyan]→ HF/{label}[/] {url}?date={day.isoformat()}")
     result = SourceProbeResult(
@@ -281,22 +284,21 @@ async def probe_hf(
 
     ★ 镜像**不会**自动启用：不替用户决定镜像站。这里只在探测时显式指定，
     用于拿到真实的响应 schema 与条数（aipulse 已实测其 schema 与官方一致）。
+    ★ 官方端点失败 = 记 warning（本环境网络问题），**不是错误**、不改源分级。
     """
     results: list[SourceProbeResult] = []
     official_result, items = await probe_hf_once(client, day, official, "official")
-    if official_result.ok:
-        official_result.availability_reason = "官方开放 API，无需认证；本环境实测可达"
-    else:
-        official_result.availability = "actions_only"
-        official_result.availability_reason = (
-            "官方开放 API，无需认证；**本环境（本地 WSL）实测不可达**；"
-            "Actions 环境另测（ci.yml 的 probe job，结论见 `docs/开发日志.md`）"
-        )
+    # ★ availability 描述"源本身是否公开可用"，与"从某台机器能否访问"无关。
+    #   失败只记原因（网络问题，配 hf_base_url / --hf-mirror 可解），不改分级。
+    official_result.availability_reason = "官方开放 API，无需认证" + (
+        "；本环境实测可达" if official_result.ok else "；本环境实测不可达（网络问题，配镜像可解）"
+    )
     results.append(official_result)
     if not official_result.ok and mirror:
-        mirror_result, mirror_items = await probe_hf_once(client, day, mirror, "mirror")
+        mirror_url = f"{mirror.rstrip('/')}/api/daily_papers"
+        mirror_result, mirror_items = await probe_hf_once(client, day, mirror_url, "mirror")
         mirror_result.availability_reason = (
-            f"用户显式指定的备用基址 `{mirror}`（探测用；schema 与官方一致）；本环境实测可达"
+            f"用户显式指定的备用端点 `{mirror_url}`（探测用；schema 与官方一致）；本环境实测可达"
         )
         results.append(mirror_result)
         items = mirror_items
@@ -336,32 +338,45 @@ def render_markdown(
 
     lines.append("## 1. 实测规模（★ 后续所有体积估算的唯一输入）")
     lines.append("")
+    lines.append("口径链条（每一步剩余条数，可审计）：")
+    lines.append("")
+    lines.append(
+        f"> arXiv total → arXiv 去版本号去重 → 并集（+HF）→ 领域过滤 → N_enter\n"
+        f"> `{stats['arxiv_total']}` → `{stats['n_arxiv']}` → `{stats['union']}`"
+        f"（= {stats['n_arxiv']} + {stats['n_hf']} − 交集 {stats['shared']}）"
+        f" → `{stats['n_enter']}`（领域过滤掉 {stats['filtered_out']}）"
+    )
+    lines.append("")
     lines.append("| 量 | 值 | 口径 |")
     lines.append("|---|---|---|")
     lines.append(
         f"| N_arxiv | {stats['n_arxiv']} | arXiv 当日（cs.AI OR cs.CL OR cs.LG，"
-        f"submittedDate 精确框定 {day.isoformat()}）去重后的条数 |"
+        f"submittedDate 精确框定 {day.isoformat()}）去版本号去重后的条数（单日，非窗口） |"
     )
     lines.append(f"| N_hf | {stats['n_hf']} | HF Daily Papers 当日上榜条数 |")
     lines.append(
-        f"| N_enter | {stats['n_enter']} | 两源合并去重后，经领域过滤（watchlist 命中，"
+        f"| 两源交集 | {stats['shared']} | HF 上榜论文里 arXiv id 出现在「当天 arXiv 集合」的条数"
+        f"（★ 不是 id_list 全库回查） |"
+    )
+    lines.append(f"| 去重并集 U | {stats['union']} | `|arXiv ∪ HF|`（未做领域过滤） |")
+    lines.append(
+        f"| N_enter | {stats['n_enter']} | U 经领域过滤（watchlist 命中，"
         f"threshold={stats['threshold']}）**进入系统**的条数 |"
     )
-    lines.append(f"| 重叠率 | {stats['overlap_ratio']} | 任务卡口径 `N_enter / (N_arxiv + N_hf)` |")
+    lines.append(
+        f"| 去重后保留比例 | {stats['retention_ratio']} | `N_enter / (N_arxiv + N_hf)`，"
+        f"**不是重叠率**（重叠要看『两源交集』那一行） |"
+    )
     lines.append("")
-    lines.append("辅助口径（便于判断两源重叠程度，避免上面那个比值被领域过滤干扰）：")
+    lines.append("辅助口径：")
     lines.append("")
     lines.append("| 量 | 值 | 说明 |")
     lines.append("|---|---|---|")
-    lines.append(f"| 去重并集 U | {stats['union']} | `|arXiv ∪ HF|`（未做领域过滤） |")
-    lines.append(f"| 源重叠条数 | {stats['shared']} | HF 上榜中当天也在 arXiv 集合里的条数 |")
-    lines.append(
-        f"| 纯重叠率 | {stats['pure_overlap']} | `(N_arxiv + N_hf - U) / (N_arxiv + N_hf)` |"
-    )
     lines.append(f"| 领域过滤通过率 | {stats['filter_rate']} | `N_enter / U` |")
+    lines.append(f"| 领域过滤掉 | {stats['filtered_out']} | `U − N_enter`（未命中 watchlist） |")
     lines.append(
-        f"| HF 中来自 arXiv | {stats.get('hf_in_arxiv', '未获得')} | 按 arXiv id "
-        f"`id_list` 批量回查（★ 不是『同日交集』） |"
+        f"| HF 中来自 arXiv（全库） | {stats.get('hf_in_arxiv', '未获得')} | 按 arXiv id "
+        f"`id_list` 批量回查**全库**（≠ 当天集合，见『两源交集』） |"
     )
     lines.append(f"| 上榜滞后 | {stats.get('lag', '未获得')} | HF 上榜日 − arXiv 提交日 |")
     lines.append("")
@@ -421,8 +436,11 @@ def render_markdown(
         lines.append(f"| `{r.name}` | `{r.availability}` | {r.availability_reason} |")
     lines.append("")
     lines.append(
-        "- `always`：本地与 Actions 都采。\n"
+        "- `always`：源本身公开可用，本地与 Actions 都采。\n"
         "- `actions_only`：本地跳过且**不计失败**，只在 `AI_SCHOLAR_ENV=actions` 时采集。\n"
+        "- ★ **不可达 ≠ 分级变化**：availability 描述『源本身是否公开可用』，"
+        "不是『从某台机器能不能访问』。本地 WSL 连不上官方 HF 是网络问题，"
+        "配 `hf_base_url`（镜像）即可解，分级仍是 `always`。\n"
         "- 本文件由**本地（WSL）**生成，`actions_only` 的源需另行在 Actions 验证："
         "`gh workflow run ci.yml`（ci.yml 的 probe job，手动触发，不回写仓库）。"
     )
@@ -431,12 +449,14 @@ def render_markdown(
     lines.append("## 4. 失效降级路径")
     lines.append("")
     lines.append(
-        "- **arXiv**：主端点 `http://export.arxiv.org/api/query`。"
+        "- **arXiv**：主端点 `https://export.arxiv.org/api/query`。"
         "失败时按 `SourceError` 记录 warning 并跳过该源，**不影响退出码**；"
         "不做『换个镜像站』的自动切换（不替用户决定镜像）。"
     )
     lines.append(
         "- **HF Daily Papers**：主端点 `https://huggingface.co/api/daily_papers`。"
+        "本地不可达是**网络环境问题**（配 `hf_base_url` / `--hf-mirror` 可解），"
+        "不可达只 warning + 跳过该源，**不计失败、不影响退出码**。"
         "某天无数据（空数组）属正常（节假日 / 索引滞后），记为 0 条并继续。"
     )
     lines.append(
@@ -497,7 +517,10 @@ async def main_async(args: argparse.Namespace) -> int:
         results.append(arxiv_result)
         samples["arxiv"] = arxiv_sample
 
-        hf_results, hf_items = await probe_hf(client, day, args.hf_base_url, args.hf_mirror)
+        hf_cfg = settings.source("hf_daily")
+        default_hf_url = hf_cfg.hf_url() if hf_cfg else "https://huggingface.co/api/daily_papers"
+        hf_url = args.hf_base_url or default_hf_url
+        hf_results, hf_items = await probe_hf(client, day, hf_url, args.hf_mirror)
         results.extend(hf_results)
         for r in hf_results:
             samples[r.name] = r.sample_excerpt
@@ -517,21 +540,23 @@ async def main_async(args: argparse.Namespace) -> int:
         lags.sort()
 
     notes: list[str] = []
+    arxiv_total = arxiv_result.item_count
     n_arxiv = len(dedup(arxiv_items))
     n_hf = len(dedup(hf_items))
     if not hf_items:
         notes.append(
-            "N_hf 未获得：HF Daily Papers 官方端点在本环境不可达（连接超时），"
-            "且未指定 `--hf-mirror`。下方 N_enter / 重叠率因此不含 HF 贡献。"
+            "N_hf 未获得：HF Daily Papers 官方端点在本环境不可达（网络问题），"
+            "且未指定 `--hf-mirror`。下方 N_enter / 保留比例因此不含 HF 贡献。"
         )
     elif args.hf_mirror and any(r.name.endswith("mirror") and r.ok for r in results):
         notes.append(
-            f"N_hf 与 HF 字段表取自备用基址 `{args.hf_mirror}`（官方端点本环境不可达）；"
-            "其为官方数据的镜像，schema 一致，条数具有代表性。"
+            f"N_hf 与 HF 字段表取自备用端点 `{args.hf_mirror}/api/daily_papers`"
+            "（官方端点本环境不可达）；其为官方数据的镜像，schema 一致，"
+            "条数具有代表性，但**镜像可能有滞后**（非实时快照）。"
         )
-    if arxiv_result.item_count is not None and arxiv_result.item_count > n_arxiv:
+    if arxiv_total is not None and arxiv_total > n_arxiv:
         notes.append(
-            f"arXiv 总结果 {arxiv_result.item_count} 条，实际抓到（并去重）{n_arxiv} 条"
+            f"arXiv 总结果 {arxiv_total} 条，实际抓到（并去版本号去重）{n_arxiv} 条"
             f"（受 `--arxiv-max {args.arxiv_max}` 限制或分页中断）。"
         )
     union_items = dedup(arxiv_items + hf_items)
@@ -546,18 +571,18 @@ async def main_async(args: argparse.Namespace) -> int:
         "probe_utc": __import__("ai_scholar.utils.timeutil", fromlist=["utcnow"])
         .utcnow()
         .isoformat(timespec="seconds"),
+        "arxiv_total": arxiv_total if arxiv_total is not None else n_arxiv,
         "n_arxiv": n_arxiv,
         "n_hf": n_hf,
-        "n_enter": len(entered),
-        "union": len(union_items),
         "shared": shared,
+        "union": len(union_items),
+        "n_enter": len(entered),
+        "filtered_out": len(union_items) - len(entered),
         "threshold": watchlist.default_threshold,
-        "overlap_ratio": f"{(len(entered) / total_raw):.3f}"
+        # ★ 这是「去重后保留比例」，不是重叠率（定义写错过，这里更正）
+        "retention_ratio": f"{(len(entered) / total_raw):.3f}"
         if total_raw
         else "未获得（两源均无数据）",
-        "pure_overlap": f"{((total_raw - len(union_items)) / total_raw):.3f}"
-        if total_raw
-        else "未获得",
         "filter_rate": f"{(len(entered) / len(union_items)):.3f}" if union_items else "未获得",
         "notes": notes,
     }
@@ -583,10 +608,11 @@ async def main_async(args: argparse.Namespace) -> int:
     out_path.write_text(render_markdown(day, results, samples, stats), encoding="utf-8")
 
     console.print("\n[bold]实测规模[/]")
-    console.print(f"  N_arxiv  = {stats['n_arxiv']}")
+    console.print(f"  N_arxiv  = {stats['n_arxiv']}（total {stats['arxiv_total']}）")
     console.print(f"  N_hf     = {stats['n_hf']}")
-    console.print(f"  N_enter  = {stats['n_enter']}")
-    console.print(f"  重叠率    = {stats['overlap_ratio']}  （纯重叠率 {stats['pure_overlap']}）")
+    console.print(f"  两源交集  = {stats['shared']}")
+    console.print(f"  N_enter  = {stats['n_enter']}（领域过滤掉 {stats['filtered_out']}）")
+    console.print(f"  去重后保留比例 = {stats['retention_ratio']}")
     console.print(f"\n[green]✓[/] 已写入 {out_path}")
     return 0
 
@@ -598,8 +624,8 @@ def main() -> int:
     parser.add_argument("--out", default="docs/数据源手册.md", help="输出 Markdown 路径")
     parser.add_argument(
         "--hf-base-url",
-        default="https://huggingface.co",
-        help="HF Daily Papers 基址（默认官方）",
+        default=None,
+        help="HF Daily Papers 完整端点（默认取 config 的 sources.hf_daily.hf_base_url）",
     )
     parser.add_argument(
         "--hf-mirror",

@@ -178,7 +178,10 @@ def doctor(
 
         def endpoint_of(name: str) -> str:
             cfg = settings.source(name)
-            return cfg.endpoint if cfg else ""
+            if cfg is None:
+                return ""
+            # HF 用 hf_base_url（默认官方，可被镜像覆盖）；arXiv 用 endpoint
+            return cfg.hf_url() if name == "hf_daily" else cfg.endpoint
 
         day = today_local().isoformat()
         checks: list[tuple[str, str, dict[str, str], str]] = [
