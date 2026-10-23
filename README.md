@@ -9,7 +9,7 @@ AI 文献的 **采集 → 关联 → 推演 → 沉淀**，外加**论文深度�
 
 - 许可证：**MIT**（只管代码，不管数据 —— 数据署名见文末）
 - 姊妹项目：[aipulse](https://github.com/tochikoma777/aipulse)（三档模式 / 三级降级 / 静默失败治理 全盘继承）
-- 当前阶段：**L0-C**（Obsidian 导出器 + `list`）—— 已完成
+- 当前阶段：**L1-0**（vault 迁出 + 双仓库防护）—— 已完成
 
 ---
 
@@ -32,7 +32,7 @@ uv sync                    # 安装依赖（含 dev）
 uv run ai-scholar init      # 建目录骨架 + 生成 config/watchlist.local.yaml + .env 骨架
 uv run ai-scholar doctor    # 环境体检（★ 没配 LLM key 也全绿，自动降级 off，退出码 0）
 uv run ai-scholar collect   # 采集（默认回看 7 天，见下）
-uv run ai-scholar export    # 生成 vault（默认 20 篇）
+uv run ai-scholar export    # 生成 vault（默认 ~/projects/ai-scholar-vault，20 篇）
 ```
 
 `doctor` 会打出一张体检表：Python 版本 / LLM 配置 / 代理 / 磁盘 / watchlist / 各数据源连通性。
@@ -50,7 +50,8 @@ AI_SCHOLAR_LLM__API_KEY=sk-...
 ### 第一个 vault 在哪？
 
 ```bash
-uv run ai-scholar export --out ~/vaults/ai-scholar   # 默认 ./vault，默认导出 20 篇
+uv run ai-scholar export --out /tmp/vault-preview   # 默认 ~/projects/ai-scholar-vault，20 篇
+uv run ai-scholar export --check                    # 只比对不写盘：无变更退出 0，有变更退出 1
 uv run ai-scholar list                              # 看库内条目（★ = watchlist 命中）
 ```
 
@@ -58,11 +59,15 @@ uv run ai-scholar list                              # 看库内条目（★ = wa
 那是**示例 vault**（合成数据，frontmatter 标了 `example: true`），
 演示导出物的完整形态：frontmatter / 标记块 / 用户笔记区。
 
-- 导出目标目录由 `--out` 指定，**默认 `./vault`**。
+- 导出目标目录由 `--out` 指定，**默认 `~/projects/ai-scholar-vault`**（配置项 `export.out_dir`，
+  只准 `~/` 开头）；`--out` 落在代码仓库内会被**直接拒绝**（含 `example_vault/`）。
 - ★ **默认不是全量导出**（§5.6：年增 18.8 万篇会让 Obsidian 不可用）；
   用 `--limit` / `--ids` / `--since` 圈定范围。
 - ★ **vault 是独立的 private 仓库**，与本项目**物理隔离**：本仓库的 CI 只会 commit public 资产，
   vault 由你本地 `export` 写入，里面是你的笔记。
+- ★ **vault 用 git 就不要再叠加 Obsidian Sync / iCloud** —— 两套同步会互相覆盖。
+- ★ 真 vault 不在代码仓库的版本控制里，`git diff` 看不到它 ⇒ 用 `export --check` 验证幂等
+  （比对范围：文献笔记 + `00-首页.md` + `links.json`；`生成报告.md` 是运行日志，允许 diff）。
 - 导出物是**合成文档**：条目元信息 + why + 你的笔记；正文用 `<!-- BEGIN/END GENERATED -->` 标记块保护，
   **生成区之外的内容永不覆盖**。
 
@@ -125,6 +130,7 @@ groups:
 - [x] **L0-A** 仓库骨架 + 配置层（三档模式 / `${ENV}` 插值）+ watchlist 双文件 + 数据源探测
 - [x] **L0-B** DB schema（SQLModel + Alembic）+ arXiv / HF 采集器 + 三级去重 + `first_seen`
 - [x] **L0-C** Obsidian 导出器（标记块 / frontmatter 合并 / 文件名清洗 / 原子写入）+ `list`
+- [x] **L1-0** vault 迁出（独立 **private** 仓库）+ 双仓库五条防护 + `export --check` + 报告秒级时间
 - [ ] **L1** 关联层：Semantic Scholar 引用边（★ 只走 `POST /graph/v1/paper/batch`）
 - [ ] **L2** 推演层：LLM 三档（off / fast / strong）+ 预算护栏 + 结果持久化
 - [ ] **L3** 沉淀层增强：主题 MOC（`20-主题/`）+ Daily Note（`40-日志/`）+ 六段深度分析正文

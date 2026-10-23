@@ -1,5 +1,7 @@
 # CODEBUDDY.md
 
+This file provides guidance to CodeBuddy Code when working with code in this repository.
+
 > 本文件指导 CodeBuddy 在本仓库中工作。
 > ★ 项目负责人提供初稿，Agent 后续维护（可补充命令、目录、阶段状态）。
 > ★ 若本文件与当前任务卡冲突，**以任务卡为准**。
@@ -7,12 +9,14 @@
 
 ---
 
-## ★ 当前阶段：L0-C（Obsidian 导出器 + list）—— 已完成
+## ★ 当前阶段：L1-0（vault 迁出 + 双仓库防护）—— 已完成
 
-已完成：`data/ai_scholar.db` 六张表、arXiv + HF 采集器 + 三级去重 + `first_seen.jsonl`
-（L0-B）；**Obsidian 导出器**（标记块 / frontmatter 读-合并-写回 / 文件名清洗 /
-双轨关联渲染 / 原子写入）+ `list`（★ 命中标记）（L0-C）。
-五个子命令全部实现，无占位。示例 vault 见 `example_vault/`。
+vault 已迁到 **`~/projects/ai-scholar-vault/`**（独立 private 仓库），
+`export.out_dir` 只准 `~/` 开头；新增 `export --check` 把幂等变成可断言检查；
+`生成报告.md` 恢复秒级时间（运行日志允许 diff）。
+
+上一阶段：L0-B（DB + 采集 + 三级去重 + `first_seen`）、L0-C（Obsidian 导出器 + `list`）。
+下一阶段（**未开始**）：L1-A Semantic Scholar 关联。
 
 `docs/设计方案.md` 与 `docs/执行手册.md` 由项目负责人维护，**Agent 只读**；
 当前阶段以任务卡为准。
@@ -36,6 +40,78 @@
 
 ---
 
+## 架构总览（★ 跨文件才看得懂的部分）
+
+```
+cli.py (typer)
+├─ collect ─→ pipeline/collect.py ─┬─ collectors/arxiv.py ─┐
+│                                 └─ collectors/hf.py ────┴→ RawPaper
+│                                    └→ store/hash.py · first_seen.py · models.py
+└─ export/list ─→ pipeline/export.py ─→ export/obsidian.py（db → Markdown）
+
+横切层：config.py（YAML + ${ENV} + watchlist 合并） · utils/http.py（唯一网络出口）
+```
+
+分层规则（违反就会重新引入已踩过的坑）：
+
+- **collectors 只产出 `RawPaper`**，不碰 DB、不碰 watchlist。新增数据源 = 一个 collector
+  函数 + `base.py` 里的源常量，去重与入库逻辑不用动。
+- **pipeline 是唯一的编排层**：事务、单源隔离、汇总报告都在这里。collector 抛的异常
+  在此转成 `degraded`，不得外泄成非零退出码。
+- **export 是单向物化**：db → Markdown。禁止从 vault 反读并回写 db。
+- **一切 HTTP 走 `utils/http.py:HttpClient.request`**（令牌桶限速 / 重试 / UA / 代理）。
+  测试靠 respx 拦截；off 档断言"0 请求"依赖这一唯一出口。
+- **配置只从 `config/*.yaml` + `.env` 读**，代码内不硬编码阈值；环境开关必须 `${ENV}`。
+
+### 两条主线的关键路径
+
+**collect** — `pipeline/collect.py:259 run_collect`
+
+1. `_days_back(days)` 逐日抓取（arXiv 按 `submittedDate` 精确框定并翻页；HF 按 `date`）。
+2. `canonical_id_for` → `_resolve_via_alias` → `upsert_paper`。三级去重：
+   ① 归一化主键（arXiv id 剥版本号 / DOI 小写）
+   ② 跨源（HF 只补 `hf_score`，不覆盖元数据、不新增条目）
+   ③ 跨版本（`paper_aliases` 指向 canonical，别名不产生新条目）。
+3. 新条目先 `first_seen.append`（先查后写，已有跳过）→ **db 里的 `first_seen_at` 只是缓存**。
+4. 每次采集写一行 `runs`，降级原因进 `degraded_json`。
+
+**export** — `pipeline/export.py:96 run_export`
+
+1. `select_papers` 圈定范围（`--limit` / `--ids` / `--since`，**默认 20 篇，不是全量**）。
+2. `ObsidianExporter.render`：读旧文件 → frontmatter 读-合并-写回（`USER_KEYS` / `OBSERVED_KEYS`）
+   → 生成区内容不变则保留 `content_rev_at`。
+3. `Exporter.write` 原子写（`.tmp` + `os.replace`），避免 Obsidian 读到半截文件。
+4. 收尾写 `00-首页.md` / `90-元数据/生成报告.md` / `90-元数据/links.json`。
+
+### 模块地图
+
+| 路径 | 职责 | 关键点 |
+|---|---|---|
+| `cli.py` | 五个子命令 + `doctor` 体检 | 退出码：正常恒 0、`ConfigError` 1、参数错误 2 |
+| `config.py` | YAML 加载、`${ENV}` 插值、watchlist 双文件合并、`Settings` | `load_settings` 带 `lru_cache`；环境变量前缀 `AI_SCHOLAR_`，嵌套分隔 `__` |
+| `models.py` | pydantic 域模型：`WatchlistConfig` / `Availability` / `TimeSemantics` | **与 `store/models.py` 不是一回事** |
+| `collectors/base.py` | `RawPaper` 统一中间表示 | 只有元数据，**没有正文字段** |
+| `pipeline/collect.py` | 编排、三级去重、upsert、`runs` | 源码级禁止 import watchlist |
+| `store/hash.py` | 主键归一化 + `content_hash` | hash 只含 title/abstract/authors/venue |
+| `store/first_seen.py` | `first_seen.jsonl` 读写 | append-only，绝不覆盖已有 id |
+| `store/models.py` | 六张 SQLModel 表 | 时间字段一律 TEXT ISO-8601 UTC |
+| `export/base.py` | `Exporter` ABC + 原子写 | 不为"将来"加 Registry / 插件机制 |
+| `export/obsidian.py` | 标记块、frontmatter 合并、双轨链接渲染 | 标记块注释里**不能有时间戳** |
+| `utils/http.py` | 限速 / 重试 / 代理 / UA | 只重试 408/425/429/5xx 与超时 |
+| `utils/timeutil.py` | UTC 工具 + 三态时间语义 | 代码内取"现在"只用 `utcnow()` |
+
+### 配置与路径解析
+
+- `project_root()` = 仓库根，可被 `AI_SCHOLAR_ROOT` 覆盖（测试用它指向 `tmp_path`）。
+- 数据路径全部由 `Settings` 派生：`data_dir()` / `db_path()`；`first_seen.jsonl` 在 `data_dir()` 下。
+- `export.out_dir` 默认 `~/projects/ai-scholar-vault`（`expanduser`）；`--out` 的相对路径按
+  仓库根解析，且最终必须落在仓库**之外**，否则抛 `UnsafeOutputPath`（含 `example_vault/`）。
+- `load_settings()` 先 `load_dotenv(override=False)` 再插值：不这么做，写进 `.env` 的 key 读不到
+  （`Settings(**yaml)` 的 init 参数优先级高于 `env_file`）。
+- watchlist 合并：`watchlist.local.yaml` 的**同名组整组覆盖** `watchlist.yaml`，不做逐字段合并。
+
+---
+
 ## ★ 数据落点（判断"数据在哪"先看这张表）
 
 | 数据 | 可再生？ | 落点 | 入库？ |
@@ -44,7 +120,7 @@
 | **`first_seen_at`**（首次见到它的日期） | ❌ | `data/first_seen.jsonl` | **✓ public** |
 | **signals 时序快照**（被引增长曲线） | ❌ | `data/signals/YYYY-MM.jsonl` | **✓ public** |
 | 每日报告 md + json | ✅ | `data/reports/YYYY-MM-DD.{md,json}` | **✓ public** |
-| 用户笔记 | ❌ | **独立 private vault 仓库** | ✗（不进本仓库） |
+| 用户笔记 | ❌ | **独立 private vault 仓库**：`~/projects/ai-scholar-vault/` | ✗（不进本仓库） |
 | 论文正文 / 全文 | — | **永不入库**（临时抓取、抓完即弃） | ❌ 绝对禁止 |
 | `config/watchlist.local.yaml` | — | 本地（配置洁癖：不该让别人 clone 到你的兴趣清单） | ✗ |
 
@@ -154,17 +230,20 @@ uv run ai-scholar doctor         # 环境体检（无 key 时提示降级 off，
 uv run ai-scholar collect [--days N] [--source arxiv|hf_daily] [--dry-run]
                                  # 采集（默认回看 sources.arxiv.lookback_days=7 天）
 uv run ai-scholar export [--limit N] [--ids a,b] [--since DATE] [--out PATH]
-                                 # 导出 vault（★ 默认 20 篇，不是全量）
+                                 # 导出 vault（★ 默认 ~/projects/ai-scholar-vault，20 篇）
+uv run ai-scholar export --check # 只比对不落盘：无变更退出 0，有变更退出 1（幂等验收）
 uv run ai-scholar list [--limit N] [--since DATE] [--watchlist-only]
                                  # ★ = watchlist 命中（只做展示筛选）
 uv run alembic upgrade head      # 建库（★ 空 data/ 目录也能跑）
 
 uv run python scripts/probe_sources.py        # 数据源探测（需联网，产出 docs/数据源手册.md）
 
-uv run pytest                    # 全量
-uv run pytest -k "config or watchlist" -q     # 按关键字筛
+uv run pytest                    # 全量（respx mock，不打真实网络）
+uv run pytest tests/test_export.py -q          # 单文件
+uv run pytest tests/test_export.py::test_note_name_has_date_prefix_and_short_hash -q   # 单条
+uv run pytest -k "config or watchlist" -q      # 按关键字筛
 uv run ruff check . && uv run ruff format --check .
-uv run mypy src/ai_scholar
+uv run mypy src/ai_scholar       # strict，cli.* 与 utils.* 有放宽
 ```
 
 ---
@@ -175,15 +254,30 @@ uv run mypy src/ai_scholar
 |---|---|
 | `config.py` · `config/*.yaml` | `pytest -k config`（★ 断言"实际收到的值"，不是"加载成功"） |
 | watchlist 加载 | `pytest -k watchlist` + `git ls-files \| grep watchlist.local`（必须为空） |
-| `utils/http.py` | `pytest -k http` + `pytest -k respx`（off 档断言 0 请求） |
+| `utils/http.py` | `pytest -k http`（★ 断言实际发出的请求数；off 档为 0） |
 | `scripts/probe_sources.py` | 实跑一次 + 检查 `docs/数据源手册.md`；不可达时确认是 skip 不是伪造 |
 | `cli.py` | `pytest -k cli` + `uv run ai-scholar --help` |
 | `store/hash.py`（content_hash） | `pytest -k content_hash`（★ 三条硬约束） |
 | `store/first_seen.py` | `pytest -k first_seen`（append-only / 幂等） |
 | `pipeline/collect.py` | `pytest -k collect` + 实跑 `ai-scholar collect --days 2` |
-| `export/obsidian.py` | `pytest -k export`（★ 连续两次导出无 diff） |
+| `export/obsidian.py` | `pytest -k export`（★ 连续两次导出无 diff，报告除外） |
+| `pipeline/export.py`（路径校验 / `--check`） | `pytest -k export` + 实跑 `ai-scholar export --check`（应退出 0） |
 | `cli.py` 的 `export`/`list` | `pytest -k cli` + 实跑一次看 vault |
 | **任何涉及 LLM 路径的改动** | 上面全绿也不算数 —— 配 key 实跑一次 |
+
+---
+
+## 测试约定
+
+- `pytest-asyncio` 是 `asyncio_mode = "auto"`：async 测试**不需要**加 `@pytest.mark.asyncio`。
+- `tests/conftest.py` 的两个 autouse fixture 是测试可复现的前提：
+  清 `load_settings` 缓存、把 `load_dotenv` 打桩并 `chdir(tmp_path)`。
+  **不要绕过它们**，否则本地有 `.env` 时会出现"本地失败、CI 通过"。
+- 网络一律 respx 拦截；`test_live_arxiv_parse` / `test_live_hf_parse_may_skip` 是联网冒烟，
+  失败/跳过不代表 CI 红。
+- 断言要落在**实际收到的值**上（如 `settings.llm.base_url`），不是"加载成功"。
+- CI：`ubuntu-24.04` 固定，`lint-and-test` **不读任何 secrets**；`probe` 仅在
+  `workflow_dispatch` 下实跑数据源探测，不回写仓库。
 
 ---
 
