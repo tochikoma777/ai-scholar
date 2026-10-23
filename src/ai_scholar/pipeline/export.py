@@ -24,10 +24,10 @@ from ai_scholar.config import (
     project_root,
     watchlist_paths,
 )
-from ai_scholar.export.base import ExportContext, ExportDoc
+from ai_scholar.export.base import ExportContext, ExportDoc, LinkRef
 from ai_scholar.export.obsidian import ObsidianExporter, note_name
 from ai_scholar.store.db import default_db_path
-from ai_scholar.store.models import Paper, Run
+from ai_scholar.store.models import Paper, PaperLink, Run
 from ai_scholar.utils.errors import UnsafeOutputPath
 from ai_scholar.utils.timeutil import utcnow
 
@@ -74,6 +74,55 @@ def ensure_outside_repo(path: Path, *, root: Path | None = None) -> None:
             f"vault 输出目录不得位于代码仓库内：{path}。"
             "请用 `export.out_dir` / `--out` 指向仓库外（默认 ~/projects/ai-scholar-vault）。"
         )
+
+
+def load_link_refs(
+    session: Session, paper_ids: list[str]
+) -> tuple[dict[str, list[LinkRef]], dict[str, list[LinkRef]]]:
+    """取选集内论文的**出边 / 入边**（★ 方向语义见 `pipeline/enrich.py`）。
+
+    - 出边 `(A → B)` = A 引用了 B：查 `src_id`
+    - 入边 `(B → A)` = B 引用了 A：查 `dst_id`（**不单独存储**，反向查询得到）
+    """
+    out_map: dict[str, list[LinkRef]] = {pid: [] for pid in paper_ids}
+    in_map: dict[str, list[LinkRef]] = {pid: [] for pid in paper_ids}
+    if not paper_ids:
+        return out_map, in_map
+
+    out_rows = list(
+        session.exec(select(PaperLink).where(col(PaperLink.src_id).in_(paper_ids))).all()
+    )
+    in_rows = list(
+        session.exec(select(PaperLink).where(col(PaperLink.dst_id).in_(paper_ids))).all()
+    )
+    papers = {
+        p.id: p
+        for p in session.exec(
+            select(Paper).where(
+                col(Paper.id).in_({r.dst_id for r in out_rows} | {r.src_id for r in in_rows})
+            )
+        ).all()
+    }
+
+    def to_ref(pid: str, link: PaperLink) -> LinkRef:
+        target = papers.get(pid)
+        return LinkRef(
+            paper_id=pid,
+            title=(target.title if target else pid),
+            url=(target.url if target else None),
+            link_type=link.link_type,
+            weight=link.weight,
+            evidence=link.evidence,
+            published_at=(target.published_at if target else None),
+        )
+
+    for row in out_rows:
+        if row.src_id in out_map:
+            out_map[row.src_id].append(to_ref(row.dst_id, row))
+    for row in in_rows:
+        if row.dst_id in in_map:
+            in_map[row.dst_id].append(to_ref(row.src_id, row))
+    return out_map, in_map
 
 
 def _file_matches(path: Path, content: str) -> bool:
@@ -168,7 +217,10 @@ def run_export(
     SQLModel.metadata.create_all(engine)
 
     effective_limit = limit if limit is not None else settings.export.default_limit
-    exporter = ObsidianExporter(filename_max_len=settings.export.filename_max_len)
+    exporter = ObsidianExporter(
+        filename_max_len=settings.export.filename_max_len,
+        links_max_per_section=settings.export.links_max_per_section,
+    )
 
     docs: list[ExportDoc] = []
     with Session(engine) as session:
@@ -179,6 +231,20 @@ def run_export(
         # ★ 双轨渲染索引：本次导出的论文才有 vault 笔记；其余目标只给文本 + 外链
         note_index = {p.id: note_name(p, max_len=settings.export.filename_max_len) for p in papers}
 
+        # ★ 关联边（出边 / 入边）→ 渲染用 LinkRef
+        out_map, in_map = load_link_refs(session, [p.id for p in papers])
+        target_ids = {
+            ref.paper_id
+            for refs in [*out_map.values(), *in_map.values()]
+            for ref in refs
+            if ref.paper_id not in note_index
+        }
+        if target_ids:
+            # ★ 目标有没有笔记，看 db 里上次导出回填的 note_path（不扫目录）
+            for target in session.exec(select(Paper).where(col(Paper.id).in_(target_ids))).all():
+                if target.note_path:
+                    note_index[target.id] = Path(target.note_path).stem
+
         report.degraded.update(_watchlist_degraded())
         report.degraded.update(_hf_degraded(session))
 
@@ -188,12 +254,19 @@ def run_export(
                 llm_mode=report.llm_mode,
                 vault_dir=vault_dir,
                 note_index=note_index,
+                out_links=out_map.get(paper.id, []),
+                in_links=in_map.get(paper.id, []),
                 watchlist_groups=hit.groups if hit.matched else [],
                 degraded=report.degraded,
             )
             content = exporter.render(paper, context)
             path = exporter.note_path(paper, context)
             docs.append(ExportDoc(path=path, content=content))
+            if not check:
+                # ★ 回填 vault 笔记相对路径（NULL = 无笔记）→ 下次导出的双轨渲染据此判断
+                rel = str(path.relative_to(vault_dir))
+                if paper.note_path != rel:
+                    paper.note_path = rel
 
         # links.json（本阶段空结构）
         docs.append(
@@ -202,6 +275,9 @@ def run_export(
                 content=exporter.render_links_json([]),
             )
         )
+
+        if not check:
+            session.commit()  # ★ note_path 回填要落库（双轨渲染的输入）
 
         # 00-首页.md
         index_context = ExportContext(llm_mode=report.llm_mode, vault_dir=vault_dir)

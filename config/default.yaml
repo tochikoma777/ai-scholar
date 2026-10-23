@@ -46,6 +46,8 @@ export:
   # ★ 默认导出条数：§5.6 明确否掉"默认全量"（年增 18.8 万篇会让 Obsidian 不可用）
   default_limit: 20
   filename_max_len: 80
+  # 「关联文献」每类（引用了 / 被引用）最多显示条数，超出显示"还有 X 篇"
+  links_max_per_section: 10
   # ★ vault 是独立 private 仓库，必须落在代码仓库之外。
   #   只准 `~/` 开头（程序 expanduser），禁止写死家目录绝对路径：
   #   ① 泄露用户名 ② 别人 clone 后路径不存在。
@@ -86,11 +88,20 @@ sources:
     # ★ 实际请求端点：默认官方，可被环境变量覆盖（填镜像基址）。★ 不要硬编码镜像。
     hf_base_url: ${AI_SCHOLAR_SOURCES__HF_DAILY__HF_BASE_URL:-https://huggingface.co/api/daily_papers}
 
-  # L1+ 才启用（引用 / 施引数据）。★ 必须走 POST /graph/v1/paper/batch，禁止逐篇 GET
+  # L1-A 启用（引用 / 施引数据）。★ 必须走 POST /graph/v1/paper/batch，禁止逐篇 GET
   semantic_scholar:
-    enabled: false
+    enabled: true
     availability: always
-    availability_reason: 公开 API；无 key 时限速较严，逐篇 GET 会直接被限流
+    availability_reason: 公开 API；无 key 限速很严（实测 429 频发），有 key 更稳
     rate_limit: 1/1s
     time_semantics: state
     endpoint: https://api.semanticscholar.org/graph/v1/paper/batch
+    # ★ 无 key 也能跑（自动降级，退出码 0）；有 key 才发 x-api-key 头
+    api_key: ${AI_SCHOLAR_S2_API_KEY}
+    # 每批 ids 上限 500；响应超限会自动降半重试（500 → 250 → 125）
+    batch_size: 500
+
+enrich:
+  # ★ 补齐队列：新论文在 S2 上可能尚未索引，查不到要**重试**，不能只查一次
+  max_attempts: 30
+  default_limit: 200

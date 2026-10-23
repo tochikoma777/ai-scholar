@@ -33,6 +33,7 @@ USER_SECTION_TITLE = "## 我的笔记"
 ILLEGAL_CHARS = re.compile(r'[\\/:*?"<>|]')
 MULTI_DASH = re.compile(r"-+")
 DEFAULT_MAX_LEN = 80
+DEFAULT_LINKS_MAX = 10  # 「关联文献」每类最多显示条数
 SCHEMA_VERSION = 1
 
 # frontmatter 中**由用户维护**的字段（生成时永不覆盖）
@@ -136,13 +137,44 @@ def render_link_line(ref: LinkRef, note_index: dict[str, str]) -> str:
     return f"- ★ {ref.title}（无笔记）— {url}"
 
 
+def _link_sort_key(ref: LinkRef, note_index: dict[str, str]) -> tuple[int, str, float]:
+    """★ 排序：有笔记的排前；同类内按 `published_at`、再按 `weight`。"""
+    return (1 if ref.paper_id in note_index else 0, ref.published_at or "", ref.weight or 0.0)
+
+
+def render_link_section(
+    title: str,
+    refs: list[LinkRef],
+    note_index: dict[str, str],
+    *,
+    max_items: int = DEFAULT_LINKS_MAX,
+    empty_hint: str = "（暂无）",
+) -> list[str]:
+    """渲染「关联文献」的一类（引用了 / 被引用）。★ 空态显式，不静默省略。"""
+    if not refs:
+        return [f"### {title}", empty_hint, ""]
+    ordered = sorted(refs, key=lambda r: _link_sort_key(r, note_index), reverse=True)
+    lines = [f"### {title}"]
+    lines += [render_link_line(ref, note_index) for ref in ordered[:max_items]]
+    if len(ordered) > max_items:
+        lines.append(f"（还有 {len(ordered) - max_items} 篇）")
+    lines.append("")
+    return lines
+
+
 class ObsidianExporter(Exporter):
     """把 db 里的论文物化成 Obsidian 笔记。"""
 
     name = "obsidian"
 
-    def __init__(self, *, filename_max_len: int = DEFAULT_MAX_LEN) -> None:
+    def __init__(
+        self,
+        *,
+        filename_max_len: int = DEFAULT_MAX_LEN,
+        links_max_per_section: int = DEFAULT_LINKS_MAX,
+    ) -> None:
         self.filename_max_len = filename_max_len
+        self.links_max_per_section = links_max_per_section
 
     # ── 路径 ────────────────────────────────────────────────────────────
     def note_path(self, paper: Paper, context: ExportContext) -> Path:
@@ -163,12 +195,21 @@ class ObsidianExporter(Exporter):
             # ★ 只打★，不决定是否导出（红线 9）
             stars = ", ".join(context.watchlist_groups)
             lines += ["", "## 命中", f"★ {stars}"]
-        lines += ["", "## 关联文献", "### 引用了"]
-        if context.links:
-            lines += [render_link_line(ref, context.note_index) for ref in context.links]
-        else:
-            lines += ["（暂无 — 关联数据在 L1 由 S2 填充）"]
-        lines += [""]
+        lines += ["", "## 关联文献"]
+        lines += render_link_section(
+            "引用了",
+            context.out_links,
+            context.note_index,
+            max_items=self.links_max_per_section,
+            empty_hint="（暂无 — 引用数据由 `ai-scholar enrich` 从 S2 采集）",
+        )
+        lines += render_link_section(
+            "被引用",
+            context.in_links,
+            context.note_index,
+            max_items=self.links_max_per_section,
+            empty_hint="（暂无 — 需等引用它的论文入库后由出边反向生成）",
+        )
         return "\n".join(lines)
 
     def _fields(self, paper: Paper, context: ExportContext) -> dict[str, object]:

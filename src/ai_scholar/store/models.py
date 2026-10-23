@@ -21,6 +21,17 @@ def _now() -> str:
     return utcnow().isoformat(timespec="seconds")
 
 
+# ── 常量（★ 方向语义与状态机集中定义，避免各处写字面量）─────────────────
+# `paper_links(src, dst, references)` 的语义固定为：**src 引用了 dst**
+LINK_TYPE_REFERENCES = "references"
+EVIDENCE_S2_REFERENCES = "s2_references"
+
+# 补齐队列状态（★ 复用 papers 表字段，不新建队列表）
+ENRICH_PENDING = "pending"
+ENRICH_DONE = "done"
+ENRICH_STALE = "stale"
+
+
 class Paper(SQLModel, table=True):
     """① 论文主表。
 
@@ -52,10 +63,18 @@ class Paper(SQLModel, table=True):
     doi: str | None = None
     primary_category: str | None = None
     categories_json: str | None = None
-    # ★ HF 社区热度信号 —— 只是信号，**不是身份依据**
+    # ★ 观测值（不进 content_hash，只存）：HF 热度信号
     hf_score: int | None = None
     citation_count: int | None = None  # 观测值，不进 hash
     refs_count: int | None = None
+    # ★ 导出后回填的 vault 笔记相对路径（NULL = 无笔记）。
+    #   双轨渲染靠它判断"目标有没有笔记"——扫目录每次 O(n) 且文件名含短 hash，不可靠。
+    note_path: str | None = None
+    # ★ 补齐队列（复用本表，不新建队列表）
+    enrich_state: str = ENRICH_PENDING
+    enrich_attempts: int = 0
+    enrich_last_at: str | None = None
+    enrich_error: str | None = None
     content_hash: str
     created_at: str = Field(default_factory=_now)
     updated_at: str = Field(default_factory=_now)

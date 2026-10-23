@@ -19,7 +19,7 @@ from ai_scholar.store.models import Paper
 
 @dataclass
 class LinkRef:
-    """一条关联（本阶段 `paper_links` 为空，结构先立好，L1 填数据）。"""
+    """一条关联（渲染用；数据来自 `paper_links`）。"""
 
     paper_id: str
     title: str
@@ -27,6 +27,7 @@ class LinkRef:
     link_type: str = "references"
     weight: float | None = None
     evidence: str | None = None  # ★ 可解释性：为什么关联
+    published_at: str | None = None  # 无笔记时的排序依据
 
 
 @dataclass
@@ -35,7 +36,9 @@ class ExportContext:
 
     llm_mode: str = "off"
     vault_dir: Path = Path("vault")
-    links: list[LinkRef] = field(default_factory=list)
+    # ★ 出边（我引用了谁）与入边（谁引用了我）**分开传** —— 方向错了整个关联图就错了
+    out_links: list[LinkRef] = field(default_factory=list)
+    in_links: list[LinkRef] = field(default_factory=list)
     # ★ 双轨渲染用：`paper_id -> 笔记名（不含 .md）`；不在其中的目标**不建空笔记**
     note_index: dict[str, str] = field(default_factory=dict)
     # ★ watchlist 命中组名（只打★与排序，**不决定是否导出**）

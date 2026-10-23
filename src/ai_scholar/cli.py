@@ -18,7 +18,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 from sqlalchemy import create_engine
-from sqlmodel import Session
+from sqlmodel import Session, col, select
 
 from ai_scholar import __version__
 from ai_scholar.config import (
@@ -381,6 +381,118 @@ def export(
         "说明：正文用标记块保护，`## 我的笔记` 区永不覆盖；"
         "导出时间（秒级）只进 `90-元数据/生成报告.md`。"
     )
+    raise typer.Exit(0)
+
+
+@app.command()
+def enrich(
+    limit: int | None = typer.Option(
+        None, "--limit", "-n", help="处理条数（默认 enrich.default_limit）"
+    ),
+    force: bool = typer.Option(False, "--force", help="忽略 enrich_state，重查全部"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="只统计，不写库"),
+) -> None:
+    """补齐引用：S2 batch → `paper_links` 出边（入边由反向查询得到）。
+
+    ★ 只写**库内目标**的边（库外目标只累加 `refs_count`，不产生幽灵条目）。
+    ★ 冷启动期边必然稀疏（§5.1b）—— 这是预期，不是失败。
+    ★ S2 失败只 warning（写进 degraded），**退出码仍为 0**。
+    """
+    from ai_scholar.pipeline.enrich import run_enrich
+
+    settings = load_settings()
+    effective = limit if limit is not None else settings.enrich.default_limit
+    report = asyncio.run(run_enrich(limit=effective, force=force, dry_run=dry_run))
+
+    table = Table(title=f"enrich · run {report.run_id}", title_justify="left")
+    table.add_column("项")
+    table.add_column("值")
+    table.add_row("本次处理论文", str(report.requested))
+    table.add_row("S2 命中（解析出 paperId）", str(report.fetched))
+    table.add_row("references 总条数", str(report.refs_seen))
+    table.add_row("其中命中库内论文", str(report.in_library_hits))
+    table.add_row("出边（新增）", str(report.out_links))
+    table.add_row("被引用条目（distinct dst）", str(report.cited_papers))
+    table.add_row("done / pending / stale", f"{report.done} / {report.pending} / {report.stale}")
+    console.print(table)
+    if report.degraded:
+        for key, reason in report.degraded.items():
+            console.print(f"[yellow]warning[/] {key}：{reason}")
+    console.print(
+        "说明：入边**不单独存储**（查 dst 即得）；库外被引目标不写边，只计入 refs_count。"
+    )
+    raise typer.Exit(0)
+
+
+def _titles_for(session: Session, ids: list[str]) -> dict[str, str]:
+    """id → 标题（`related` 展示用，避免只显示内部主键）。"""
+    from ai_scholar.store.models import Paper
+
+    if not ids:
+        return {}
+    rows = session.exec(select(Paper).where(col(Paper.id).in_(set(ids)))).all()
+    return {p.id: p.title for p in rows}
+
+
+@app.command()
+def related(paper_id: str) -> None:
+    """查看某篇论文的关联（★ 分「引用了」「被引用」两栏，用于人工验证方向）。
+
+    ★ 方向语义：`paper_links(src, dst, references)` == **src 引用了 dst**。
+      左边查 `src_id`，右边查 `dst_id`，两者必须互为反向。
+    """
+    from ai_scholar.store.models import LINK_TYPE_REFERENCES, Paper, PaperLink
+
+    settings = load_settings()
+    engine = create_engine(f"sqlite:///{settings.db_path()}", echo=False)
+    with Session(engine) as session:
+        paper = session.get(Paper, paper_id)
+        if paper is None:
+            console.print(f"[red]未知论文 id[/]：{paper_id}")
+            raise typer.Exit(2)
+
+        out_rows = list(
+            session.exec(
+                select(PaperLink).where(
+                    PaperLink.src_id == paper_id,
+                    PaperLink.link_type == LINK_TYPE_REFERENCES,
+                )
+            ).all()
+        )
+        in_rows = list(
+            session.exec(
+                select(PaperLink).where(
+                    PaperLink.dst_id == paper_id,
+                    PaperLink.link_type == LINK_TYPE_REFERENCES,
+                )
+            ).all()
+        )
+
+    titles = {}
+    with Session(engine) as session:
+        titles = _titles_for(session, [r.dst_id for r in out_rows] + [r.src_id for r in in_rows])
+
+    table = Table(
+        title=f"关联 · {paper.title[:60]}",
+        title_justify="left",
+        caption="★ 左栏 = 它引用了谁（出边）；右栏 = 谁引用了它（入边，反向查询得到）",
+    )
+    table.add_column(f"引用了（{len(out_rows)}）", max_width=60)
+    table.add_column(f"被引用（{len(in_rows)}）", max_width=60)
+    rows = max(len(out_rows), len(in_rows))
+    for i in range(rows):
+        left = ""
+        if i < len(out_rows):
+            dst = out_rows[i].dst_id
+            left = titles.get(dst, dst)
+        right = ""
+        if i < len(in_rows):
+            src = in_rows[i].src_id
+            right = titles.get(src, src)
+        table.add_row(left, right)
+    if rows == 0:
+        table.add_row("（暂无 — 冷启动期必然稀疏）", "（暂无 — 需等引用它的论文入库）")
+    console.print(table)
     raise typer.Exit(0)
 
 

@@ -123,6 +123,16 @@ class SourceSettings(BaseModel):
     endpoint: str = ""
     # ★ HF 专用：实际请求端点（默认官方，可被镜像覆盖）。写成 ${ENV} 占位符。
     hf_base_url: str = ""
+    # ★ S2 专用：无 key 也能跑（降级，不报错），有 key 才发 `x-api-key` 头
+    api_key: str = ""
+    # ★ S2 专用：batch 每批 ids 数（上限 500；超限会降半重试）
+    batch_size: int = 500
+
+    @field_validator("api_key", mode="before")
+    @classmethod
+    def _none_to_empty(cls, value: Any) -> Any:
+        """YAML 里 `${VAR}` 未设置时解析成 None（无 key 是**预期状态**），收敛成空串。"""
+        return "" if value is None else value
 
     def hf_url(self) -> str:
         """HF 实际请求端点：优先 `hf_base_url`，回落 `endpoint`（兼容旧配置）。"""
@@ -152,6 +162,8 @@ class ExportSettings(BaseModel):
 
     default_limit: int = 20
     filename_max_len: int = 80
+    # ★ 「关联文献」每类（引用了 / 被引用）最多显示条数，超出显示"还有 X 篇"
+    links_max_per_section: int = 10
     # ★ vault 是独立 private 仓库，默认落在代码仓库之外。
     #   只准 `~/` 开头：写死家目录绝对路径会① 泄露用户名 ② 别人 clone 后路径不存在。
     out_dir: str = "~/projects/ai-scholar-vault"
@@ -167,6 +179,15 @@ class CollectSettings(BaseModel):
     default_days: int = 7
     # 深度分析通道 A 的当日 Top N（★ 立刻执行，不看 Tier）
     deep_dive_top_n: int = 5
+
+
+class EnrichSettings(BaseModel):
+    """补齐队列参数（§3.3：新论文的引用数据要等 S2 索引，不能只查一次）。"""
+
+    # 单篇最多重试次数（超过 ⇒ 标 stale，不再重试）
+    max_attempts: int = 30
+    # 单次 `enrich` 处理的论文数上限（★ 每天数百篇 = 1~2 次 batch 请求）
+    default_limit: int = 200
 
 
 class Settings(BaseSettings):
@@ -185,6 +206,7 @@ class Settings(BaseSettings):
     budget: BudgetSettings = Field(default_factory=BudgetSettings)
     export: ExportSettings = Field(default_factory=ExportSettings)
     collect: CollectSettings = Field(default_factory=CollectSettings)
+    enrich: EnrichSettings = Field(default_factory=EnrichSettings)
     sources: dict[str, SourceSettings] = Field(default_factory=dict)
 
     def effective_mode(self) -> RunMode:

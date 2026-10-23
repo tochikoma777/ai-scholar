@@ -238,7 +238,7 @@ def test_link_render_does_not_create_empty_notes(tmp_path: Path) -> None:
     context = ExportContext(
         vault_dir=tmp_path,
         llm_mode="off",
-        links=[LinkRef("arXiv:2610.99999", "Target Without Note", "https://x.test")],
+        out_links=[LinkRef("arXiv:2610.99999", "Target Without Note", "https://x.test")],
     )
     text = exporter.render(paper, context)
     assert "Target Without Note" in text
