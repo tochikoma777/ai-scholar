@@ -9,15 +9,17 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 ---
 
-## ★ 当前阶段：L1-A（S2 关联：引用入库 + 补齐队列 + 双轨渲染）—— 已完成
+## ★ 当前阶段：L1-B（signals 采样 + 预筛 + 选集策略）—— 已完成
 
-S2 `paper/batch` 真实跑通（无 key 也能跑）；引用边写入 `paper_links`
-（★ 方向：`(src,dst,'references')` == **src 引用了 dst**，入边靠反向查询、**不单独存储**）；
-只存**库内目标**的边（库外只累加 `refs_count`）；补齐队列复用 `papers` 表字段；
-「关联文献」区已接真实数据（有笔记 `[[双链]]` / 无笔记 文本+外链）。
+- **采样状态机**（`papers.signal_state/signal_next_at/...`）：pending / ready（快路径）/ tracked /
+  dormant / sample，状态**持久化**、靠 `signal_next_at` 到期触发，不每日重算。
+- **零成本预筛**：只决定是否进 pending（`sample` / `rejected`），**不决定入库**。
+- **实测 `p`**：1.00（2174/2174，无 LLM），体积实测 ≈ **27.8 MB/年**（signals 78 B/行 + first_seen 77 B/行）。
+- **选集**：`papers.selected`；`export` 默认只导 selected，`--all` 才按 limit 导最新；
+  `mark <id>` 收藏；`export --check --all` 校验全量笔记。
 
-上一阶段：L1-0（vault 迁出 + 双仓库防护）。
-下一阶段（**未开始**）：L1-B（signals 采样状态机 / 预筛 / 实测 p）。
+上一阶段：L1-A（S2 引用关联 + 补齐队列 + 双轨渲染）。
+下一阶段（**未开始**）：L1-C（TF-IDF 语义相似 / 文献耦合 / 实体共现）。
 
 上一阶段：L0-B（DB + 采集 + 三级去重 + `first_seen`）、L0-C（Obsidian 导出器 + `list`）。
 下一阶段（**未开始**）：L1-A Semantic Scholar 关联。
@@ -97,6 +99,8 @@ cli.py (typer)
 | `collectors/base.py` | `RawPaper` 统一中间表示 | 只有元数据，**没有正文字段** |
 | `pipeline/collect.py` | 编排、三级去重、upsert、`runs` | 源码级禁止 import watchlist |
 | `pipeline/enrich.py` | 引用补齐：S2 → 出边 + 队列状态机 | ★ 方向语义固定为 src 引用 dst；入库前先写方向单测 |
+| `pipeline/prescreen.py` | 零成本预筛（规则负面排除） | ★ 只决定是否跟踪；`r` 是淘汰集留存率 |
+| `pipeline/signals.py` | 采样状态机 + signals 写入 + 月度 JSONL | ★ 状态持久化；两套时钟不可混用 |
 | `store/hash.py` | 主键归一化 + `content_hash` | hash 只含 title/abstract/authors/venue |
 | `store/first_seen.py` | `first_seen.jsonl` 读写 | append-only，绝不覆盖已有 id |
 | `store/models.py` | 六张 SQLModel 表 | 时间字段一律 TEXT ISO-8601 UTC |
@@ -213,6 +217,14 @@ vault 由本地 `export` 写入。任何"让 Actions 写 private vault"的设计
 15. ❌ **回采被引论文** —— 每篇引约 30 条 × 515 篇/天 ⇒ ≈1.5 万条/天（**564 万行/年**），库会失控。
 16. ★ **不得因"关联边很少"判定 L1-A 失败** —— 冷启动期引用关联**必然稀疏**
     （§5.1b：新论文引用的是库外老论文）；真正的冷启动主线是 L1-C 的语义相似。
+17. ❌ **采样状态每日重算** —— 状态必须持久化（`signal_state` / `signal_next_at`）。
+    新论文只在当天属于"新采集"，每日重算 ⇒ 只有 1 个快照 ⇒ C8 延迟定级被架空。
+18. ❌ **dormant 复活条件里带 age** —— 采样点 age 恒 ≥180 ⇒ 全量复活。
+    条件**只**是 `citation_count ≥ min_citations`，且**最多一次**。
+19. ❌ **两个时钟混用** —— 成熟度 = `published_at`（快路径 / 复活点）；观测窗口 = `first_seen`（90 天退出）。
+20. ❌ **预筛决定入库 / 把 `r` 当总体放行率** —— 预筛只决定"是否进 pending"；
+    `r=0.2` 是**淘汰集**抽样留存率（总量 = `N×p + N×(1-p)×r`）。
+21. ❌ **导出默认"最新 N 篇"** —— 默认只导 `selected=1`，否则每天 20 篇 = 7,300 篇/年（目标 300–500）。
 
 ---
 
@@ -242,9 +254,14 @@ uv run ai-scholar init           # 目录骨架 + watchlist.local.yaml + .env �
 uv run ai-scholar doctor         # 环境体检（无 key 时提示降级 off，退出码 0）
 uv run ai-scholar collect [--days N] [--source arxiv|hf_daily] [--dry-run]
                                  # 采集（默认回看 sources.arxiv.lookback_days=7 天）
-uv run ai-scholar export [--limit N] [--ids a,b] [--since DATE] [--out PATH]
-                                 # 导出 vault（★ 默认 ~/projects/ai-scholar-vault，20 篇）
+uv run ai-scholar export [--limit N] [--ids a,b] [--since DATE] [--out PATH] [--all]
+                                 # 导出 vault（★ 默认只导 selected=1；--all 导最新 N 篇）
 uv run ai-scholar export --check # 只比对不落盘：无变更退出 0，有变更退出 1（幂等验收）
+uv run ai-scholar export --check --all
+                                 # 校验**全量笔记**（磁盘上所有 .md，不只本次选集）
+uv run ai-scholar mark <paper-id> [--unmark]   # 显式收藏（决定是否生成笔记）
+uv run ai-scholar signals [--limit N] [--force] [--dry-run]
+                                 # 按时序状态机采样（signals 表 + data/signals/YYYY-MM.jsonl）
 uv run ai-scholar enrich [--limit N] [--force] [--dry-run]
                                  # 补查 S2 引用（★ 全程 batch，禁止逐篇 GET）
 uv run ai-scholar related <paper-id>
@@ -274,6 +291,7 @@ uv run mypy src/ai_scholar       # strict，cli.* 与 utils.* 有放宽
 | watchlist 加载 | `pytest -k watchlist` + `git ls-files \| grep watchlist.local`（必须为空） |
 | `utils/http.py` | `pytest -k http`（★ 断言实际发出的请求数；off 档为 0） |
 | `collectors/s2.py` · `pipeline/enrich.py` | `pytest -k enrich`（★ 方向三组 + 降半重试 + 队列状态机） |
+| `pipeline/signals.py` · `pipeline/prescreen.py` | `pytest -k signals`（★ 跨天/跨月时序 + 幂等） + `pytest -k prescreen` |
 | `scripts/probe_sources.py` | 实跑一次 + 检查 `docs/数据源手册.md`；不可达时确认是 skip 不是伪造 |
 | `cli.py` | `pytest -k cli` + `uv run ai-scholar --help` |
 | `store/hash.py`（content_hash） | `pytest -k content_hash`（★ 三条硬约束） |

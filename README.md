@@ -9,7 +9,7 @@ AI 文献的 **采集 → 关联 → 推演 → 沉淀**，外加**论文深度�
 
 - 许可证：**MIT**（只管代码，不管数据 —— 数据署名见文末）
 - 姊妹项目：[aipulse](https://github.com/tochikoma777/aipulse)（三档模式 / 三级降级 / 静默失败治理 全盘继承）
-- 当前阶段：**L1-A**（S2 关联：引用入库 + 补齐队列 + 双轨渲染）—— 已完成
+- 当前阶段：**L1-B**（signals 采样 + 预筛 + 选集策略）—— 已完成
 
 ---
 
@@ -32,8 +32,10 @@ uv sync                    # 安装依赖（含 dev）
 uv run ai-scholar init      # 建目录骨架 + 生成 config/watchlist.local.yaml + .env 骨架
 uv run ai-scholar doctor    # 环境体检（★ 没配 LLM key 也全绿，自动降级 off，退出码 0）
 uv run ai-scholar collect   # 采集（默认回看 7 天，见下）
-uv run ai-scholar export    # 生成 vault（默认 ~/projects/ai-scholar-vault，20 篇）
+uv run ai-scholar export    # 导出**已收藏**的论文（默认只导 selected；--all 导最新 N 篇）
 uv run ai-scholar enrich     # 补查 S2 引用（★ 全程 batch，无 key 也能跑）
+uv run ai-scholar signals    # 时序采样（★ 状态持久化，按到期采样，不每日全量重算）
+uv run ai-scholar mark arXiv:2610.30122      # 显式收藏（export 默认只导收藏的）
 uv run ai-scholar related arXiv:2610.30122   # 看某篇的关联（引用了 / 被引用 两栏）
 ```
 
@@ -134,8 +136,8 @@ groups:
 - [x] **L0-C** Obsidian 导出器（标记块 / frontmatter 合并 / 文件名清洗 / 原子写入）+ `list`
 - [x] **L1-0** vault 迁出（独立 **private** 仓库）+ 双仓库五条防护 + `export --check` + 报告秒级时间
 - [x] **L1-A** S2 引用关联：`paper/batch` → 出边入库 + 补齐队列 + 双轨渲染（`enrich` / `related`）
-- [ ] **L1-B** 信号采样（signals 状态机 / 预筛 / 实测 `p`）
-- [ ] **L1-C** 语义相似（TF-IDF，★ 冷启动期关联的主线）
+- [x] **L1-B** signals 采样状态机 + 零成本预筛 + `papers.selected` 选集（`signals` / `mark` / `--all`）
+- [ ] **L1-C** 语义相似（TF-IDF，★ 冷启动期关联的主线）+ 文献耦合
 - [ ] **L2** 推演层：LLM 三档（off / fast / strong）+ 预算护栏 + 结果持久化
 - [ ] **L3** 沉淀层增强：主题 MOC（`20-主题/`）+ Daily Note（`40-日志/`）+ 六段深度分析正文
       （vault 基础导出已在 **L0-C** 落地：标记块 / frontmatter 合并 / 原子写入）
