@@ -147,12 +147,22 @@ class SourceSettings(BaseModel):
         return list(self.source_extra("categories", []) or [])
 
 
+class ExportSettings(BaseModel):
+    """导出参数（★ 默认**不是**全量：§5.6 明确否掉，年增 18.8 万篇会撑爆 Obsidian）。"""
+
+    default_limit: int = 20
+    filename_max_len: int = 80
+    vault_dir: str = "vault"
+
+
 class CollectSettings(BaseModel):
     """采集层的规模参数（★ 改这些值必须回头回归依赖上下文长度的环节）。"""
 
     # 每日两源各取多少条原始数据
     arxiv_max_results: int = 200
     hf_days: int = 1
+    # ★ 默认回看天数的**兜底值**；实际优先取 `sources.arxiv.lookback_days`
+    default_days: int = 7
     # 深度分析通道 A 的当日 Top N（★ 立刻执行，不看 Tier）
     deep_dive_top_n: int = 5
 
@@ -171,6 +181,7 @@ class Settings(BaseSettings):
     http: HttpSettings = Field(default_factory=HttpSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)
     budget: BudgetSettings = Field(default_factory=BudgetSettings)
+    export: ExportSettings = Field(default_factory=ExportSettings)
     collect: CollectSettings = Field(default_factory=CollectSettings)
     sources: dict[str, SourceSettings] = Field(default_factory=dict)
 
@@ -194,6 +205,18 @@ class Settings(BaseSettings):
 
     def source(self, name: str) -> SourceSettings | None:
         return self.sources.get(name)
+
+    def lookback_days(self) -> int:
+        """默认回看窗口（天）：优先 `sources.arxiv.lookback_days`，回落 `collect.default_days`。
+
+        ★ 不硬编码：设计方案 §3.3 载明 arXiv 索引滞后 3–7 天，窗口要能按环境调。
+        """
+        arxiv = self.source("arxiv")
+        if arxiv is not None:
+            value = arxiv.source_extra("lookback_days")
+            if value is not None:
+                return int(value)
+        return self.collect.default_days
 
 
 def is_actions_env(env: Mapping[str, str] | None = None) -> bool:

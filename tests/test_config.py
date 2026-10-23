@@ -76,6 +76,27 @@ def test_sources_config_loaded_from_repo() -> None:
     assert settings.source("hf_daily") is not None
 
 
+def test_lookback_days_default_is_seven() -> None:
+    """★ 默认回看窗口 = 7 天（arXiv 索引滞后 3–7 天，取上限；见设计方案 §3.3）。"""
+    assert load_settings().lookback_days() == 7
+
+
+def test_lookback_days_reads_from_arxiv_source(tmp_path: Path) -> None:
+    """回看窗口写在 `sources.arxiv.lookback_days`，不硬编码在代码里。"""
+    cfg = tmp_path / "default.yaml"
+    cfg.write_text(
+        "collect:\n  default_days: 7\nsources:\n  arxiv:\n    lookback_days: 3\n",
+        encoding="utf-8",
+    )
+    assert load_settings(cfg).lookback_days() == 3
+
+
+def test_lookback_days_falls_back_when_absent(tmp_path: Path) -> None:
+    cfg = tmp_path / "default.yaml"
+    cfg.write_text("collect:\n  default_days: 5\n", encoding="utf-8")
+    assert load_settings(cfg).lookback_days() == 5
+
+
 def test_hf_availability_is_always() -> None:
     """★ HF 的 availability 描述"源本身是否公开可用"，必须 always（不能因本地网络不稳而降级）。"""
     hf = load_settings().source("hf_daily")

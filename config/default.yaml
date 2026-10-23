@@ -42,6 +42,12 @@ http:
   max_retries: 3
   user_agent: "ai-scholar/0.1 (+https://github.com/tochikoma777/ai-scholar)"
 
+export:
+  # ★ 默认导出条数：§5.6 明确否掉"默认全量"（年增 18.8 万篇会让 Obsidian 不可用）
+  default_limit: 20
+  filename_max_len: 80
+  vault_dir: vault
+
 collect:
   # ★ 单日实测 465 条（§12），200 会把当天截断 —— 取 600 留余量（3 页 × 1 req/3s）
   arxiv_max_results: 600
@@ -58,6 +64,12 @@ sources:
     # ★ 实测：http:// 会 301 且在本环境连接更慢，统一用 https
     endpoint: https://export.arxiv.org/api/query
     categories: [cs.AI, cs.CL, cs.LG]
+    # ★ 回看窗口（天）：设计方案 §3.3 载明 arXiv 索引滞后 3–7 天，取上限才安全。
+    #   实测同一日期 10-21 探测 362 → 10-22 探测 465（隔一天仍增长 28%），
+    #   只看"当天"会系统性漏采。
+    #   窗口加宽后 HF（滞后 2~4 天）能解析到其 arXiv 原始条目 ⇒ 跨源去重率上升。
+    #   重复扫描不产生重复条目：first_seen.jsonl append-only + papers upsert 兜住。
+    lookback_days: 7
 
   hf_daily:
     enabled: true

@@ -1,8 +1,7 @@
 """CLI 入口。
 
 五个子命令：`init` / `doctor` / `collect` / `export` / `list`。
-★ `collect` / `export` / `list` 在 L0-A 是**刻意占位**（`NotImplementedError`），
-它们的 `--help` 必须可见，实现留给后续阶段（L0-B 起）。
+L0-B 实现 `collect`；L0-C 实现 `export` / `list`。
 """
 
 from __future__ import annotations
@@ -10,17 +9,21 @@ from __future__ import annotations
 import asyncio
 import shutil
 import sys
+from datetime import date
 from pathlib import Path
 
 import httpx
 import typer
 from rich.console import Console
 from rich.table import Table
+from sqlalchemy import create_engine
+from sqlmodel import Session
 
 from ai_scholar import __version__
 from ai_scholar.config import (
     load_settings,
     load_watchlist,
+    match_watchlist,
     project_root,
     watchlist_paths,
 )
@@ -216,13 +219,16 @@ def doctor(
 # ── 以下子命令为 L0-A 的**刻意占位** ──────────────────────────────────────
 @app.command()
 def collect(
-    days: int = typer.Option(1, "--days", "-d", help="回溯天数（按天查 submittedDate）"),
+    days: int | None = typer.Option(
+        None, "--days", "-d", help="回溯天数（默认取 sources.arxiv.lookback_days）"
+    ),
     source: str | None = typer.Option(None, "--source", "-s", help="只采一个源：arxiv | hf_daily"),
     dry_run: bool = typer.Option(False, "--dry-run", help="只统计，不写库 / 不写 JSONL"),
 ) -> None:
     """采集：arXiv + HF Daily Papers → 三级去重 → 入库 + `first_seen.jsonl`。
 
     ★ 单源失败只 warning（写进 `runs.degraded_json`），**退出码仍为 0**。
+    ★ 默认回看窗口取 `sources.arxiv.lookback_days`（索引滞后 3–7 天，只采当天会漏采）。
     """
     from ai_scholar.pipeline.collect import run_collect
 
@@ -230,7 +236,9 @@ def collect(
         console.print(f"[red]未知源[/]：{source}（可选 arxiv / hf_daily）")
         raise typer.Exit(2)
 
-    report = asyncio.run(run_collect(days=days, source=source, dry_run=dry_run))
+    settings = load_settings()
+    effective_days = days if days is not None else settings.lookback_days()
+    report = asyncio.run(run_collect(days=effective_days, source=source, dry_run=dry_run))
 
     table = Table(
         title=f"collect · run {report.run_id}" + ("（dry-run）" if dry_run else ""),
@@ -267,21 +275,101 @@ def collect(
 
 @app.command()
 def export(
-    out: Path = typer.Option(Path("vault"), "--out", help="Obsidian vault 输出目录"),
+    limit: int | None = typer.Option(
+        None, "--limit", "-n", help="导出条数（默认读 export.default_limit）"
+    ),
+    ids: str | None = typer.Option(None, "--ids", help="只导这些 id（逗号分隔，db 主键）"),
+    since: str | None = typer.Option(None, "--since", help="只导 first_seen >= 该日期"),
+    out: Path | None = typer.Option(None, "--out", help="vault 输出目录"),
 ) -> None:
-    """导出：生成自包含 Markdown 的 Obsidian 知识库（L0-C 及以后实现）。"""
-    raise NotImplementedError(f"export(out={out}) 将在导出层实现")
+    """导出：db → Obsidian vault（合成文档：元信息 + why + 我的笔记区）。
+
+    ★ 用户区永不覆盖（标记块）；★ 默认**不是全量**（§5.6：年增 18.8 万篇会撑爆 Obsidian）。
+    """
+    from ai_scholar.pipeline.export import run_export
+
+    since_date = None
+    if since:
+        try:
+            since_date = date.fromisoformat(since)
+        except ValueError:
+            console.print(f"[red]日期格式错误[/]：{since}（应为 YYYY-MM-DD）")
+            raise typer.Exit(2) from None
+
+    id_list = [s.strip() for s in ids.split(",") if s.strip()] if ids else None
+    report = run_export(limit=limit, ids=id_list, since=since_date, out=out)
+
+    console.print(
+        f"[green]✓[/] 导出 {report.exported} 篇"
+        f"（库内共 {report.total_in_db} 篇）→ {report.vault_dir}"
+    )
+    if report.degraded:
+        for key, reason in report.degraded.items():
+            console.print(f"[yellow]warning[/] {key}：{reason}")
+    console.print(
+        "说明：正文用标记块保护，`## 我的笔记` 区永不覆盖；导出时间只进 `90-元数据/生成报告.md`。"
+    )
+    raise typer.Exit(0)
 
 
 @app.command("list")
 def list_papers(
     limit: int = typer.Option(20, "--limit", "-n", help="显示条数"),
+    since: str | None = typer.Option(None, "--since", help="只显示 first_seen >= 该日期"),
+    watchlist_only: bool = typer.Option(
+        False, "--watchlist-only", help="只显示 watchlist 命中的（★ 展示筛选，不改库）"
+    ),
 ) -> None:
-    """列出：库内论文条目（L0-B 起可用）。
+    """列出库内论文，**★ 显示 watchlist 命中标记**。
 
+    ★ `--watchlist-only` 只是**展示筛选**，不改变库、不影响入库。
     ★ 函数名不能叫 `list`——那会遮蔽内建的 `list` 类型（mypy strict 直接报错）。
     """
-    raise NotImplementedError(f"list(limit={limit}) 将在 L0-B 实现")
+    from ai_scholar.pipeline.export import select_papers
+
+    settings = load_settings()
+    _default_path, local_path = watchlist_paths()
+    if not local_path.exists():
+        console.print(
+            f"[yellow]warning[/] 未找到 {local_path.name}；"
+            "当前用仓库里的通用示例（`ai-scholar init` 可复制一份）"
+        )
+
+    since_date = None
+    if since:
+        try:
+            since_date = date.fromisoformat(since)
+        except ValueError:
+            console.print(f"[red]日期格式错误[/]：{since}（应为 YYYY-MM-DD）")
+            raise typer.Exit(2) from None
+
+    engine = create_engine(f"sqlite:///{settings.db_path()}", echo=False)
+    watchlist = load_watchlist()
+    table = Table(title=f"库内论文（{settings.db_path().name}）", title_justify="left")
+    table.add_column("★")
+    table.add_column("id")
+    table.add_column("first_seen")
+    table.add_column("title", max_width=60)
+    table.add_column("HF")
+
+    shown = 0
+    with Session(engine) as session:
+        papers = select_papers(session, limit=limit, since=since_date)
+        for paper in papers:
+            hit = match_watchlist(watchlist, paper.title, paper.abstract or "")
+            if watchlist_only and not hit.matched:
+                continue
+            shown += 1
+            table.add_row(
+                "★" if hit.matched else "",
+                paper.id,
+                (paper.first_seen_at or "")[:10],
+                paper.title[:60],
+                str(paper.hf_score) if paper.hf_score is not None else "",
+            )
+    console.print(table)
+    console.print(f"显示 {shown} 条（★ = watchlist 命中）")
+    raise typer.Exit(0)
 
 
 def main() -> None:

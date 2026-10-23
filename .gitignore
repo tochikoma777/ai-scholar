@@ -27,6 +27,11 @@ data/tmp/
 # ★ 个人兴趣清单：配置洁癖，别人 clone 下来不该带着你的方向
 config/watchlist.local.yaml
 
+# ★ 导出产物：vault 是独立的 private 仓库，与代码仓库物理隔离（§3.7.1）
+vault/
+# ★ 例外：仓库内的示例 vault 必须入仓
+!example_vault/
+
 # 编辑器 / 系统
 .DS_Store
 .idea/

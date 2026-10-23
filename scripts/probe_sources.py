@@ -428,6 +428,17 @@ def render_markdown(
             lines.append("响应片段：未获得。")
             lines.append("")
 
+    lines.append(
+        "## 2.5 采集回看窗口\n"
+        "\n"
+        "★ 单日条数是**下界**（索引会补全，见上），因此 `collect` 默认用 "
+        f"**{stats.get('lookback_days', 'sources.arxiv.lookback_days')} 天回看窗口** 采集，"
+        "而不是只采当天。\n"
+        "\n"
+        "重复扫描**不产生重复条目**：`first_seen.jsonl` append-only + `papers` upsert 兜住；"
+        "窗口加宽后 HF（滞后 2~4 天）能解析到其 arXiv 原始条目 ⇒ **跨源去重率上升**。\n"
+    )
+    lines.append("")
     lines.append("## 3. 环境分级结论")
     lines.append("")
     lines.append("| 源 | 分级 | 依据 |")
@@ -568,6 +579,7 @@ async def main_async(args: argparse.Namespace) -> int:
 
     total_raw = n_arxiv + n_hf
     stats: dict[str, Any] = {
+        "lookback_days": settings.lookback_days(),
         "probe_utc": __import__("ai_scholar.utils.timeutil", fromlist=["utcnow"])
         .utcnow()
         .isoformat(timespec="seconds"),
