@@ -7,11 +7,12 @@
 
 ---
 
-## ★ 当前阶段：L0-B（DB schema + 采集器 + 三级去重 + first_seen）—— 已完成
+## ★ 当前阶段：L0-C（Obsidian 导出器 + list）—— 已完成
 
-已完成：`data/ai_scholar.db` 六张表（alembic 迁移）、arXiv + HF 采集器、
-三级去重（身份 upsert / 跨源只补 hf_score / 别名归一）、`data/first_seen.jsonl`。
-`collect` 真实跑通；`export` / `list` **仍为刻意占位**（属 L0-C）。
+已完成：`data/ai_scholar.db` 六张表、arXiv + HF 采集器 + 三级去重 + `first_seen.jsonl`
+（L0-B）；**Obsidian 导出器**（标记块 / frontmatter 读-合并-写回 / 文件名清洗 /
+双轨关联渲染 / 原子写入）+ `list`（★ 命中标记）（L0-C）。
+五个子命令全部实现，无占位。示例 vault 见 `example_vault/`。
 
 `docs/设计方案.md` 与 `docs/执行手册.md` 由项目负责人维护，**Agent 只读**；
 当前阶段以任务卡为准。
@@ -150,8 +151,12 @@ uv sync                          # 安装依赖（含 dev）
 uv run ai-scholar --help         # 命令树
 uv run ai-scholar init           # 目录骨架 + watchlist.local.yaml + .env 骨架
 uv run ai-scholar doctor         # 环境体检（无 key 时提示降级 off，退出码 0）
-uv run ai-scholar collect --days 2 [--source arxiv|hf_daily] [--dry-run]
-                                 # 采集（★ 单源失败只 warning，退出码 0）
+uv run ai-scholar collect [--days N] [--source arxiv|hf_daily] [--dry-run]
+                                 # 采集（默认回看 sources.arxiv.lookback_days=7 天）
+uv run ai-scholar export [--limit N] [--ids a,b] [--since DATE] [--out PATH]
+                                 # 导出 vault（★ 默认 20 篇，不是全量）
+uv run ai-scholar list [--limit N] [--since DATE] [--watchlist-only]
+                                 # ★ = watchlist 命中（只做展示筛选）
 uv run alembic upgrade head      # 建库（★ 空 data/ 目录也能跑）
 
 uv run python scripts/probe_sources.py        # 数据源探测（需联网，产出 docs/数据源手册.md）
@@ -176,6 +181,8 @@ uv run mypy src/ai_scholar
 | `store/hash.py`（content_hash） | `pytest -k content_hash`（★ 三条硬约束） |
 | `store/first_seen.py` | `pytest -k first_seen`（append-only / 幂等） |
 | `pipeline/collect.py` | `pytest -k collect` + 实跑 `ai-scholar collect --days 2` |
+| `export/obsidian.py` | `pytest -k export`（★ 连续两次导出无 diff） |
+| `cli.py` 的 `export`/`list` | `pytest -k cli` + 实跑一次看 vault |
 | **任何涉及 LLM 路径的改动** | 上面全绿也不算数 —— 配 key 实跑一次 |
 
 ---
