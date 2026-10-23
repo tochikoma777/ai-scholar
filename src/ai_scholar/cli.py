@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import shutil
+import subprocess
 import sys
 from datetime import date
 from pathlib import Path
@@ -21,13 +22,15 @@ from sqlmodel import Session
 
 from ai_scholar import __version__
 from ai_scholar.config import (
+    Settings,
     load_settings,
     load_watchlist,
     match_watchlist,
     project_root,
     watchlist_paths,
 )
-from ai_scholar.utils.errors import ConfigError
+from ai_scholar.pipeline.export import resolve_out_dir
+from ai_scholar.utils.errors import ConfigError, UnsafeOutputPath
 from ai_scholar.utils.http import HttpClient, resolve_proxy
 
 app = typer.Typer(
@@ -92,6 +95,54 @@ def _disk_free_gb(path: Path) -> float | None:
     return usage.free / (1024**3)
 
 
+def _display_path(path: Path) -> str:
+    """日志脱敏：家目录以内显示成 `~/...`（★ CI 日志默认公开）。"""
+    try:
+        return "~/" + str(path.resolve().relative_to(Path.home()))
+    except (ValueError, OSError):
+        return str(path)
+
+
+def _git_remote_names(path: Path) -> set[str] | None:
+    """读 vault 的 git remote 名（不联网）。失败返回 None。"""
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(path), "remote"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return {line.strip() for line in proc.stdout.splitlines() if line.strip()}
+
+
+def _vault_row(settings: Settings) -> tuple[str, str, str]:
+    """vault 状态：★ 无 remote 是 warning（笔记丢了就是真丢），不是 error。"""
+    try:
+        path = resolve_out_dir(None, settings)
+    except UnsafeOutputPath as exc:
+        return "vault", "[red]危险[/]", str(exc)
+
+    shown = _display_path(path)
+    if not path.exists():
+        return (
+            "vault",
+            "[yellow]warning[/]",
+            f"{shown} 不存在（首次 export 会创建；建议先 git init + private remote）",
+        )
+    if not (path / ".git").exists():
+        return "vault", "[yellow]warning[/]", f"{shown} 未初始化 git —— ★ 笔记无备份"
+
+    remotes = _git_remote_names(path)
+    if not remotes:
+        return "vault", "[yellow]warning[/]", f"{shown} 无 git remote —— ★ 笔记无备份"
+    return "vault", "[green]OK[/]", f"{shown} · remote: {', '.join(sorted(remotes))}"
+
+
 async def _healthcheck(name: str, url: str, params: dict[str, str], rate_limit: str) -> str:
     """对某个源发一个**最小的**真实请求，返回人类可读结论。
 
@@ -149,12 +200,12 @@ def doctor(
     free_gb = _disk_free_gb(data_dir)
     free_text = f" · 可用 {free_gb:.1f} GB" if free_gb is not None else ""
     if data_dir.exists():
-        table.add_row("数据目录", "[green]OK[/]", f"{data_dir}{free_text}")
+        table.add_row("数据目录", "[green]OK[/]", f"{_display_path(data_dir)}{free_text}")
     else:
         table.add_row(
             "数据目录",
             "[yellow]缺失[/]",
-            f"{data_dir} 不存在；运行 `ai-scholar init` 创建{free_text}",
+            f"{_display_path(data_dir)} 不存在；运行 `ai-scholar init` 创建{free_text}",
         )
 
     _default_path, local_path = watchlist_paths()
@@ -173,6 +224,8 @@ def doctor(
             f"无 {local_path.name}；当前用通用示例 {len(watchlist.groups)} 组 / "
             f"{watchlist.total_keywords()} 关键词（ai-scholar init 可复制一份）",
         )
+
+    table.add_row(*_vault_row(settings))
 
     if skip_healthcheck:
         table.add_row("数据源", "[cyan]已跳过[/]", "--skip-healthcheck")
@@ -280,11 +333,16 @@ def export(
     ),
     ids: str | None = typer.Option(None, "--ids", help="只导这些 id（逗号分隔，db 主键）"),
     since: str | None = typer.Option(None, "--since", help="只导 first_seen >= 该日期"),
-    out: Path | None = typer.Option(None, "--out", help="vault 输出目录"),
+    out: Path | None = typer.Option(None, "--out", help="vault 输出目录（必须在代码仓库之外）"),
+    check: bool = typer.Option(
+        False, "--check", help="只比对不写盘：列出会变更的文件；有变更退出 1，无变更退出 0"
+    ),
 ) -> None:
     """导出：db → Obsidian vault（合成文档：元信息 + why + 我的笔记区）。
 
     ★ 用户区永不覆盖（标记块）；★ 默认**不是全量**（§5.6：年增 18.8 万篇会撑爆 Obsidian）。
+    ★ `--check` 把幂等变成**可断言**的检查（真 vault 不在版本控制里，git diff 看不到它）。
+      比对范围 = 文献笔记 + 首页 + links.json；生成报告是运行日志，允许 diff。
     """
     from ai_scholar.pipeline.export import run_export
 
@@ -297,17 +355,31 @@ def export(
             raise typer.Exit(2) from None
 
     id_list = [s.strip() for s in ids.split(",") if s.strip()] if ids else None
-    report = run_export(limit=limit, ids=id_list, since=since_date, out=out)
+    report = run_export(limit=limit, ids=id_list, since=since_date, out=out, check=check)
+
+    if check:
+        if report.changed:
+            console.print(f"[yellow]将变更 {len(report.changed)} 个文件[/]（首次导出或幂等被破坏）")
+            for path in report.changed:
+                try:
+                    shown = path.relative_to(report.vault_dir)
+                except ValueError:
+                    shown = path
+                console.print(f"  · {shown}")
+            raise typer.Exit(1)
+        console.print(f"[green]✓[/] 无变更（{report.exported} 篇，幂等）")
+        raise typer.Exit(0)
 
     console.print(
         f"[green]✓[/] 导出 {report.exported} 篇"
-        f"（库内共 {report.total_in_db} 篇）→ {report.vault_dir}"
+        f"（库内共 {report.total_in_db} 篇）→ {_display_path(report.vault_dir)}"
     )
     if report.degraded:
         for key, reason in report.degraded.items():
             console.print(f"[yellow]warning[/] {key}：{reason}")
     console.print(
-        "说明：正文用标记块保护，`## 我的笔记` 区永不覆盖；导出时间只进 `90-元数据/生成报告.md`。"
+        "说明：正文用标记块保护，`## 我的笔记` 区永不覆盖；"
+        "导出时间（秒级）只进 `90-元数据/生成报告.md`。"
     )
     raise typer.Exit(0)
 

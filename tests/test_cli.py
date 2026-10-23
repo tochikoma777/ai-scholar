@@ -140,9 +140,10 @@ def _seed_db(tmp_path: Path, titles: list[str]) -> None:
 
 
 def test_export_cli_writes_vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _seed_db(tmp_path, ["A multimodal paper: with colon", "Another paper"])
-    monkeypatch.setenv("AI_SCHOLAR_ROOT", str(tmp_path))
-    vault = tmp_path / "vault"
+    root = tmp_path / "repo"
+    _seed_db(root, ["A multimodal paper: with colon", "Another paper"])
+    monkeypatch.setenv("AI_SCHOLAR_ROOT", str(root))
+    vault = tmp_path / "vault"  # ★ 必须在代码仓库之外
     result = runner.invoke(
         app, ["export", "--limit", "1", "--out", str(vault)], env={"COLUMNS": "200"}
     )

@@ -8,13 +8,16 @@
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import httpx
+import pytest
 import respx
 from sqlmodel import Session, SQLModel, select
+from typer.testing import CliRunner
 
+from ai_scholar.cli import app
 from ai_scholar.config import Settings
 from ai_scholar.export.base import ExportContext, LinkRef
 from ai_scholar.export.obsidian import (
@@ -29,6 +32,7 @@ from ai_scholar.export.obsidian import (
 from ai_scholar.pipeline.export import run_export
 from ai_scholar.store.db import engine_for
 from ai_scholar.store.models import Paper, Run
+from ai_scholar.utils.errors import UnsafeOutputPath
 
 
 def make_paper(
@@ -257,7 +261,10 @@ def test_atomic_write_leaves_no_tmp(tmp_path: Path) -> None:
 # ── ⑥ 端到端：幂等 + 首页 + 报告 + off 档 ───────────────────────────────
 @respx.mock
 def test_export_is_idempotent(tmp_path: Path) -> None:
-    """★ 头号验收项：连续两次 export，所有文件**字节级相同**。"""
+    """★ 头号验收项：连续两次 export，幂等范围内文件**字节级相同**。
+
+    ★ v1.4：`90-元数据/生成报告.md` 是运行日志（秒级时间），**允许 diff**，不在比对范围。
+    """
     db_path = tmp_path / "data" / "t.db"
     _seed_db(db_path, [make_paper("arXiv:1", "Paper One: A"), make_paper("arXiv:2", "Paper Two")])
     settings = _settings(tmp_path)
@@ -270,7 +277,11 @@ def test_export_is_idempotent(tmp_path: Path) -> None:
     after = {p.relative_to(vault): p.read_bytes() for p in vault.rglob("*") if p.is_file()}
 
     assert first.exported == second.exported == 2
-    assert snapshot == after, "★ 连续两次导出产生了 diff"
+    report_rel = Path("90-元数据") / "生成报告.md"
+    assert report_rel in snapshot and report_rel in after  # 报告存在，但允许 diff
+    snapshot.pop(report_rel)
+    after.pop(report_rel)
+    assert snapshot == after, "★ 连续两次导出在幂等范围内产生了 diff"
     assert network.call_count == 0  # ★ 导出零网络调用
 
 
@@ -286,11 +297,81 @@ def test_export_generates_index_and_report(tmp_path: Path) -> None:
     assert BEGIN_MARKER in index.read_text(encoding="utf-8")
 
     text = report_md.read_text(encoding="utf-8")
-    assert "导出日期：" in text
+    assert "导出时间：" in text
     assert "运行档位：off" in text
     assert "LLM 用量：0 行" in text
     assert "降级状态" in text
     assert report.llm_usage_rows == 0
+
+
+def test_report_time_is_second_level_and_changes_every_run(tmp_path: Path) -> None:
+    """★ 报告是运行日志：秒级时间，每次导出都应更新（v1.4 修正 L0-C 的错误取舍）。"""
+    db_path = tmp_path / "data" / "t.db"
+    _seed_db(db_path, [make_paper()])
+    vault = tmp_path / "vault"
+    settings = _settings(tmp_path)
+    report_md = vault / "90-元数据" / "生成报告.md"
+
+    first_at = datetime(2026, 10, 23, 13, 5, 7, tzinfo=UTC)
+    run_export(settings=settings, db_path=db_path, out=vault, exported_at=first_at)
+    first = report_md.read_text(encoding="utf-8")
+    assert "导出时间：2026-10-23 21:05:07" in first  # Asia/Shanghai
+
+    run_export(
+        settings=settings,
+        db_path=db_path,
+        out=vault,
+        exported_at=first_at + timedelta(seconds=1),
+    )
+    second = report_md.read_text(encoding="utf-8")
+    assert "导出时间：2026-10-23 21:05:08" in second
+    assert first != second, "★ 生成报告必须每次导出都更新（运行日志）"
+
+
+def test_export_check_lists_changes_without_writing(tmp_path: Path) -> None:
+    """★ `--check`：首次列出全部新建且不落盘；二次为空（幂等可自动验证）。"""
+    db_path = tmp_path / "data" / "t.db"
+    _seed_db(db_path, [make_paper()])
+    vault = tmp_path / "vault"
+    settings = _settings(tmp_path)
+
+    first = run_export(settings=settings, db_path=db_path, out=vault, check=True)
+    assert first.changed, "首次导出应列出全部新建"
+    assert not vault.exists(), "★ --check 不得写盘（连目录都不建）"
+    assert all(p.name != "生成报告.md" for p in first.changed)  # 报告是运行日志，不参与
+
+    run_export(settings=settings, db_path=db_path, out=vault)
+    second = run_export(settings=settings, db_path=db_path, out=vault, check=True)
+    assert second.changed == []
+    assert second.check is True
+
+
+def test_export_rejects_target_inside_repo(tmp_path: Path, repo_root: Path) -> None:
+    """★ 双仓库防护 3：目标落在代码仓库内（含 example_vault）必须拒绝。"""
+    settings = _settings(tmp_path)
+    with pytest.raises(UnsafeOutputPath):
+        run_export(settings=settings, db_path=tmp_path / "t.db", out=repo_root / "example_vault")
+    with pytest.raises(UnsafeOutputPath):
+        run_export(settings=settings, db_path=tmp_path / "t.db", out=repo_root / "vault")
+
+
+def test_export_check_cli_exit_codes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """★ `export --check`：有变更退出 1，无变更退出 0（CI 可断言）。"""
+    root = tmp_path / "repo"
+    monkeypatch.setenv("AI_SCHOLAR_ROOT", str(root))
+    monkeypatch.setenv("AI_SCHOLAR_EXPORT__OUT_DIR", str(tmp_path / "vault"))
+    _seed_db(root / "data" / "ai_scholar.db", [make_paper()])
+    runner = CliRunner()
+
+    first = runner.invoke(app, ["export", "--check"], env={"COLUMNS": "200"})
+    assert first.exit_code == 1
+    assert "将变更" in first.output
+    assert not (tmp_path / "vault").exists()
+
+    assert runner.invoke(app, ["export"], env={"COLUMNS": "200"}).exit_code == 0
+    second = runner.invoke(app, ["export", "--check"], env={"COLUMNS": "200"})
+    assert second.exit_code == 0
+    assert "无变更" in second.output
 
 
 def test_report_exposes_degraded_state(tmp_path: Path) -> None:

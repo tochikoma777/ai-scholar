@@ -31,6 +31,10 @@ class SourceError(AIScholarError):
         super().__init__(f"[{source}] {message}")
 
 
+class UnsafeOutputPath(ConfigError):
+    """导出目标路径危险（例如落在代码仓库内）。★ 拒绝写入，不做降级。"""
+
+
 class StoreError(AIScholarError):
     """数据库读写失败。"""
 

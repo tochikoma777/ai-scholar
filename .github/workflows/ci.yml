@@ -33,6 +33,8 @@ jobs:
       - name: Mypy
         run: uv run mypy src/ai_scholar
 
+      # ★ 双仓库防护 2：Actions 日志默认公开。禁止在此运行 `ai-scholar export`，
+      #   导出测试一律用 tmp_path；确需实跑必须显式 `--out` 到临时目录。
       - name: Pytest
         run: uv run pytest
 

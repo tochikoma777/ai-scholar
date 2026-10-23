@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from sqlalchemy import desc
@@ -21,13 +21,15 @@ from ai_scholar.config import (
     load_settings,
     load_watchlist,
     match_watchlist,
+    project_root,
     watchlist_paths,
 )
 from ai_scholar.export.base import ExportContext, ExportDoc
 from ai_scholar.export.obsidian import ObsidianExporter, note_name
 from ai_scholar.store.db import default_db_path
 from ai_scholar.store.models import Paper, Run
-from ai_scholar.utils.timeutil import today_local
+from ai_scholar.utils.errors import UnsafeOutputPath
+from ai_scholar.utils.timeutil import utcnow
 
 
 @dataclass
@@ -39,6 +41,47 @@ class ExportReport:
     vault_dir: Path = Path("vault")
     llm_mode: str = "off"
     llm_usage_rows: int = 0
+    check: bool = False
+    # ★ --check：会变更的文件（文献笔记 / 首页 / links.json）；生成报告按设计不参与
+    changed: list[Path] = field(default_factory=list)
+
+
+def resolve_out_dir(out: Path | str | None, settings: Settings | None = None) -> Path:
+    """解析 vault 输出目录。
+
+    规则：`--out` > `export.out_dir`；`~` 展开；相对路径按**仓库根**解析；
+    最终必须落在**代码仓库之外**（双仓库防护 3）。
+    """
+    settings = settings or load_settings()
+    raw = str(out) if out is not None else settings.export.out_dir
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        path = project_root() / path
+    path = path.resolve()
+    ensure_outside_repo(path)
+    return path
+
+
+def ensure_outside_repo(path: Path, *, root: Path | None = None) -> None:
+    """★ 目标目录不得位于代码仓库内（含 `example_vault/`）。
+
+    真 vault 是独立 private 仓库，与代码仓库物理隔离；写进仓库既会污染 public 提交，
+    也会让 `example_vault/` 的示例语义失效。
+    """
+    repo = (root or project_root()).resolve()
+    if path == repo or repo in path.parents:
+        raise UnsafeOutputPath(
+            f"vault 输出目录不得位于代码仓库内：{path}。"
+            "请用 `export.out_dir` / `--out` 指向仓库外（默认 ~/projects/ai-scholar-vault）。"
+        )
+
+
+def _file_matches(path: Path, content: str) -> bool:
+    """文件内容是否与待写入内容**逐字节**一致（不存在即视为不一致）。"""
+    try:
+        return path.read_bytes() == content.encode("utf-8")
+    except (FileNotFoundError, IsADirectoryError):
+        return False
 
 
 def select_papers(
@@ -102,24 +145,32 @@ def run_export(
     settings: Settings | None = None,
     db_path: Path | None = None,
     llm_mode: str | None = None,
+    check: bool = False,
+    exported_at: datetime | None = None,
 ) -> ExportReport:
-    """跑一次导出（同步：本阶段无网络调用）。"""
+    """跑一次导出（同步：本阶段无网络调用）。
+
+    ★ `check=True` 只做**逐字节比对**、不落盘：列出会变更的文件，供幂等验收。
+      比对范围 = 文献笔记 + `00-首页.md` + `links.json`；
+      `生成报告.md` 是运行日志，按设计允许 diff，不参与比对。
+    """
     settings = settings or load_settings()
     report = ExportReport()
+    report.check = check
     report.llm_mode = llm_mode or settings.effective_mode().value
+
+    # ★ 先校验输出路径：落在代码仓库内直接拒绝（防 example_vault / 手滑）
+    vault_dir = resolve_out_dir(out, settings)
+    report.vault_dir = vault_dir
 
     db_file = Path(db_path) if db_path else default_db_path(settings)
     engine = create_engine(f"sqlite:///{db_file}", echo=False)
     SQLModel.metadata.create_all(engine)
 
-    vault_dir = Path(out) if out else Path(settings.export.vault_dir)
-    if not vault_dir.is_absolute():
-        vault_dir = settings.data_dir().parent / vault_dir
-    report.vault_dir = vault_dir
-
     effective_limit = limit if limit is not None else settings.export.default_limit
     exporter = ObsidianExporter(filename_max_len=settings.export.filename_max_len)
 
+    docs: list[ExportDoc] = []
     with Session(engine) as session:
         papers = select_papers(session, limit=effective_limit, ids=ids, since=since)
         report.total_in_db = len(session.exec(select(Paper)).all())
@@ -142,29 +193,46 @@ def run_export(
             )
             content = exporter.render(paper, context)
             path = exporter.note_path(paper, context)
-            exporter.write(ExportDoc(path=path, content=content))
-            report.paths.append(path)
+            docs.append(ExportDoc(path=path, content=content))
 
         # links.json（本阶段空结构）
-        exporter.write_links_json(ExportContext(vault_dir=vault_dir), [])
+        docs.append(
+            ExportDoc(
+                path=vault_dir / "90-元数据" / "links.json",
+                content=exporter.render_links_json([]),
+            )
+        )
 
         # 00-首页.md
         index_context = ExportContext(llm_mode=report.llm_mode, vault_dir=vault_dir)
         index_text = exporter.render_index(
             papers, index_context, total_in_db=report.total_in_db, note_names=note_index
         )
-        exporter.write(ExportDoc(path=vault_dir / "00-首页.md", content=index_text))
+        docs.append(ExportDoc(path=vault_dir / "00-首页.md", content=index_text))
 
-        # 90-元数据/生成报告.md（★ 导出时间只进这里）
+        # 90-元数据/生成报告.md（★ 导出时间只进这里，秒级；作为运行日志允许 diff）
         report_text = exporter.render_report(
             exported=len(papers),
             total_in_db=report.total_in_db,
             llm_mode=report.llm_mode,
             llm_usage_rows=0,  # ★ 本阶段零 LLM 调用
             degraded=report.degraded,
-            export_day=today_local(),
+            exported_at=exported_at or utcnow(),
+            timezone=settings.app.timezone,
         )
-        exporter.write(ExportDoc(path=vault_dir / "90-元数据" / "生成报告.md", content=report_text))
 
     report.exported = len(papers)
+    report.changed = [doc.path for doc in docs if not _file_matches(doc.path, doc.content)]
+    if check:
+        return report
+
+    for doc in docs:
+        exporter.write(doc)
+        report.paths.append(doc.path)
+    report_doc = ExportDoc(
+        path=vault_dir / "90-元数据" / "生成报告.md",
+        content=report_text,
+    )
+    exporter.write(report_doc)
+    report.paths.append(report_doc.path)
     return report

@@ -152,7 +152,9 @@ class ExportSettings(BaseModel):
 
     default_limit: int = 20
     filename_max_len: int = 80
-    vault_dir: str = "vault"
+    # ★ vault 是独立 private 仓库，默认落在代码仓库之外。
+    #   只准 `~/` 开头：写死家目录绝对路径会① 泄露用户名 ② 别人 clone 后路径不存在。
+    out_dir: str = "~/projects/ai-scholar-vault"
 
 
 class CollectSettings(BaseModel):

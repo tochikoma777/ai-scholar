@@ -46,7 +46,10 @@ export:
   # ★ 默认导出条数：§5.6 明确否掉"默认全量"（年增 18.8 万篇会让 Obsidian 不可用）
   default_limit: 20
   filename_max_len: 80
-  vault_dir: vault
+  # ★ vault 是独立 private 仓库，必须落在代码仓库之外。
+  #   只准 `~/` 开头（程序 expanduser），禁止写死家目录绝对路径：
+  #   ① 泄露用户名 ② 别人 clone 后路径不存在。
+  out_dir: ${AI_SCHOLAR_EXPORT__OUT_DIR:-~/projects/ai-scholar-vault}
 
 collect:
   # ★ 单日实测 465 条（§12），200 会把当天截断 —— 取 600 留余量（3 页 × 1 req/3s）

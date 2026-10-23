@@ -23,7 +23,7 @@ import yaml
 
 from ai_scholar.export.base import ExportContext, ExportDoc, Exporter, LinkRef
 from ai_scholar.store.models import Paper
-from ai_scholar.utils.timeutil import today_local
+from ai_scholar.utils.timeutil import DEFAULT_TZ, format_local, today_local
 
 # ★ 标记块注释**不含时间戳**（原稿的 `· 2026-10-17T08:00:00+08:00` 每次都变 ⇒ 与幂等冲突）
 BEGIN_MARKER = "<!-- BEGIN GENERATED · 以下内容会被重新生成覆盖 -->"
@@ -269,16 +269,18 @@ class ObsidianExporter(Exporter):
         llm_mode: str,
         llm_usage_rows: int,
         degraded: dict[str, str],
-        export_day: date,
+        exported_at: datetime,
+        timezone: str = DEFAULT_TZ,
     ) -> str:
-        """`90-元数据/生成报告.md`（★ 导出时间只进这里）。
+        """`90-元数据/生成报告.md`（★ 导出时间只进这里，**秒级**）。
 
-        ★ 为保证"连续两次导出无 diff"，这里的时间是**日期级**；
-        秒级时间请查 db 的 `runs.started_at`。
+        ★ v1.4 修正：L0-C 曾把它降级为日期级以保幂等，**这是错的** ——
+        报告是运行日志，本就该每次变。正确做法是**收窄幂等验收范围**
+        （文献笔记 / 首页 / links.json 必须无 diff；本报告允许 diff）。
         """
         lines = [
             "",
-            f"导出日期：{export_day.isoformat()}",
+            f"导出时间：{format_local(exported_at, timezone)}",
             f"运行档位：{llm_mode}",
             f"LLM 用量：{llm_usage_rows} 行（off 档必须为 0）",
             f"本次导出条数：{exported}",
@@ -293,8 +295,8 @@ class ObsidianExporter(Exporter):
             lines.append("- 无")
         lines += [
             "",
-            "> ★ 本报告只记**日期级**导出时间：秒级会导致重复导出产生 diff。"
-            "需要精确时间请查 db 的 `runs.started_at`。",
+            "> ★ 本报告是**运行日志**，每次导出都会更新（含秒级时间），允许产生 diff。"
+            "幂等验收只看文献笔记 / `00-首页.md` / `links.json`。",
             "",
         ]
         fields = {"title": "生成报告", "schema_version": SCHEMA_VERSION}
@@ -302,8 +304,8 @@ class ObsidianExporter(Exporter):
             f"{dump_frontmatter(fields)}\n{BEGIN_MARKER}\n" + "\n".join(lines) + f"{END_MARKER}\n"
         )
 
-    def write_links_json(self, context: ExportContext, links: list[LinkRef]) -> Path:
-        """`90-元数据/links.json`（本阶段为空结构，L1 填数据）。"""
+    def render_links_json(self, links: list[LinkRef]) -> str:
+        """`90-元数据/links.json` 的内容（本阶段为空结构，L1 填数据）。"""
         payload = {
             "schema_version": SCHEMA_VERSION,
             "links": [
@@ -318,8 +320,11 @@ class ObsidianExporter(Exporter):
                 for r in links
             ],
         }
+        return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+
+    def write_links_json(self, context: ExportContext, links: list[LinkRef]) -> Path:
         doc = ExportDoc(
             path=Path(context.vault_dir) / "90-元数据" / "links.json",
-            content=json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+            content=self.render_links_json(links),
         )
         return self.write(doc)
