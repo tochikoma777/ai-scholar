@@ -127,7 +127,8 @@ groups:
 - [x] **L0-C** Obsidian 导出器（标记块 / frontmatter 合并 / 文件名清洗 / 原子写入）+ `list`
 - [ ] **L1** 关联层：Semantic Scholar 引用边（★ 只走 `POST /graph/v1/paper/batch`）
 - [ ] **L2** 推演层：LLM 三档（off / fast / strong）+ 预算护栏 + 结果持久化
-- [ ] **L3** 沉淀层：Obsidian vault 导出（合成文档 + 生成区标记块保护）
+- [ ] **L3** 沉淀层增强：主题 MOC（`20-主题/`）+ Daily Note（`40-日志/`）+ 六段深度分析正文
+      （vault 基础导出已在 **L0-C** 落地：标记块 / frontmatter 合并 / 原子写入）
 - [ ] **深度分析**：六段结构 + 三句半 + 背景透镜（延迟定级，有施引数据才输出"历史地位"）
 
 ---

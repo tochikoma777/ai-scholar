@@ -28,9 +28,8 @@ data/tmp/
 config/watchlist.local.yaml
 
 # ★ 导出产物：vault 是独立的 private 仓库，与代码仓库物理隔离（§3.7.1）
+#   注意：这只匹配名为 `vault` 的目录；仓库内的 `example_vault/` 不受影响（照常入仓）
 vault/
-# ★ 例外：仓库内的示例 vault 必须入仓
-!example_vault/
 
 # 编辑器 / 系统
 .DS_Store
