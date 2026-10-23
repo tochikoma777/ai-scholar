@@ -9,11 +9,15 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 ---
 
-## ★ 当前阶段：L1-0（vault 迁出 + 双仓库防护）—— 已完成
+## ★ 当前阶段：L1-A（S2 关联：引用入库 + 补齐队列 + 双轨渲染）—— 已完成
 
-vault 已迁到 **`~/projects/ai-scholar-vault/`**（独立 private 仓库），
-`export.out_dir` 只准 `~/` 开头；新增 `export --check` 把幂等变成可断言检查；
-`生成报告.md` 恢复秒级时间（运行日志允许 diff）。
+S2 `paper/batch` 真实跑通（无 key 也能跑）；引用边写入 `paper_links`
+（★ 方向：`(src,dst,'references')` == **src 引用了 dst**，入边靠反向查询、**不单独存储**）；
+只存**库内目标**的边（库外只累加 `refs_count`）；补齐队列复用 `papers` 表字段；
+「关联文献」区已接真实数据（有笔记 `[[双链]]` / 无笔记 文本+外链）。
+
+上一阶段：L1-0（vault 迁出 + 双仓库防护）。
+下一阶段（**未开始**）：L1-B（signals 采样状态机 / 预筛 / 实测 p）。
 
 上一阶段：L0-B（DB + 采集 + 三级去重 + `first_seen`）、L0-C（Obsidian 导出器 + `list`）。
 下一阶段（**未开始**）：L1-A Semantic Scholar 关联。
@@ -92,6 +96,7 @@ cli.py (typer)
 | `models.py` | pydantic 域模型：`WatchlistConfig` / `Availability` / `TimeSemantics` | **与 `store/models.py` 不是一回事** |
 | `collectors/base.py` | `RawPaper` 统一中间表示 | 只有元数据，**没有正文字段** |
 | `pipeline/collect.py` | 编排、三级去重、upsert、`runs` | 源码级禁止 import watchlist |
+| `pipeline/enrich.py` | 引用补齐：S2 → 出边 + 队列状态机 | ★ 方向语义固定为 src 引用 dst；入库前先写方向单测 |
 | `store/hash.py` | 主键归一化 + `content_hash` | hash 只含 title/abstract/authors/venue |
 | `store/first_seen.py` | `first_seen.jsonl` 读写 | append-only，绝不覆盖已有 id |
 | `store/models.py` | 六张 SQLModel 表 | 时间字段一律 TEXT ISO-8601 UTC |
@@ -200,6 +205,14 @@ vault 由本地 `export` 写入。任何"让 Actions 写 private vault"的设计
     > 直接背叛动机「没看完的东西以后还能用」。
     > 守这条的测试：`test_pipeline_never_imports_watchlist`（源码级断言
     > 采集编排不得引用 watchlist）。
+14. ❌ **关联方向搞反 / 写库外目标的边** ——
+    `paper_links(src,dst,'references')` 的语义固定为 **src 引用了 dst**；
+    入边**不单独存储**（`idx_links_dst` 反向查询即得）；
+    被引目标不在 `papers` 表 ⇒ **不写边**，只累加 `refs_count`。
+    ★ 方向建模错误能通过所有测试、只是结果反了 —— 必须先写方向单测（出边 / 入边 / 互为反向）。
+15. ❌ **回采被引论文** —— 每篇引约 30 条 × 515 篇/天 ⇒ ≈1.5 万条/天（**564 万行/年**），库会失控。
+16. ★ **不得因"关联边很少"判定 L1-A 失败** —— 冷启动期引用关联**必然稀疏**
+    （§5.1b：新论文引用的是库外老论文）；真正的冷启动主线是 L1-C 的语义相似。
 
 ---
 
@@ -232,6 +245,11 @@ uv run ai-scholar collect [--days N] [--source arxiv|hf_daily] [--dry-run]
 uv run ai-scholar export [--limit N] [--ids a,b] [--since DATE] [--out PATH]
                                  # 导出 vault（★ 默认 ~/projects/ai-scholar-vault，20 篇）
 uv run ai-scholar export --check # 只比对不落盘：无变更退出 0，有变更退出 1（幂等验收）
+uv run ai-scholar enrich [--limit N] [--force] [--dry-run]
+                                 # 补查 S2 引用（★ 全程 batch，禁止逐篇 GET）
+uv run ai-scholar related <paper-id>
+                                 # 查看关联（分「引用了」「被引用」两栏，验证方向）
+uv run python scripts/probe_s2.py --n 50     # S2 实测（产出 docs/数据源手册.md §2.6）
 uv run ai-scholar list [--limit N] [--since DATE] [--watchlist-only]
                                  # ★ = watchlist 命中（只做展示筛选）
 uv run alembic upgrade head      # 建库（★ 空 data/ 目录也能跑）
@@ -255,6 +273,7 @@ uv run mypy src/ai_scholar       # strict，cli.* 与 utils.* 有放宽
 | `config.py` · `config/*.yaml` | `pytest -k config`（★ 断言"实际收到的值"，不是"加载成功"） |
 | watchlist 加载 | `pytest -k watchlist` + `git ls-files \| grep watchlist.local`（必须为空） |
 | `utils/http.py` | `pytest -k http`（★ 断言实际发出的请求数；off 档为 0） |
+| `collectors/s2.py` · `pipeline/enrich.py` | `pytest -k enrich`（★ 方向三组 + 降半重试 + 队列状态机） |
 | `scripts/probe_sources.py` | 实跑一次 + 检查 `docs/数据源手册.md`；不可达时确认是 skip 不是伪造 |
 | `cli.py` | `pytest -k cli` + `uv run ai-scholar --help` |
 | `store/hash.py`（content_hash） | `pytest -k content_hash`（★ 三条硬约束） |
