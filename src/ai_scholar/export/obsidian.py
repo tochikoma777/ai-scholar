@@ -253,7 +253,9 @@ class ObsidianExporter(Exporter):
         new_generated = self._generated_body(paper, context)
 
         # ★ content_rev_at：只有生成区内容变了才更新（日期级，减少 diff）
-        if old_generated and old_generated == new_generated:
+        #   标记块两侧的换行是**框架**（写入时固定拼 `\n{body}\n`），不属于内容，
+        #   比较前必须剥掉 —— 否则跨天后即使内容没变也会刷新日期（--check 会误报）。
+        if old_generated.strip("\n") and old_generated.strip("\n") == new_generated.strip("\n"):
             new_fields["content_rev_at"] = (
                 old_fields.get("content_rev_at") or (paper.first_seen_at or "")[:10]
             )

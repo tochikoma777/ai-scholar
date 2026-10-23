@@ -395,6 +395,32 @@ def test_report_exposes_degraded_state(tmp_path: Path) -> None:
     assert "HF Daily Papers" in (vault / "90-元数据" / "生成报告.md").read_text(encoding="utf-8")
 
 
+def test_content_rev_at_not_bumped_across_days_without_change(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """★ 跨天重复导出、内容没变 ⇒ `content_rev_at` 不得变（否则 --check 每天误报）。
+
+    标记块两侧的换行是框架，不属于内容；比较时必须剥掉（L1-A 跨天后暴露的坑）。
+    """
+    from ai_scholar.export.base import ExportDoc
+
+    exporter = ObsidianExporter()
+    paper = make_paper()
+    context = ExportContext(vault_dir=tmp_path, llm_mode="off")
+    path = exporter.note_path(paper, context)
+
+    monkeypatch.setattr("ai_scholar.export.obsidian.today_local", lambda: date(2026, 10, 23))
+    exporter.write(ExportDoc(path=path, content=exporter.render(paper, context)))
+    first = path.read_text(encoding="utf-8")
+    assert "content_rev_at: 2026-10-23" in first
+
+    monkeypatch.setattr("ai_scholar.export.obsidian.today_local", lambda: date(2026, 10, 24))
+    exporter.write(ExportDoc(path=path, content=exporter.render(paper, context)))
+    second = path.read_text(encoding="utf-8")
+
+    assert second == first  # ★ 内容没变，整文件（含 content_rev_at）都不该变
+
+
 def test_export_limit_is_not_full_dump(tmp_path: Path) -> None:
     """★ 默认**不是全量**（§5.6）；`--limit` 生效。"""
     db_path = tmp_path / "data" / "t.db"
