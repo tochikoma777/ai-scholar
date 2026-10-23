@@ -31,6 +31,17 @@ ENRICH_PENDING = "pending"
 ENRICH_DONE = "done"
 ENRICH_STALE = "stale"
 
+# 采样状态机（§3.7.2；★ 持久状态，不是每日重算）
+SIGNAL_PENDING = "pending"  # 预筛通过 & 未定级
+SIGNAL_READY = "ready"  # 快路径：进入时 published_at ≥ 180 天，跳过 pending 等 L3 定级
+SIGNAL_TRACKED = "tracked"  # 已定级 / 已深度分析
+SIGNAL_DORMANT = "dormant"  # 不常规观测（可单点复活一次）
+SIGNAL_SAMPLE = "sample"  # 预筛淘汰的留样集（仅校准）
+SIGNAL_REJECTED = "rejected"  # 预筛淘汰且未抽中留样 ⇒ 不跟踪
+
+# 观测来源
+SIGNAL_SOURCE_S2 = "s2"
+
 
 class Paper(SQLModel, table=True):
     """① 论文主表。
@@ -75,6 +86,15 @@ class Paper(SQLModel, table=True):
     enrich_attempts: int = 0
     enrich_last_at: str | None = None
     enrich_error: str | None = None
+    # ★ 采样状态机（§3.7.2）：状态**持久化**，不是每日重算。
+    #   NULL = 尚未预筛（新入库 / 迁移前的历史行），下一次 collect 或 signals 补跑。
+    signal_state: str | None = None
+    signal_next_at: str | None = None  # 下次该观测的日期（YYYY-MM-DD）
+    signal_last_at: str | None = None
+    signal_revived: bool = False  # dormant 的单点复活是否已用掉（★ 最多一次）
+    prescreen_reason: str | None = None  # 预筛淘汰原因（NULL = 通过）
+    # ★ 选集：export 默认**只导出** selected=1（§5.6 v1.7，防每天造 20 篇新笔记）
+    selected: bool = False
     content_hash: str
     created_at: str = Field(default_factory=_now)
     updated_at: str = Field(default_factory=_now)

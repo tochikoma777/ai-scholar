@@ -105,3 +105,25 @@ enrich:
   # ★ 补齐队列：新论文在 S2 上可能尚未索引，查不到要**重试**，不能只查一次
   max_attempts: 30
   default_limit: 200
+
+signals:
+  # ★ 时序采样状态机（§3.7.2）。状态持久化在 papers 表，不每日重算。
+  default_limit: 200
+  # dormant 复活的**唯一**条件（★ 不含 age —— age 只决定"何时采"）
+  min_citations: 3
+  # 观测窗口：first_seen + 90 天仍未成熟 ⇒ dormant
+  pending_days: 90
+  # 成熟度门槛：published_at + 180 天（快路径 / dormant 复活点）
+  maturity_days: 180
+  monthly_days: 30
+  quarterly_days: 91
+  tracked_first_year_days: 365
+  retention_years: 3
+  sample_retention_days: 365
+
+prescreen:
+  # ★ 零成本预筛（规则负面排除，不走 LLM）：只决定"是否进 pending"，**绝不决定入库**
+  min_abstract_chars: 200
+  # ★ 淘汰集抽样留存率（不是总体放行率）：总量 = N×p + N×(1-p)×r
+  retain_ratio: 0.2
+  exclude_title_patterns: [erratum, corrigendum, retraction, retracted, withdrawn, "comment on"]

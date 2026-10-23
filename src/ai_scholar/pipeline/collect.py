@@ -20,7 +20,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from sqlalchemy import create_engine
-from sqlmodel import Session, SQLModel, select
+from sqlmodel import Session, SQLModel, col, select
 
 from ai_scholar.collectors.arxiv import fetch_arxiv_day
 from ai_scholar.collectors.base import SOURCE_HF, RawPaper
@@ -321,6 +321,22 @@ async def run_collect(
                 for raw in items:
                     _record_aliases(session, raw, canonical_id_for(raw), dry_run=dry_run)
                 report.outcomes.append(outcome)
+
+            if not dry_run:
+                # ★ 零成本预筛（L1-B）：只决定"是否跟踪"（pending/sample/rejected），
+                #   **绝不决定入库** —— 论文已经全部写入 papers 表。
+                from ai_scholar.pipeline.prescreen import apply_prescreen
+
+                ungraded = list(
+                    session.exec(select(Paper).where(col(Paper.signal_state).is_(None))).all()
+                )
+                for paper in ungraded:
+                    apply_prescreen(
+                        paper,
+                        prescreen_cfg=settings.prescreen,
+                        signals_cfg=settings.signals,
+                        today=day0,
+                    )
 
             if not dry_run:
                 session.commit()

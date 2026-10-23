@@ -190,6 +190,45 @@ class EnrichSettings(BaseModel):
     default_limit: int = 200
 
 
+class SignalsSettings(BaseModel):
+    """采样状态机参数（§3.7.2）。★ 状态是持久的，这里只放"到期"与"退出"阈值。"""
+
+    default_limit: int = 200
+    # ★ dormant 复活的**唯一**条件（不含 age；age 只决定"何时采"）
+    min_citations: int = 3
+    # pending 的观测窗口：first_seen + 90 天仍未成熟 ⇒ dormant
+    pending_days: int = 90
+    # 成熟度门槛：published_at + 180 天（快路径 / dormant 复活点）
+    maturity_days: int = 180
+    monthly_days: int = 30
+    quarterly_days: int = 91
+    # 已定级：第 1 年每月，之后每季度；保留 3 年
+    tracked_first_year_days: int = 365
+    retention_years: int = 3
+    # 留样集：每季度，保留 365 天
+    sample_retention_days: int = 365
+
+
+class PrescreenSettings(BaseModel):
+    """零成本预筛（规则负面排除，★ 不走 LLM）。"""
+
+    # 摘要短于该长度 ⇒ 无法评估，淘汰
+    min_abstract_chars: int = 200
+    # ★ 淘汰集抽样留存率 —— **不是**总体放行率（§3.7.2）
+    retain_ratio: float = 0.2
+    # 标题命中这些词 ⇒ 淘汰（勘误/撤稿/评论等非研究性条目）
+    exclude_title_patterns: list[str] = Field(
+        default_factory=lambda: [
+            "erratum",
+            "corrigendum",
+            "retraction",
+            "retracted",
+            "withdrawn",
+            "comment on",
+        ]
+    )
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix=ENV_PREFIX,
@@ -207,6 +246,8 @@ class Settings(BaseSettings):
     export: ExportSettings = Field(default_factory=ExportSettings)
     collect: CollectSettings = Field(default_factory=CollectSettings)
     enrich: EnrichSettings = Field(default_factory=EnrichSettings)
+    signals: SignalsSettings = Field(default_factory=SignalsSettings)
+    prescreen: PrescreenSettings = Field(default_factory=PrescreenSettings)
     sources: dict[str, SourceSettings] = Field(default_factory=dict)
 
     def effective_mode(self) -> RunMode:

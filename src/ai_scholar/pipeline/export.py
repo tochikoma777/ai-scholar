@@ -44,6 +44,8 @@ class ExportReport:
     check: bool = False
     # ★ --check：会变更的文件（文献笔记 / 首页 / links.json）；生成报告按设计不参与
     changed: list[Path] = field(default_factory=list)
+    # ★ 默认只导 selected；为空时 CLI 要给明确提示，不能静默导出 0 篇
+    empty_selection: bool = False
 
 
 def resolve_out_dir(out: Path | str | None, settings: Settings | None = None) -> Path:
@@ -139,9 +141,12 @@ def select_papers(
     limit: int,
     ids: list[str] | None = None,
     since: date | None = None,
+    all_papers: bool = False,
 ) -> list[Paper]:
     """按范围选出要导出的论文。
 
+    ★ 默认**只导 `selected=1`**（§5.6 v1.7）：否则每天 export 都会造 20 篇新笔记
+      （≈7,300 篇/年，是 300–500 篇目标的 15 倍）。`--all` 才按 limit 导最新（demo/调试）。
     排序：`published_at` desc，`hf_score` 兜底（★ 与入库顺序无关）。
     """
     if ids:
@@ -152,6 +157,8 @@ def select_papers(
         return picked[:limit] if limit > 0 else picked
 
     statement = select(Paper)
+    if not all_papers:
+        statement = statement.where(col(Paper.selected).is_(True))
     if since is not None:
         statement = statement.where(Paper.first_seen_at >= since.isoformat())
     statement = statement.order_by(desc(col(Paper.published_at)), desc(col(Paper.hf_score)))
@@ -196,12 +203,15 @@ def run_export(
     llm_mode: str | None = None,
     check: bool = False,
     exported_at: datetime | None = None,
+    all_papers: bool = False,
 ) -> ExportReport:
     """跑一次导出（同步：本阶段无网络调用）。
 
     ★ `check=True` 只做**逐字节比对**、不落盘：列出会变更的文件，供幂等验收。
       比对范围 = 文献笔记 + `00-首页.md` + `links.json`；
       `生成报告.md` 是运行日志，按设计允许 diff，不参与比对。
+    ★ `all_papers=True`：非 check 时按 `--limit` 导最新（demo/调试）；
+      check 时校验**全量笔记**（所有 `note_path` 非空的论文），补 L1-0 的局限。
     """
     settings = settings or load_settings()
     report = ExportReport()
@@ -224,8 +234,29 @@ def run_export(
 
     docs: list[ExportDoc] = []
     with Session(engine) as session:
-        papers = select_papers(session, limit=effective_limit, ids=ids, since=since)
+        if check and all_papers:
+            # ★ --check --all：校验**磁盘上真实存在的全部笔记**（不只本次选集）。
+            #   不依赖 note_path 是否回填过：按论文算一遍目标路径，文件存在就校验。
+            probe = ExportContext(vault_dir=vault_dir)
+            papers = [
+                p
+                for p in session.exec(select(Paper)).all()
+                if p.note_path or exporter.note_path(p, probe).exists()
+            ]
+            papers.sort(key=lambda p: (p.published_at or "", p.hf_score or 0), reverse=True)
+        else:
+            papers = select_papers(
+                session,
+                limit=effective_limit,
+                ids=ids,
+                since=since,
+                all_papers=all_papers,
+            )
         report.total_in_db = len(session.exec(select(Paper)).all())
+        report.empty_selection = not papers
+        if report.empty_selection and not check:
+            # ★ 无选中论文：不写任何文件（避免造出空首页 / 空报告），由 CLI 给提示
+            return report
 
         watchlist = load_watchlist()
         # ★ 双轨渲染索引：本次导出的论文才有 vault 笔记；其余目标只给文本 + 外链
@@ -280,9 +311,24 @@ def run_export(
             session.commit()  # ★ note_path 回填要落库（双轨渲染的输入）
 
         # 00-首页.md
+        # ★ 索引描述 **vault 状态**（磁盘上已有笔记 ∪ 本次要写的笔记），与本次选集无关
+        probe = ExportContext(vault_dir=vault_dir)
+        selected_ids = {p.id for p in papers}
+        index_papers = [
+            p
+            for p in session.exec(select(Paper)).all()
+            if p.id in selected_ids or p.note_path or exporter.note_path(p, probe).exists()
+        ]
+        index_papers.sort(key=lambda p: (p.published_at or "", p.hf_score or 0), reverse=True)
+        index_names = {
+            p.id: note_name(p, max_len=settings.export.filename_max_len) for p in index_papers
+        }
         index_context = ExportContext(llm_mode=report.llm_mode, vault_dir=vault_dir)
         index_text = exporter.render_index(
-            papers, index_context, total_in_db=report.total_in_db, note_names=note_index
+            index_papers,
+            index_context,
+            total_in_db=report.total_in_db,
+            note_names=index_names,
         )
         docs.append(ExportDoc(path=vault_dir / "00-首页.md", content=index_text))
 

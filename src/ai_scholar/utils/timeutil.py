@@ -103,3 +103,19 @@ def age_days(published_at: datetime, now: datetime | None = None) -> float:
     """内容"年龄"（天）。用于「历史地位」条件式输出里的"发表 N 天，被引 M 次"。"""
     ref = ensure_utc(now) if now is not None else utcnow()
     return max(0.0, (ref - ensure_utc(published_at)).total_seconds() / 86400.0)
+
+
+def parse_iso_date(text: str | None) -> date | None:
+    """从 ISO 字符串取日期（`2026-10-20T00:00:00Z` / `2026-10-20` 都支持）。"""
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(str(text).replace("Z", "+00:00")).date()
+    except ValueError:
+        return None
+
+
+def age_days_since(text: str | None, on: date) -> int | None:
+    """某 ISO 时间距 `on` 的天数（解析失败返回 None）。★ 用于成熟度判定。"""
+    parsed = parse_iso_date(text)
+    return None if parsed is None else (on - parsed).days

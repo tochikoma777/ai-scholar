@@ -34,6 +34,8 @@ from ai_scholar.store.db import engine_for
 from ai_scholar.store.models import Paper, Run
 from ai_scholar.utils.errors import UnsafeOutputPath
 
+runner = CliRunner()
+
 
 def make_paper(
     pid: str = "arXiv:2610.00001",
@@ -44,6 +46,7 @@ def make_paper(
     hf_score: int | None = 7,
     citations: int | None = 3,
     category: str = "cs.AI",
+    selected: bool = True,
 ) -> Paper:
     return Paper(
         id=pid,
@@ -64,6 +67,7 @@ def make_paper(
         citation_count=citations,
         refs_count=12,
         content_hash="deadbeef",
+        selected=selected,  # ★ 本文件的用例默认把论文视为"已收藏"，专测导出机制
     )
 
 
@@ -196,6 +200,21 @@ def test_citations_not_updated_on_reexport(tmp_path: Path) -> None:
     new_text = exporter.render(paper, context)
     fields, _ = parse_frontmatter(new_text)
     assert fields["citations"] == 3  # ★ 未被更新
+
+
+def test_refs_count_not_updated_on_reexport(tmp_path: Path) -> None:
+    """★ `refs_count` 同为观测值（L1-B signals 会刷新它）⇒ 不得每次导出都改笔记。"""
+    exporter = ObsidianExporter()
+    paper = make_paper()
+    paper.refs_count = 12
+    context = ExportContext(vault_dir=tmp_path, llm_mode="off")
+    path = exporter.note_path(paper, context)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(exporter.render(paper, context), encoding="utf-8")
+
+    paper.refs_count = 99  # signals 采样刷新了它
+    fields, _ = parse_frontmatter(exporter.render(paper, context))
+    assert fields["refs_count"] == 12  # ★ 未被更新（否则全库笔记反复产生 diff）
 
 
 def test_user_custom_fields_preserved(tmp_path: Path) -> None:
@@ -500,3 +519,135 @@ def test_no_llm_usage_after_export(tmp_path: Path) -> None:
     engine = engine_for(db_path)
     with Session(engine) as session:
         assert list(session.exec(select(LLMUsage)).all()) == []
+
+
+# ── ⑦ 选集策略（§5.6 v1.7）──────────────────────────────────────────────
+def test_export_default_only_includes_selected(tmp_path: Path) -> None:
+    """★ 默认只导 selected=1（否则每天 20 篇 = 7,300 篇/年）。"""
+    db_path = tmp_path / "data" / "t.db"
+    _seed_db(
+        db_path,
+        [
+            make_paper("arXiv:1", "Selected Paper", selected=True),
+            make_paper("arXiv:2", "Unselected Paper", selected=False),
+        ],
+    )
+    vault = tmp_path / "vault"
+    report = run_export(settings=_settings(tmp_path), db_path=db_path, out=vault)
+    assert report.exported == 1
+    names = [p.name for p in (vault / "10-文献").rglob("*.md")]
+    assert any("Selected-Paper" in n for n in names)
+    assert not any("Unselected-Paper" in n for n in names)
+
+
+def test_export_all_includes_unselected(tmp_path: Path) -> None:
+    db_path = tmp_path / "data" / "t.db"
+    _seed_db(
+        db_path,
+        [
+            make_paper("arXiv:1", "Selected Paper", selected=True),
+            make_paper("arXiv:2", "Unselected Paper", selected=False),
+        ],
+    )
+    vault = tmp_path / "vault"
+    report = run_export(settings=_settings(tmp_path), db_path=db_path, out=vault, all_papers=True)
+    assert report.exported == 2
+
+
+def test_index_describes_vault_not_current_selection(tmp_path: Path) -> None:
+    """★ 首页只描述 vault 状态：换选集（默认 / --ids）不得改变首页（否则幂等失效）。"""
+    db_path = tmp_path / "data" / "t.db"
+    _seed_db(
+        db_path,
+        [
+            make_paper("arXiv:1", "Paper A"),
+            make_paper("arXiv:2", "Paper B"),
+        ],
+    )
+    vault = tmp_path / "vault"
+    settings = _settings(tmp_path)
+    run_export(settings=settings, db_path=db_path, out=vault)
+    first = (vault / "00-首页.md").read_text(encoding="utf-8")
+    assert "有笔记论文数：2" in first
+    assert "本次导出" not in first
+
+    # 只导 A（--ids）⇒ 首页仍应统计到 2 篇笔记
+    run_export(settings=settings, db_path=db_path, out=vault, ids=["arXiv:1"])
+    second = (vault / "00-首页.md").read_text(encoding="utf-8")
+    assert first == second
+
+
+def test_export_empty_selection_is_explicit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """★ 无 selected 时给明确提示，不静默导出 0 篇、不写空首页。"""
+    root = tmp_path / "repo"
+    _seed_db(root / "data" / "ai_scholar.db", [make_paper(selected=False)])
+    monkeypatch.setenv("AI_SCHOLAR_ROOT", str(root))
+    monkeypatch.setenv("AI_SCHOLAR_EXPORT__OUT_DIR", str(tmp_path / "vault"))
+
+    result = runner.invoke(app, ["export"], env={"COLUMNS": "200"})
+    assert result.exit_code == 0, result.output
+    assert "尚无选中论文" in result.output
+    assert not (tmp_path / "vault" / "00-首页.md").exists()
+
+    checked = runner.invoke(app, ["export", "--check"], env={"COLUMNS": "200"})
+    assert checked.exit_code == 0
+    assert "尚无选中论文" in checked.output
+
+
+def test_mark_cli_toggles_selected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "repo"
+    db_path = root / "data" / "ai_scholar.db"
+    _seed_db(db_path, [make_paper("arXiv:1", "A Paper", selected=False)])
+    monkeypatch.setenv("AI_SCHOLAR_ROOT", str(root))
+
+    marked = runner.invoke(app, ["mark", "arXiv:1"], env={"COLUMNS": "200"})
+    assert marked.exit_code == 0, marked.output
+    with Session(engine_for(db_path)) as session:
+        assert session.get(Paper, "arXiv:1").selected is True
+
+    unmarked = runner.invoke(app, ["mark", "arXiv:1", "--unmark"], env={"COLUMNS": "200"})
+    assert unmarked.exit_code == 0
+    with Session(engine_for(db_path)) as session:
+        assert session.get(Paper, "arXiv:1").selected is False
+
+    missing = runner.invoke(app, ["mark", "arXiv:404"], env={"COLUMNS": "200"})
+    assert missing.exit_code == 2
+
+
+def test_check_all_covers_notes_outside_selection(tmp_path: Path) -> None:
+    """★ `--check --all` 校验全量笔记（补 L1-0 只校验本次选集的局限）。"""
+    db_path = tmp_path / "data" / "t.db"
+    _seed_db(
+        db_path,
+        [
+            make_paper("arXiv:1", "Paper A"),
+            make_paper("arXiv:2", "Paper B"),
+        ],
+    )
+    vault = tmp_path / "vault"
+    run_export(settings=_settings(tmp_path), db_path=db_path, out=vault)
+
+    # B 不再选中，且磁盘上的笔记被改动 ⇒ 默认 --check 看不到，--all 必须报出来
+    with Session(engine_for(db_path)) as session:
+        session.get(Paper, "arXiv:2").selected = False
+        session.commit()
+    note_b = next((vault / "10-文献").rglob("*Paper-B*.md"))
+    original = note_b.read_text(encoding="utf-8")
+    # ★ 改**生成区**（用户区会被合法保留，改那里不算 diff）
+    patched = original.replace("## 方法标签", "## 方法标签（被篡改）", 1)
+    assert patched != original
+    note_b.write_text(patched, encoding="utf-8")
+
+    default = run_export(settings=_settings(tmp_path), db_path=db_path, out=vault, check=True)
+    assert note_b not in default.changed  # ★ 默认范围看不到未选中的笔记
+
+    full = run_export(
+        settings=_settings(tmp_path),
+        db_path=db_path,
+        out=vault,
+        check=True,
+        all_papers=True,
+    )
+    assert note_b in full.changed  # ★ --all 覆盖全量笔记

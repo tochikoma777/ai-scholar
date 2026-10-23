@@ -134,6 +134,7 @@ def _seed_db(tmp_path: Path, titles: list[str]) -> None:
                     arxiv_id=f"2610.0000{i}",
                     primary_category="cs.AI",
                     content_hash="h",
+                    selected=True,  # ★ export 默认只导 selected
                 )
             )
         session.commit()

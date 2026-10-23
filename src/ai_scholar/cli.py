@@ -337,10 +337,15 @@ def export(
     check: bool = typer.Option(
         False, "--check", help="只比对不写盘：列出会变更的文件；有变更退出 1，无变更退出 0"
     ),
+    all_papers: bool = typer.Option(
+        False,
+        "--all",
+        help="导出最新 N 篇（demo/调试）；★ 默认只导出 selected；与 --check 合用则校验全量笔记",
+    ),
 ) -> None:
     """导出：db → Obsidian vault（合成文档：元信息 + why + 我的笔记区）。
 
-    ★ 用户区永不覆盖（标记块）；★ 默认**不是全量**（§5.6：年增 18.8 万篇会撑爆 Obsidian）。
+    ★ 用户区永不覆盖（标记块）；★ **默认只导出 `selected=1`**（§5.6 v1.7）。
     ★ `--check` 把幂等变成**可断言**的检查（真 vault 不在版本控制里，git diff 看不到它）。
       比对范围 = 文献笔记 + 首页 + links.json；生成报告是运行日志，允许 diff。
     """
@@ -355,7 +360,22 @@ def export(
             raise typer.Exit(2) from None
 
     id_list = [s.strip() for s in ids.split(",") if s.strip()] if ids else None
-    report = run_export(limit=limit, ids=id_list, since=since_date, out=out, check=check)
+    report = run_export(
+        limit=limit,
+        ids=id_list,
+        since=since_date,
+        out=out,
+        check=check,
+        all_papers=all_papers,
+    )
+
+    if report.empty_selection:
+        console.print(
+            "[yellow]尚无选中论文[/]：默认只导出 `selected=1`。\n"
+            "  · 用 `ai-scholar mark <paper-id>` 收藏要读的论文\n"
+            "  · 或 `ai-scholar export --all` 导出最新 N 篇（demo/调试）"
+        )
+        raise typer.Exit(0)
 
     if check:
         if report.changed:
@@ -421,6 +441,81 @@ def enrich(
     console.print(
         "说明：入边**不单独存储**（查 dst 即得）；库外被引目标不写边，只计入 refs_count。"
     )
+    raise typer.Exit(0)
+
+
+@app.command()
+def mark(
+    paper_id: str,
+    unmark: bool = typer.Option(False, "--unmark", help="取消收藏"),
+) -> None:
+    """显式收藏 / 取消收藏（★ 决定 `export` 是否为该篇生成笔记）。"""
+    from ai_scholar.store.models import Paper
+
+    settings = load_settings()
+    engine = create_engine(f"sqlite:///{settings.db_path()}", echo=False)
+    with Session(engine) as session:
+        paper = session.get(Paper, paper_id)
+        if paper is None:
+            console.print(f"[red]未知论文 id[/]：{paper_id}")
+            raise typer.Exit(2)
+        paper.selected = not unmark
+        title = paper.title[:60]
+        session.commit()
+    console.print(f"[green]✓[/] {'取消收藏' if unmark else '已收藏'}：{paper_id} — {title}")
+    raise typer.Exit(0)
+
+
+@app.command()
+def signals(
+    limit: int | None = typer.Option(
+        None, "--limit", "-n", help="本次最多处理多少篇（默认 signals.default_limit）"
+    ),
+    force: bool = typer.Option(False, "--force", help="忽略 signal_next_at，全部采样一次"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="只统计，不写库 / 不写 JSONL"),
+) -> None:
+    """按时序状态机采样一次：S2 batch → `signals` 表 + `data/signals/YYYY-MM.jsonl`。
+
+    ★ 状态持久化（`signal_next_at`），**不是每日全量重算**。
+    ★ 两套时钟：成熟度用 `published_at`，观测窗口用 `first_seen`。
+    ★ S2 失败只 warning，退出码 0；off 档零 LLM 调用。
+    """
+    from ai_scholar.pipeline.signals import run_signals
+
+    settings = load_settings()
+    effective = limit if limit is not None else settings.signals.default_limit
+    report = asyncio.run(run_signals(limit=effective, force=force, dry_run=dry_run))
+
+    table = Table(
+        title=f"signals · {report.today} · run {report.run_id}"
+        + ("（dry-run）" if dry_run else ""),
+        title_justify="left",
+    )
+    table.add_column("项")
+    table.add_column("值")
+    table.add_row("补跑预筛（历史行）", str(report.backfilled))
+    table.add_row("本次到期", str(report.due))
+    table.add_row("S2 命中", str(report.fetched))
+    table.add_row("signals 新增行", str(report.rows_new))
+    table.add_row("已存在（幂等跳过）", str(report.rows_existing))
+    table.add_row("耗时", f"{report.duration_s}s")
+    console.print(table)
+
+    states = Table(title="状态分布", title_justify="left")
+    states.add_column("signal_state")
+    states.add_column("数量")
+    for state, count in sorted(report.states.items()):
+        states.add_row(state or "(未预筛)", str(count))
+    console.print(states)
+
+    if report.events:
+        events = " · ".join(f"{k}={v}" for k, v in sorted(report.events.items()))
+        console.print(f"状态机事件：{events}")
+    if report.degraded:
+        for key, reason in report.degraded.items():
+            console.print(f"[yellow]warning[/] {key}：{reason}")
+    if not dry_run:
+        console.print(f"JSONL：{report.jsonl_path}")
     raise typer.Exit(0)
 
 
@@ -538,7 +633,8 @@ def list_papers(
 
     shown = 0
     with Session(engine) as session:
-        papers = select_papers(session, limit=limit, since=since_date)
+        # ★ `list` 是"看库里有什么"，不受选集限制（export 才默认只导 selected）
+        papers = select_papers(session, limit=limit, since=since_date, all_papers=True)
         for paper in papers:
             hit = match_watchlist(watchlist, paper.title, paper.abstract or "")
             if watchlist_only and not hit.matched:

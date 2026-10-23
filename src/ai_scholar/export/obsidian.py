@@ -39,7 +39,9 @@ SCHEMA_VERSION = 1
 # frontmatter 中**由用户维护**的字段（生成时永不覆盖）
 USER_KEYS = frozenset({"status"})
 # ★ 观测值：已有值保持不变（只在笔记被重新生成即深度分析/定级触发时才更新）
-OBSERVED_KEYS = frozenset({"citations"})
+#   `refs_count` 与 `citations` 同类：L1-B 的 signals 采样会刷新它们，
+#   若每次导出都跟着变 ⇒ 全库笔记反复产生 diff（`--check --all` 直接红）。
+OBSERVED_KEYS = frozenset({"citations", "refs_count"})
 
 
 def sanitize_title(title: str, *, max_len: int = DEFAULT_MAX_LEN) -> str:
@@ -291,9 +293,13 @@ class ObsidianExporter(Exporter):
         total_in_db: int,
         note_names: dict[str, str],
     ) -> str:
-        """`00-首页.md` MOC（★ 也用标记块）。"""
-        lines = ["", f"库内论文数：{total_in_db}", f"本次导出：{len(papers)} 篇"]
-        lines += ["", "## 最近导出"]
+        """`00-首页.md` MOC（★ 也用标记块）。
+
+        ★ 索引只描述**vault 状态**（有笔记的论文），不写"本次导出 N 篇"：
+          否则不同选集（默认 selected / `--ids` / `--all`）会写出不同首页 ⇒ 幂等失效。
+        """
+        lines = ["", f"库内论文数：{total_in_db}", f"有笔记论文数：{len(papers)}"]
+        lines += ["", "## 笔记索引"]
         for paper in papers[:20]:
             name = note_names.get(paper.id) or note_name(paper, max_len=self.filename_max_len)
             star = "★ " if context.watchlist_groups else ""

@@ -81,6 +81,7 @@ def make_paper(
         primary_category="cs.AI",
         categories_json="[]",
         content_hash=f"h-{pid}",
+        selected=True,  # ★ 导出相关用例需要 selected=1（export 默认只导 selected）
     )
 
 
