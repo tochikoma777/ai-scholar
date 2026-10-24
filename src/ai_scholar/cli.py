@@ -1,7 +1,7 @@
 """CLI 入口。
 
 子命令：`init` / `doctor` / `collect` / `export` / `enrich` / `mark` /
-`signals` / `relate` / `related` / `list` / `budget`。
+`signals` / `relate` / `related` / `list` / `budget` / `report`。
 """
 
 from __future__ import annotations
@@ -756,6 +756,58 @@ def budget(
         console.print(f"[green]✓ 放行[/]：预估 ¥{estimate.cost_cny:.4f}")
     else:
         console.print(f"[red]✗ 拦截[/]：{decision.reason}（任务进队列，不截断生成）")
+    raise typer.Exit(0)
+
+
+@app.command()
+def report(
+    day: str | None = typer.Option(None, "--date", help="报告日期（默认今天，YYYY-MM-DD）"),
+    out: str | None = typer.Option(None, "--out", help="输出目录（默认 data/reports）"),
+) -> None:
+    """生成当日报告快照：`data/reports/YYYY-MM-DD.md` + `.json`（★ 只读，不写库）。
+
+    ★ 聚合「概览 / ★命中 Top10 / 运行状态」三块；「深度分析 / 新定级」是 L3 能力，恒空。
+    """
+    from ai_scholar.pipeline.report import build_daily_report, write_report
+    from ai_scholar.utils.timeutil import today_local
+
+    settings = load_settings()
+    if day is None:
+        today = today_local()
+    else:
+        try:
+            today = date.fromisoformat(day)
+        except ValueError:
+            console.print(f"[red]日期格式错误[/]：{day}（应为 YYYY-MM-DD）")
+            raise typer.Exit(2) from None
+
+    if out:
+        out_dir = Path(out).expanduser()
+        if not out_dir.is_absolute():
+            out_dir = project_root() / out_dir
+    else:
+        out_dir = settings.data_dir() / "reports"
+
+    engine = create_engine(f"sqlite:///{settings.db_path()}", echo=False)
+    watchlist = load_watchlist()
+    with Session(engine) as session:
+        daily = build_daily_report(session, today=today, watchlist=watchlist)
+
+    outcome = write_report(daily, out_dir)
+
+    table = Table(title=f"report · {daily.date}", title_justify="left")
+    table.add_column("项")
+    table.add_column("值")
+    table.add_row("库内论文", str(daily.total_papers))
+    table.add_row("今日新增", str(daily.new_today))
+    table.add_row("★ 命中", str(len(daily.watchlist_hits)))
+    table.add_row("今日 run", str(len(daily.runs)))
+    table.add_row("md", str(outcome.md_path))
+    table.add_row("json", str(outcome.json_path))
+    console.print(table)
+    if daily.degraded:
+        for key, reason in daily.degraded.items():
+            console.print(f"[yellow]warning[/] {key}：{reason}")
     raise typer.Exit(0)
 
 

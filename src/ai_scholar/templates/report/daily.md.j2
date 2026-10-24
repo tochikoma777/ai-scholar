@@ -1,0 +1,57 @@
+---
+date: {{ report.date }}
+schema_version: {{ report.schema_version }}
+---
+
+# {{ report.date }}
+
+## 概览
+
+- 库内论文：{{ report.total_papers }} 篇
+- 今日新增：{{ report.new_today }} 篇
+
+## ★ 命中 Top10
+
+{% if report.watchlist_hits -%}
+{% for hit in report.watchlist_hits %}
+- ★ `{{ hit.id }}` — {{ hit.title }}（{{ "%.2f"|format(hit.score) }} · {{ hit.groups|join("、") }}）
+{% endfor -%}
+{%- else -%}
+- 今日无 watchlist 命中
+{%- endif %}
+
+## 深度分析
+
+{% if report.deep_analyzed -%}
+{% for hit in report.deep_analyzed %}
+- `{{ hit.id }}` — {{ hit.title }}
+{% endfor -%}
+{%- else -%}
+- 暂无（L3 实现后填充）
+{%- endif %}
+
+## 新定级
+
+{% if report.new_graded -%}
+{% for hit in report.new_graded %}
+- `{{ hit.id }}` — {{ hit.title }}
+{% endfor -%}
+{%- else -%}
+- 暂无（L3 实现后填充）
+{%- endif %}
+
+## 运行状态
+
+{% if report.runs -%}
+{% for run in report.runs %}
+- `{{ run.run_id }}`（{{ run.mode }}{% if run.source %} / {{ run.source }}{% endif %}）：fetched {{ run.fetched }} · new {{ run.new }}{% if run.degraded %} · 降级：{{ run.degraded|join("；") }}{% endif %}
+{% endfor -%}
+{%- else -%}
+- 今日无运行记录
+{%- endif %}
+{%- if report.cost_cny is not none %}
+
+## 成本
+
+- 当日实际：¥{{ "%.4f"|format(report.cost_cny) }}
+{%- endif %}
