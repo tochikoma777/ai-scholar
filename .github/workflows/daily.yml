@@ -1,0 +1,82 @@
+name: daily
+
+# ★ L2-B：每日自动化。每天北京时间凌晨跑一次（UTC 16:30 = 北京时间次日 00:30）。
+# 编排：collect → enrich → signals → relate → report，然后 commit 真源回 public。
+on:
+  schedule:
+    - cron: "30 16 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write # ★ commit/push 真源需要写权限
+
+jobs:
+  daily:
+    runs-on: ubuntu-24.04 # ★ 固定，不用 ubuntu-latest（红线 12）
+    timeout-minutes: 60
+    env:
+      AI_SCHOLAR_ENV: actions
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.11
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --frozen || uv sync
+
+      # ★ db 是"可丢弃缓存"（§3.7.1）：用 actions-cache 跨天续命，避免每天重采全部引用。
+      #   但它不是唯一依托 —— 失效时 first_seen.jsonl / signals（git 真源）不受影响，
+      #   只丢 db（可由 JSONL/源重采重建）。
+      - name: Restore db cache
+        uses: actions/cache@v4
+        with:
+          path: data/ai_scholar.db
+          key: ai-scholar-db
+          restore-keys: ai-scholar-db
+
+      - name: Migrate
+        run: uv run alembic upgrade head
+
+      - name: Collect
+        run: uv run ai-scholar collect
+
+      - name: Enrich
+        run: uv run ai-scholar enrich
+
+      - name: Signals
+        run: uv run ai-scholar signals
+
+      - name: Relate
+        run: uv run ai-scholar relate
+
+      - name: Report
+        run: uv run ai-scholar report
+
+      - name: Save db cache
+        uses: actions/cache@v4
+        with:
+          path: data/ai_scholar.db
+          key: ai-scholar-db
+
+      # ★ 持久化真源（§8.3 定案 C′）：first_seen / signals / 报告 commit 回 public；
+      #   db 被 .gitignore 排除，不 commit。
+      #   并发冲突：fetch + reset --soft（坑 7），不用 pull --rebase。
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/first_seen.jsonl data/signals data/reports
+          if git diff --cached --quiet; then
+            echo "无变更，跳过 commit"
+            exit 0
+          fi
+          git fetch origin main
+          git reset --soft FETCH_HEAD
+          git commit -m "chore(daily): 每日采集与报告 $(date -u +%Y-%m-%d)"
+          git push origin HEAD:main
