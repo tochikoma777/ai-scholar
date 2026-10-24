@@ -290,7 +290,8 @@ def test_render_new_link_sections(tmp_path: Path) -> None:
     assert "### 相似" in text
     assert "- [[2026-10-20__Paper-B]] — 相似 0.42" in text
     assert "### 文献耦合" in text
-    assert "- ★ Paper C（无笔记）— https://arxiv.org/abs/3" in text
+    # ★ 无笔记也必须能解释"为什么关联"（§5.4）：相似度 / 共现数不能因为没笔记就丢掉
+    assert "- ★ Paper C（无笔记）— https://arxiv.org/abs/3 — 共现 4 篇参考文献" in text
     # ★ 不能混进「引用了」
     assert text.index("### 引用了") < text.index("### 相似") < text.index("### 文献耦合")
 
@@ -354,6 +355,45 @@ def test_symmetric_edge_does_not_leak_into_references_section(tmp_path: Path) ->
     assert "相似" not in cited  # ★ 引用区里不得出现相似边
     assert "（暂无 — 引用数据由" in cited
     assert "### 相似" in text
+
+
+def test_reference_evidence_is_not_rendered(tmp_path: Path) -> None:
+    """★ 引用边是事实，`s2_references` 这类机器标记不该出现在笔记里。"""
+    exporter = ObsidianExporter()
+    context = ExportContext(
+        vault_dir=tmp_path,
+        note_index={"arXiv:2": "2026-10-20__Paper-B"},
+        out_links=[
+            LinkRef(
+                "arXiv:2",
+                "Paper B",
+                None,
+                link_type="references",
+                weight=1.0,
+                evidence="s2_references",
+            )
+        ],
+    )
+    text = exporter.render(make_paper("arXiv:1"), context)
+    assert "- [[2026-10-20__Paper-B]]" in text
+    assert "s2_references" not in text
+
+
+def test_dry_run_distinguishes_new_and_existing_edges(tmp_path: Path) -> None:
+    """★ dry-run 的数字要能用来预估：存量边必须记成"已存在"，不能全算新增。"""
+    db_path = tmp_path / "data" / "t.db"
+    seed(
+        db_path,
+        [make_paper("arXiv:1"), make_paper("arXiv:2")],
+        {"arXiv:1": ["ARXIV:r1", "ARXIV:r2"], "arXiv:2": ["ARXIV:r1", "ARXIV:r2"]},
+    )
+    settings = settings_for(tmp_path)
+    first = run_relate(kind="bibcoupling", db_path=db_path, settings=settings)
+    assert first.edges_new["bibcoupling"] == 1
+
+    again = run_relate(kind="bibcoupling", db_path=db_path, settings=settings, dry_run=True)
+    assert again.edges_new["bibcoupling"] == 0
+    assert again.edges_existing["bibcoupling"] == 1
 
 
 # ── ⑥ CLI ───────────────────────────────────────────────────────────────

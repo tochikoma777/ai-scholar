@@ -31,7 +31,7 @@ from ai_scholar.export.obsidian import (
 )
 from ai_scholar.pipeline.export import run_export
 from ai_scholar.store.db import engine_for
-from ai_scholar.store.models import Paper, Run
+from ai_scholar.store.models import LINK_TYPE_SIMILARITY, Paper, Run
 from ai_scholar.utils.errors import UnsafeOutputPath
 
 runner = CliRunner()
@@ -238,6 +238,7 @@ def test_link_rendering_dual_track() -> None:
         paper_id="arXiv:2610.00009",
         title="SWE-bench",
         url="https://arxiv.org/abs/2310.06770",
+        link_type=LINK_TYPE_SIMILARITY,
         evidence="相似性基准",
     )
     with_note = render_link_line(ref, {"arXiv:2610.00009": "2026-09-01__SWE-bench"})

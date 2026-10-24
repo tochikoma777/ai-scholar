@@ -254,8 +254,11 @@ def run_relate(
                     continue
                 evidence = f"共现 {cooccur} 篇参考文献"
                 if dry_run:
-                    existing += 0
-                    new += 1
+                    # ★ dry-run 也要区分新增/已存在，否则报告把存量全算成"新增"，无法用来预估
+                    if session.get(PaperLink, (a, b, LINK_TYPE_BIBCOUPLING)) is None:
+                        new += 1
+                    else:
+                        existing += 1
                 elif _upsert_edge(
                     session,
                     a,
@@ -290,14 +293,18 @@ def run_relate(
                 else:
                     new = existing = 0
                     for (a, b), weight in edges.items():
-                        if dry_run or _upsert_edge(
-                            session,
-                            a,
-                            b,
-                            link_type=LINK_TYPE_SIMILARITY,
-                            weight=round(weight, 4),
-                            evidence=f"相似 {weight:.2f}",
-                        ):
+                        if dry_run:
+                            created = session.get(PaperLink, (a, b, LINK_TYPE_SIMILARITY)) is None
+                        else:
+                            created = _upsert_edge(
+                                session,
+                                a,
+                                b,
+                                link_type=LINK_TYPE_SIMILARITY,
+                                weight=round(weight, 4),
+                                evidence=f"相似 {weight:.2f}",
+                            )
+                        if created:
                             new += 1
                         else:
                             existing += 1

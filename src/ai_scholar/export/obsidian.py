@@ -22,7 +22,7 @@ from pathlib import Path
 import yaml
 
 from ai_scholar.export.base import ExportContext, ExportDoc, Exporter, LinkRef
-from ai_scholar.store.models import Paper
+from ai_scholar.store.models import LINK_TYPE_BIBCOUPLING, LINK_TYPE_SIMILARITY, Paper
 from ai_scholar.utils.timeutil import DEFAULT_TZ, format_local, today_local
 
 # ★ 标记块注释**不含时间戳**（原稿的 `· 2026-10-17T08:00:00+08:00` 每次都变 ⇒ 与幂等冲突）
@@ -130,13 +130,20 @@ def split_generated(body: str) -> tuple[str, str]:
 
 
 def render_link_line(ref: LinkRef, note_index: dict[str, str]) -> str:
-    """★ 双轨渲染（§6.4 v1.3）：有笔记 → `[[双链]]`；无笔记 → 文本 + 外链（**不建空笔记**）。"""
+    """★ 双轨渲染（§6.4 v1.3）：有笔记 → `[[双链]]`；无笔记 → 文本 + 外链（**不建空笔记**）。
+
+    ★ 相似 / 耦合的 `evidence`（`相似 0.42` / `共现 4 篇参考文献`）**是这条边存在的唯一解释**
+      （设计方案 §5.4「不可解释的关联不要用」），双轨**都要显示**；
+      引用边的 `evidence` 是 `s2_references` 这类机器标记 —— 引用是事实，不显示。
+    """
     note = note_index.get(ref.paper_id)
+    reason = ""
+    if ref.link_type in (LINK_TYPE_SIMILARITY, LINK_TYPE_BIBCOUPLING) and ref.evidence:
+        reason = f" — {ref.evidence}"
     if note:
-        suffix = f" — {ref.evidence}" if ref.evidence else ""
-        return f"- [[{note}]]{suffix}"
+        return f"- [[{note}]]{reason}"
     url = ref.url or "（无外链）"
-    return f"- ★ {ref.title}（无笔记）— {url}"
+    return f"- ★ {ref.title}（无笔记）— {url}{reason}"
 
 
 def _link_sort_key(ref: LinkRef, note_index: dict[str, str]) -> tuple[int, str, float]:

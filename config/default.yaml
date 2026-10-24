@@ -134,6 +134,6 @@ relate:
   bibcoupling_min_weight: 0.1        # Jaccard 阈值
   similarity_top_k: 10
   similarity_min_weight: 0.15        # §5.2 进池阈值
-  similarity_strong_weight: 0.30     # §5.2 强关联阈值（仅用于展示标注）
+  similarity_strong_weight: 0.30     # §5.2 强关联阈值（★ 消费方是 L2「关联解读」选题，本阶段不读）
   similarity_title_weight: 2.0       # 标题 ×2 + 摘要 ×1
   similarity_max_features: 50000
