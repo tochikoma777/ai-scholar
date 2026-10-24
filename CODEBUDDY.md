@@ -151,10 +151,15 @@ vault 由本地 `export` 写入。任何"让 Actions 写 private vault"的设计
 
 ## 文档归属（★ 同一份文件只能一方写）
 
+> 2026-10-24 起**全部由 Agent 维护**，按变更性质分级（详见 `docs/经验固化.md`）：
+> **L1 事实同步**（状态/命令/tag 栏/错别字）与 **L2 决策记录** → Agent 直改；
+> **L3 意图变更**（改核心判据/红线/阶段划分/数据落点/成本上限）→ Agent 出提案 + diff，**负责人批准**。
+
 | 文档 | 维护方 |
 |---|---|
-| `docs/设计方案.md` · `docs/执行手册.md` · `docs/文档维护日志.md` | **项目负责人，Agent 只读** |
-| `docs/数据源手册.md` · `docs/开发日志.md` · `docs/踩坑实录.md` | **Agent** |
+| `docs/设计方案.md` · `docs/执行手册.md` · `docs/文档维护日志.md` | **Agent**（分级维护，L3 变更需负责人批准） |
+| `docs/数据源手册.md` · `docs/开发日志.md` | **Agent** |
+| `docs/成本预算.md` · `docs/经验固化.md` · `docs/handoff/*.md` | **Agent** |
 | `README.md` · `CHANGELOG.md` · `CONTRIBUTING.md` · `CODEBUDDY.md` · `pyproject.toml` | **Agent** |
 
 ★ **先提交代码 + 打 tag，再刷新文档**（否则维护日志的 tag 栏对不上）。
