@@ -1,0 +1,25 @@
+{
+  "date": "2026-10-25",
+  "schema_version": 1,
+  "total_papers": 2109,
+  "new_today": 0,
+  "watchlist_hits": [],
+  "deep_analyzed": [],
+  "new_graded": [],
+  "runs": [
+    {
+      "run_id": "062435dd1dbf",
+      "mode": "off",
+      "source": null,
+      "fetched": 1717,
+      "new": 0,
+      "degraded": [
+        "RuntimeError: HF HTTP 400"
+      ]
+    }
+  ],
+  "degraded": {
+    "hf_daily": "RuntimeError: HF HTTP 400"
+  },
+  "cost_cny": null
+}
