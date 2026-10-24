@@ -6,6 +6,8 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 > ★ 项目负责人提供初稿，Agent 后续维护（可补充命令、目录、阶段状态）。
 > ★ 若本文件与当前任务卡冲突，**以任务卡为准**。
 > ★ 全程中文回复（技术术语 / 代码 / 路径除外）。
+> ★ **每次 clear / init 后第一件事**：读 `docs/经验固化.md`（尤其「输出规范类 O1」：
+>   两张进度表 + 待决策子格式），再读 `docs/handoff/` 当前阶段交接。**未读即开工或输出 = 违规。**
 
 ---
 
