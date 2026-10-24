@@ -148,6 +148,12 @@ relate:
   bibcoupling_min_weight: 0.1        # Jaccard 阈值
   similarity_top_k: 10
   similarity_min_weight: 0.15        # §5.2 进池阈值
-  similarity_strong_weight: 0.30     # §5.2 强关联阈值（★ 消费方是 L2「关联解读」选题，本阶段不读）
+  similarity_strong_weight: 0.30     # §5.2 强关联阈值（★ 消费方是 L3a「关联解读」选题）
   similarity_title_weight: 2.0       # 标题 ×2 + 摘要 ×1
   similarity_max_features: 50000
+
+enhance:
+  # ★ L3a 增强对象（§3.6「高价值」）：watchlist 命中的未增强论文，按分降序 Top N
+  default_limit: 20
+  # 关联解读：每次最多处理的强相似边对数（weight ≥ relate.similarity_strong_weight）
+  link_pairs_limit: 10

@@ -652,3 +652,37 @@ def test_check_all_covers_notes_outside_selection(tmp_path: Path) -> None:
         all_papers=True,
     )
     assert note_b in full.changed  # ★ --all 覆盖全量笔记
+
+
+def test_enhance_fields_rendered_or_dash(tmp_path: Path) -> None:
+    """★ L3a：有增强字段就渲染，没有就显式 `—`。"""
+    paper = make_paper()
+    paper.one_line = "一句话内容"
+    paper.why = "为什么重要内容"
+    paper.method_tags_json = json.dumps(["agent", "benchmark"], ensure_ascii=False)
+    text = ObsidianExporter().render(paper, ExportContext(vault_dir=tmp_path, llm_mode="off"))
+    assert "一句话内容" in text
+    assert "为什么重要内容" in text
+    assert "`agent`" in text
+    assert "`benchmark`" in text
+
+    plain = make_paper()
+    text2 = ObsidianExporter().render(plain, ExportContext(vault_dir=tmp_path, llm_mode="off"))
+    assert "## 一句话\n—" in text2
+    assert "## 为什么重要\n—" in text2
+    assert "## 方法标签\n—" in text2
+
+
+def test_link_rendering_shows_interpretation() -> None:
+    """★ L3a：强相似边的 interpretation 追加在 evidence 之后。"""
+    ref = LinkRef(
+        paper_id="arXiv:2610.00009",
+        title="SWE-bench",
+        url="https://arxiv.org/abs/2310.06770",
+        link_type=LINK_TYPE_SIMILARITY,
+        evidence="相似 0.42",
+        interpretation="同一方向的演进",
+    )
+    line = render_link_line(ref, {})
+    assert "相似 0.42" in line
+    assert "同一方向的演进" in line

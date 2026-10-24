@@ -101,6 +101,13 @@ class Paper(SQLModel, table=True):
     selected: bool = False
     # ★ 相似度计算标记（L1-C 增量）：NULL = 还没参与过 TF-IDF 比对
     similar_at: str | None = None
+    # ★ L3a LLM 增强（fast 档）：一句话 / 为什么重要 / 方法标签
+    one_line: str | None = None
+    why: str | None = None
+    method_tags_json: str | None = None  # JSON 数组
+    enhanced_at: str | None = None  # 增强时间（本地日 YYYY-MM-DD）
+    # ★ 增强时的内容身份：与 content_hash 不同 ⇒ 论文元数据已变，需要重新增强
+    enhance_content_hash: str | None = None
     content_hash: str
     created_at: str = Field(default_factory=_now)
     updated_at: str = Field(default_factory=_now)
@@ -146,6 +153,8 @@ class PaperLink(SQLModel, table=True):
     link_type: str = Field(primary_key=True)  # references | similarity | entity_cooccur | temporal
     weight: float | None = None
     evidence: str | None = None  # ★ 可解释性：为什么关联
+    # ★ L3a 关联解读（强相似边）：LLM 生成的一句解读；机器 evidence 保持不变
+    interpretation: str | None = None
     created_at: str = Field(default_factory=_now)
 
 

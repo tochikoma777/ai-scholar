@@ -445,6 +445,40 @@ def enrich(
 
 
 @app.command()
+def enhance(
+    limit: int | None = typer.Option(
+        None, "--limit", "-n", help="增强论文数（默认 enhance.default_limit）"
+    ),
+    force: bool = typer.Option(False, "--force", help="忽略 enhance_content_hash，重做全部"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="只统计，不写库 / 不调 LLM"),
+) -> None:
+    """LLM 增强（fast）：一句话 / 为什么重要 / 方法标签 + 强相似边关联解读。
+
+    ★ off 档零调用；预算闸门超限即停；结果持久化（同条目不重复生成）。
+    ★ 失败只 warning（写进 degraded），**退出码仍为 0**。
+    """
+    from ai_scholar.pipeline.enhance import run_enhance
+
+    report = asyncio.run(run_enhance(limit=limit, force=force, dry_run=dry_run))
+
+    table = Table(title=f"enhance · run {report.run_id}（{report.mode}）", title_justify="left")
+    table.add_column("项")
+    table.add_column("值")
+    table.add_row("本次选中", str(report.requested))
+    table.add_row("增强成功", str(report.enhanced))
+    table.add_row("预算拦截", str(report.blocked))
+    table.add_row("已增强跳过", str(report.skipped))
+    table.add_row("关联解读", str(report.links_interpreted))
+    table.add_row("LLM 调用", str(report.llm_calls))
+    table.add_row("成本（元）", f"{report.cost_cny:.4f}")
+    console.print(table)
+    if report.degraded:
+        for key, reason in report.degraded.items():
+            console.print(f"[yellow]warning[/] {key}：{reason}")
+    raise typer.Exit(0)
+
+
+@app.command()
 def mark(
     paper_id: str,
     unmark: bool = typer.Option(False, "--unmark", help="取消收藏"),

@@ -27,6 +27,7 @@ class LinkRef:
     link_type: str = "references"
     weight: float | None = None
     evidence: str | None = None  # ★ 可解释性：为什么关联
+    interpretation: str | None = None  # ★ L3a 关联解读（强相似边的 LLM 一句解读）
     published_at: str | None = None  # 无笔记时的排序依据
 
 

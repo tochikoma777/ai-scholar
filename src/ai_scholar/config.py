@@ -269,6 +269,15 @@ class RelateSettings(BaseModel):
     similarity_max_features: int = 50000
 
 
+class EnhanceSettings(BaseModel):
+    """L3a 增强参数（fast 档）。★ 强相似阈值复用 `relate.similarity_strong_weight`。"""
+
+    # 增强对象：watchlist 命中的未增强论文，按分降序 Top N（§3.6「高价值」）
+    default_limit: int = 20
+    # 关联解读：每次最多处理的强相似边对数
+    link_pairs_limit: int = 10
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix=ENV_PREFIX,
@@ -289,6 +298,7 @@ class Settings(BaseSettings):
     signals: SignalsSettings = Field(default_factory=SignalsSettings)
     prescreen: PrescreenSettings = Field(default_factory=PrescreenSettings)
     relate: RelateSettings = Field(default_factory=RelateSettings)
+    enhance: EnhanceSettings = Field(default_factory=EnhanceSettings)
     sources: dict[str, SourceSettings] = Field(default_factory=dict)
 
     def effective_mode(self) -> RunMode:

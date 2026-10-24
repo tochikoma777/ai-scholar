@@ -58,6 +58,9 @@ jobs:
       - name: Relate
         run: uv run ai-scholar relate
 
+      - name: Enhance
+        run: uv run ai-scholar enhance
+
       - name: Report
         run: uv run ai-scholar report
 

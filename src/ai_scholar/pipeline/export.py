@@ -150,6 +150,7 @@ def load_link_refs(
             link_type=link.link_type,
             weight=link.weight,
             evidence=link.evidence,
+            interpretation=link.interpretation,
             published_at=(target.published_at if target else None),
         )
 

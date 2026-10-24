@@ -50,6 +50,9 @@ class NullLLM:
     ) -> LLMResponse:
         return LLMResponse()
 
+    async def aclose(self) -> None:
+        return None
+
 
 class LLMClient:
     """OpenAI 兼容 `/chat/completions` 的 httpx 直连客户端（非流式）。"""
@@ -145,6 +148,9 @@ class LLMClient:
             tokens_out=int(usage.get("completion_tokens") or 0),
             cache_hit=int(usage.get("prompt_cache_hit_tokens") or 0) > 0,
         )
+
+    async def aclose(self) -> None:
+        await self.http.aclose()
 
 
 def build_client(settings: Settings | None = None, *, tier: str = "fast") -> LLMClient | NullLLM:

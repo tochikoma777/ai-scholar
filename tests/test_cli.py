@@ -364,3 +364,10 @@ def test_budget_cli_unknown_tier_exits_2() -> None:
         env={"COLUMNS": "200"},
     )
     assert result.exit_code == 2
+
+
+def test_enhance_command_has_help() -> None:
+    """★ L3a：enhance 命令可见且 --help 正常。"""
+    result = runner.invoke(app, ["enhance", "--help"], env={"COLUMNS": "200"})
+    assert result.exit_code == 0
+    assert "enhance" in result.output

@@ -135,11 +135,15 @@ def render_link_line(ref: LinkRef, note_index: dict[str, str]) -> str:
     ★ 相似 / 耦合的 `evidence`（`相似 0.42` / `共现 4 篇参考文献`）**是这条边存在的唯一解释**
       （设计方案 §5.4「不可解释的关联不要用」），双轨**都要显示**；
       引用边的 `evidence` 是 `s2_references` 这类机器标记 —— 引用是事实，不显示。
+    ★ L3a：强相似边的 `interpretation`（LLM 一句解读）追加在 evidence 之后。
     """
     note = note_index.get(ref.paper_id)
-    reason = ""
+    reason_parts: list[str] = []
     if ref.link_type in (LINK_TYPE_SIMILARITY, LINK_TYPE_BIBCOUPLING) and ref.evidence:
-        reason = f" — {ref.evidence}"
+        reason_parts.append(ref.evidence)
+    if ref.interpretation:
+        reason_parts.append(ref.interpretation)
+    reason = f" — {'。'.join(reason_parts)}" if reason_parts else ""
     if note:
         return f"- [[{note}]]{reason}"
     url = ref.url or "（无外链）"
@@ -199,7 +203,11 @@ class ObsidianExporter(Exporter):
     # ── 渲染 ────────────────────────────────────────────────────────────
     def _generated_body(self, paper: Paper, context: ExportContext) -> str:
         # ★ 空态显式（执行手册 §2.3）：没有内容就显示 `—`，不静默省略区块
-        lines = ["", "## 一句话", "—", "", "## 为什么重要", "—", "", "## 方法标签", "—"]
+        one_line = paper.one_line or "—"
+        why = paper.why or "—"
+        tags = json.loads(paper.method_tags_json or "[]")
+        tags_text = " ".join(f"`{t}`" for t in tags) if tags else "—"
+        lines = ["", "## 一句话", one_line, "", "## 为什么重要", why, "", "## 方法标签", tags_text]
         if context.watchlist_groups:
             # ★ 只打★，不决定是否导出（红线 9）
             stars = ", ".join(context.watchlist_groups)
