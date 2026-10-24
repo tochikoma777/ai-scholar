@@ -101,6 +101,28 @@ def append_jsonl(path: Path, rows: list[dict[str, object]]) -> None:
             fh.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
+def _load_jsonl_seen(path: Path) -> set[tuple[str, str]]:
+    """加载 JSONL 真源已有的 `(paper_id, observed_at)` 集合。
+
+    ★ 幂等的**真源**是 JSONL（public 资产），不是 db 的 `signals` 表：
+    db 是可丢弃缓存，丢弃后 `signals` 表为空，若只查 db 会重新采样、
+    把 JSONL 已有行重复追加（2026-10-24 实跑踩中）。
+    """
+    seen: set[tuple[str, str]] = set()
+    if not path.exists():
+        return seen
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        seen.add((str(row.get("paper_id") or ""), str(row.get("observed_at") or "")))
+    return seen
+
+
 def select_due(session: Session, *, today: date, limit: int, force: bool = False) -> list[Paper]:
     """取本次该观测的论文。
 
@@ -234,6 +256,8 @@ async def run_signals(
 
         due = select_due(session, today=day, limit=effective_limit, force=force)
         report.due = len(due)
+        # ★ 幂等真源：JSONL 已有的 (paper_id, observed_at) —— db 丢失也不重复追加
+        jsonl_seen = _load_jsonl_seen(Path(report.jsonl_path))
 
         id_to_paper: dict[str, Paper] = {}
         ordered_ids: list[str] = []
@@ -280,16 +304,23 @@ async def run_signals(
                 report.fetched += 1
 
             created = False
+            key = (paper.id, day.isoformat())
             if record is not None and not dry_run:
-                created = _write_signal(
-                    session, paper_id=paper.id, today=day, citation=citation, refs=refs
-                )
+                if key not in jsonl_seen:
+                    created = _write_signal(
+                        session, paper_id=paper.id, today=day, citation=citation, refs=refs
+                    )
+                    if created:
+                        jsonl_seen.add(key)
                 if citation is not None:
                     paper.citation_count = citation
                 if refs is not None:
                     paper.refs_count = refs
             elif record is not None and dry_run:
-                created = session.get(Signal, (paper.id, day.isoformat())) is None
+                created = (
+                    session.get(Signal, (paper.id, day.isoformat())) is None
+                    and key not in jsonl_seen
+                )
 
             if created:
                 report.rows_new += 1

@@ -31,14 +31,17 @@ jobs:
         run: uv sync --frozen || uv sync
 
       # ★ db 是"可丢弃缓存"（§3.7.1）：用 actions-cache 跨天续命，避免每天重采全部引用。
-      #   但它不是唯一依托 —— 失效时 first_seen.jsonl / signals（git 真源）不受影响，
-      #   只丢 db（可由 JSONL/源重采重建）。
+      #   但它不是唯一依托 —— 失效时 first_seen.jsonl / signals（git 真源）不受影响。
+      #   ★ 标准单一步骤：主步骤按 restore-keys 恢复最近的 db，post（job 末尾）用新 key 保存。
+      #   不要再加显式 Save 步骤 —— 固定 key 的第二个 cache 步骤会 hit 同一 key、
+      #   用旧 db 覆盖 signals 更新（2026-10-24 实跑踩中）。
       - name: Restore db cache
         uses: actions/cache@v4
         with:
           path: data/ai_scholar.db
-          key: ai-scholar-db
-          restore-keys: ai-scholar-db
+          key: ai-scholar-db-${{ github.run_id }}
+          restore-keys: |
+            ai-scholar-db-
 
       - name: Migrate
         run: uv run alembic upgrade head
@@ -57,12 +60,6 @@ jobs:
 
       - name: Report
         run: uv run ai-scholar report
-
-      - name: Save db cache
-        uses: actions/cache@v4
-        with:
-          path: data/ai_scholar.db
-          key: ai-scholar-db
 
       # ★ 持久化真源（§8.3 定案 C′）：first_seen / signals / 报告 commit 回 public；
       #   db 被 .gitignore 排除，不 commit。

@@ -341,3 +341,49 @@ def test_signals_cli_reports_states(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert result.exit_code == 0, result.output
     assert "signals 新增行" in result.output
     assert "状态分布" in result.output
+
+
+@respx.mock
+async def test_signals_skips_paper_already_in_jsonl(tmp_path: Path) -> None:
+    """★ 真源幂等：JSONL 已有该 paper 当日行，即使 db `signals` 表为空也不重复追加。
+
+    场景：db 是可丢弃缓存，丢弃后 `signals` 表空、但 JSONL 真源仍在。
+    若只查 db 会重新采样、重复污染 JSONL（2026-10-24 实跑踩中）。
+    """
+    db_path = tmp_path / "data" / "t.db"
+    seed(
+        db_path,
+        [make_paper(pid="arXiv:2610.00001", state=SIGNAL_PENDING, next_at="2026-03-01")],
+    )
+    mock_s2({"ARXIV:2610.00001": s2_payload("2610.00001", citations=9)})
+    settings = settings_for(tmp_path)
+    day = date(2026, 3, 1)
+
+    jsonl = Path(settings.data_dir()) / "signals" / "2026-03.jsonl"
+    jsonl.parent.mkdir(parents=True, exist_ok=True)
+    jsonl.write_text(
+        json.dumps(
+            {
+                "paper_id": "arXiv:2610.00001",
+                "observed_at": "2026-03-01",
+                "citation_count": 9,
+                "reference_count": 10,
+                "source": "s2",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    report = await run_signals(today=day, settings=settings, db_path=db_path)
+
+    assert report.rows_new == 0  # ★ JSONL 已有 → 不重复追加
+    assert report.rows_existing == 1
+
+    lines = jsonl.read_text(encoding="utf-8").strip().splitlines()
+    assert len(lines) == 1  # 真源不被污染
+
+    # ★ advance 仍推进 signal_next_at（避免一直 due）
+    with Session(engine_for(db_path)) as session:
+        paper = session.get(Paper, "arXiv:2610.00001")
+        assert paper.signal_next_at == (day + timedelta(days=30)).isoformat()
