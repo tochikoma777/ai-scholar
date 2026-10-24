@@ -15,8 +15,9 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
   `estimate_cost` + `check_budget`，四层上限 + 单次 run 次数）。
 - **L2-A**：每日报告产物（`pipeline/report.py` + `templates/report/daily.md.j2` + `report` 命令），
   产出 `data/reports/YYYY-MM-DD.{md,json}`。
-- **L2-B**：`daily.yml`（cron UTC 16:30 + workflow_dispatch）：collect → enrich → signals → relate → report，
-  真源（first_seen / signals / 报告）commit 回 public，db 走 actions-cache 跨天续命。
+- **L2-B**：`daily.yml`（cron UTC 16:30 + workflow_dispatch）：migrate → collect → enrich → signals → relate → report，
+  真源（first_seen / signals / 报告）commit 回 public，db 走 actions-cache 跨天续命；
+  缓存只用单个 cache 步骤恢复并在 post 阶段保存，不要加第二个固定 key 的 Save 步骤。
 - ★ **L2-C Daily Note**（vault `40-日志/`）**推迟到 L3 之后** —— 依赖深度分析/新定级数据，届时再做。
 
 上一阶段：L1-C（文献耦合 + TF-IDF 相似）。
@@ -42,7 +43,7 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 | 导出物形态 | **合成文档** = 条目元信息 + why + 我的笔记（**不是条目列表**） |
 | 许可证 | MIT |
 | 仓库 | GitHub **public** |
-| LLM 默认 | DeepSeek：`deepseek-chat`（fast）/ `deepseek-reasoner`（strong） |
+| LLM 默认 | DeepSeek：`deepseek-v4-flash`（fast）/ `deepseek-v4-pro`（strong） |
 | 运行模式 | 三档 `off` / `fast` / `strong`；**未配 key 自动降级 off 且不报错** |
 | 本地路径 | `~/projects/ai-scholar`（WSL2 原生 ext4，**不要放 `/mnt/c/`**） |
 
@@ -52,21 +53,26 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 ```
 cli.py (typer)
-├─ collect ─→ pipeline/collect.py ─┬─ collectors/arxiv.py ─┐
-│                                 └─ collectors/hf.py ────┴→ RawPaper
-│                                    └→ store/hash.py · first_seen.py · models.py
-└─ export/list ─→ pipeline/export.py ─→ export/obsidian.py（db → Markdown）
+├─ collect ─→ pipeline/collect.py ─→ collectors/arxiv.py · hf.py ─→ RawPaper
+│                                      └→ store/hash.py · first_seen.py · models.py
+├─ enrich / signals ─→ pipeline/enrich.py · signals.py ─→ collectors/s2.py（batch）
+├─ relate ─→ pipeline/relate.py ─→ paper_links（文献耦合 / TF-IDF 相似）
+├─ export ─→ pipeline/export.py ─→ export/obsidian.py（db → Markdown）
+├─ report ─→ pipeline/report.py ─→ templates/report/ ─→ data/reports/
+└─ budget ─→ budget.py（纯成本估算与闸门；无网络、无 DB）
 
 横切层：config.py（YAML + ${ENV} + watchlist 合并） · utils/http.py（唯一网络出口）
 ```
 
 分层规则（违反就会重新引入已踩过的坑）：
 
-- **collectors 只产出 `RawPaper`**，不碰 DB、不碰 watchlist。新增数据源 = 一个 collector
-  函数 + `base.py` 里的源常量，去重与入库逻辑不用动。
+- **arXiv / HF collectors 只产出 `RawPaper`**，不碰 DB、不碰 watchlist。新增采集源 = 一个
+  collector 函数 + `base.py` 里的源常量，去重与入库逻辑不用动；S2 是增强客户端，
+  返回位置对齐的 `list[S2Record | None]`，不套 `RawPaper`。
 - **pipeline 是唯一的编排层**：事务、单源隔离、汇总报告都在这里。collector 抛的异常
   在此转成 `degraded`，不得外泄成非零退出码。
-- **export 是单向物化**：db → Markdown。禁止从 vault 反读并回写 db。
+- **export 的笔记内容单向物化**：db → Markdown；唯一 DB 回写是 `papers.note_path`
+  （供双轨链接判断目标笔记是否存在）。禁止从 vault 内容反读并回写其他 DB 字段。
 - **一切 HTTP 走 `utils/http.py:HttpClient.request`**（令牌桶限速 / 重试 / UA / 代理）。
   测试靠 respx 拦截；off 档断言"0 请求"依赖这一唯一出口。
 - **配置只从 `config/*.yaml` + `.env` 读**，代码内不硬编码阈值；环境开关必须 `${ENV}`。
@@ -81,11 +87,13 @@ cli.py (typer)
    ② 跨源（HF 只补 `hf_score`，不覆盖元数据、不新增条目）
    ③ 跨版本（`paper_aliases` 指向 canonical，别名不产生新条目）。
 3. 新条目先 `first_seen.append`（先查后写，已有跳过）→ **db 里的 `first_seen_at` 只是缓存**。
-4. 每次采集写一行 `runs`，降级原因进 `degraded_json`。
+4. 非 dry-run 时，对 `signal_state IS NULL` 的条目做零成本预筛，再写一行 `runs`；
+   降级原因进 `degraded_json`，dry-run 不写 DB / JSONL。
 
-**export** — `pipeline/export.py:96 run_export`
+**export** — `pipeline/export.py run_export`
 
-1. `select_papers` 圈定范围（`--limit` / `--ids` / `--since`，**默认 20 篇，不是全量**）。
+1. `select_papers` 圈定范围（`--limit` / `--ids` / `--since`）：**默认只选 `selected=1`，
+   上限默认 20；`--all` 才按 limit 选最新论文**。
 2. `ObsidianExporter.render`：读旧文件 → frontmatter 读-合并-写回（`USER_KEYS` / `OBSERVED_KEYS`）
    → 生成区内容不变则保留 `content_rev_at`。
 3. `Exporter.write` 原子写（`.tmp` + `os.replace`），避免 Obsidian 读到半截文件。
@@ -95,19 +103,21 @@ cli.py (typer)
 
 | 路径 | 职责 | 关键点 |
 |---|---|---|
-| `cli.py` | 十个子命令：`init`/`doctor`/`collect`/`export`/`enrich`/`mark`/`signals`/`relate`/`related`/`list` | 退出码：正常恒 0、`ConfigError` 1、参数错误 2 |
+| `cli.py` | 十二个子命令：`init`/`doctor`/`collect`/`export`/`enrich`/`mark`/`signals`/`relate`/`related`/`list`/`budget`/`report` | 退出码：正常恒 0、`ConfigError` 1、参数错误 2 |
 | `config.py` | YAML 加载、`${ENV}` 插值、watchlist 双文件合并、`Settings` | `load_settings` 带 `lru_cache`；环境变量前缀 `AI_SCHOLAR_`，嵌套分隔 `__` |
 | `models.py` | pydantic 域模型：`WatchlistConfig` / `Availability` / `TimeSemantics` | **与 `store/models.py` 不是一回事** |
+| `budget.py` | `estimate_cost` + `check_budget` | 纯逻辑；L3 真实调用前接入，记账闭环尚未实现 |
 | `collectors/base.py` | `RawPaper` 统一中间表示 | 只有元数据，**没有正文字段** |
 | `collectors/s2.py` | S2 `paper/batch` 客户端 | ★ 未命中返回 `null`（位置对齐）；超限降半重试；无 key 不发 `x-api-key` |
 | `pipeline/collect.py` | 编排、三级去重、upsert、`runs` | 源码级禁止 import watchlist |
 | `pipeline/enrich.py` | 引用补齐：S2 → 出边 + 队列状态机 | ★ 方向语义固定为 src 引用 dst；入库前先写方向单测 |
 | `pipeline/prescreen.py` | 零成本预筛（规则负面排除） | ★ 只决定是否跟踪；`r` 是淘汰集留存率 |
-| `pipeline/signals.py` | 采样状态机 + signals 写入 + 月度 JSONL | ★ 状态持久化；两套时钟不可混用 |
+| `pipeline/signals.py` | 采样状态机 + signals 写入 + 月度 JSONL | ★ 状态持久化；两套时钟不可混用；JSONL 是跨 DB 重建的幂等真源 |
 | `pipeline/relate.py` | 文献耦合（倒排）+ TF-IDF 相似（增量） | ★ 禁止全库两两比较；对称边只存一条 |
+| `pipeline/report.py` | `DailyReport` + Jinja 渲染 + 原子写 | 只读 DB；当天重跑无生成时间 diff |
 | `store/hash.py` | 主键归一化 + `content_hash` | hash 只含 title/abstract/authors/venue |
 | `store/first_seen.py` | `first_seen.jsonl` 读写 | append-only，绝不覆盖已有 id |
-| `store/models.py` | 六张 SQLModel 表 | 时间字段一律 TEXT ISO-8601 UTC |
+| `store/models.py` | 七张 SQLModel 表 | 运行时间戳为 UTC ISO 文本；`first_seen_at`/`observed_at` 按本地日存 `YYYY-MM-DD` |
 | `export/base.py` | `Exporter` ABC + 原子写 | 不为"将来"加 Registry / 插件机制 |
 | `export/obsidian.py` | 标记块、frontmatter 合并、双轨链接渲染 | 标记块注释里**不能有时间戳** |
 | `utils/http.py` | 限速 / 重试 / 代理 / UA | 只重试 408/425/429/5xx 与超时 |
@@ -196,9 +206,9 @@ vault 由本地 `export` 写入。任何"让 Actions 写 private vault"的设计
    一次最多 500 个 id，`fields` 走 URL query 参数，Header `x-api-key`。
 6. ❌ **覆盖用户笔记** —— vault 正文必须用标记块 `<!-- BEGIN/END GENERATED -->` 保护，
    生成区之外的用户区**永不覆盖、永不重做**。
-7. ❌ **导出产生 diff 噪音** —— 文件内**只留内容级时间戳**（why/note 内容变了才更新）；
-   导出时间移出文件，只进 `90-元数据/生成报告.md`。hash 基于**每条目的 why/note 内容**，
-   不是"条目集合"。
+7. ❌ **导出产生 diff 噪音** —— 文件内**只留内容级时间戳**：直接比较新旧生成区文本，
+   只有生成区变化才更新 `content_rev_at`，用户笔记变化不触发；导出时间移出文件，
+   只进 `90-元数据/生成报告.md`。这里没有单独的导出内容 hash。
 8. ❌ **Tier 当门槛用** —— **Tier 是排序权重，不是门槛**。
    深度分析通道 A（watchlist 命中 / 显式指定 / 当日 Top N）**立刻执行、不看 Tier**；
    正文抓取跟随深度分析触发，不按 Tier 限流。
@@ -273,7 +283,7 @@ uv run ai-scholar export [--limit N] [--ids a,b] [--since DATE] [--out PATH] [--
                                  # 导出 vault（★ 默认只导 selected=1；--all 导最新 N 篇）
 uv run ai-scholar export --check # 只比对不落盘：无变更退出 0，有变更退出 1（幂等验收）
 uv run ai-scholar export --check --all
-                                 # 校验**全量笔记**（磁盘上所有 .md，不只本次选集）
+                                 # 校验库内论文对应的全部现存文献笔记，不只本次选集
 uv run ai-scholar mark <paper-id> [--unmark]   # 显式收藏（决定是否生成笔记）
 uv run ai-scholar signals [--limit N] [--force] [--dry-run]
                                  # 按时序状态机采样（signals 表 + data/signals/YYYY-MM.jsonl）
@@ -287,19 +297,20 @@ uv run python scripts/probe_s2.py --n 50     # S2 实测（产出 docs/数据源
 uv run ai-scholar list [--limit N] [--since DATE] [--watchlist-only]
                                  # ★ = watchlist 命中（只做展示筛选）
 uv run ai-scholar report [--date YYYY-MM-DD] [--out DIR]
-                                 # 每日报告（★ 只读，写 data/reports/YYYY-MM-DD.{md,json}）
+                                 # 每日报告（只读 DB，写 data/reports/YYYY-MM-DD.{md,json}）
 uv run ai-scholar budget --input-tokens N --max-tokens M [--tier fast|strong]
                                  # 预算演练（★ 不调 LLM，只估算成本 + 过闸门）
 uv run alembic upgrade head      # 建库（★ 空 data/ 目录也能跑）
 
 uv run python scripts/probe_sources.py        # 数据源探测（需联网，产出 docs/数据源手册.md）
 
-uv run pytest                    # 全量（respx mock，不打真实网络）
+uv run pytest                    # 全量（含 2 个联网冒烟；其余网络用 respx mock）
 uv run pytest tests/test_export.py -q          # 单文件
 uv run pytest tests/test_export.py::test_note_name_has_date_prefix_and_short_hash -q   # 单条
 uv run pytest -k "config or watchlist" -q      # 按关键字筛
 uv run ruff check . && uv run ruff format --check .
 uv run mypy src/ai_scholar       # strict，cli.* 与 utils.* 有放宽
+uv build                         # hatchling：构建 sdist + wheel（默认写 dist/）
 ```
 
 ---
@@ -314,6 +325,8 @@ uv run mypy src/ai_scholar       # strict，cli.* 与 utils.* 有放宽
 | `collectors/s2.py` · `pipeline/enrich.py` | `pytest -k enrich`（★ 方向三组 + 降半重试 + 队列状态机） |
 | `pipeline/signals.py` · `pipeline/prescreen.py` | `pytest -k signals`（★ 跨天/跨月时序 + 幂等） + `pytest -k prescreen` |
 | `pipeline/relate.py` | `pytest -k relate`（★ 倒排分桶 / 阈值 / 增量 / 对称边不混入引用） |
+| `pipeline/report.py` · `templates/report/` | `pytest -k report`（★ 当天重跑无 diff；只读 DB） |
+| `budget.py` · 预算配置 | `pytest -k budget` + `ai-scholar budget ...` 演练（零网络） |
 | `scripts/probe_sources.py` | 实跑一次 + 检查 `docs/数据源手册.md`；不可达时确认是 skip 不是伪造 |
 | `cli.py` | `pytest -k cli` + `uv run ai-scholar --help` |
 | `store/hash.py`（content_hash） | `pytest -k content_hash`（★ 三条硬约束） |
@@ -332,10 +345,11 @@ uv run mypy src/ai_scholar       # strict，cli.* 与 utils.* 有放宽
 - `tests/conftest.py` 的两个 autouse fixture 是测试可复现的前提：
   清 `load_settings` 缓存、把 `load_dotenv` 打桩并 `chdir(tmp_path)`。
   **不要绕过它们**，否则本地有 `.env` 时会出现"本地失败、CI 通过"。
-- 网络一律 respx 拦截；`test_live_arxiv_parse` / `test_live_hf_parse_may_skip` 是联网冒烟，
-  失败/跳过不代表 CI 红。
+- 除 `test_live_arxiv_parse` / `test_live_hf_parse_may_skip` 外，网络一律 respx 拦截；
+  这两个联网冒烟在连接失败、非 200 或无数据时 skip，但解析断言失败仍会让测试红。
 - 断言要落在**实际收到的值**上（如 `settings.llm.base_url`），不是"加载成功"。
-- CI：`ubuntu-24.04` 固定，`lint-and-test` **不读任何 secrets**；`probe` 仅在
+- CI：`ubuntu-24.04` + Python 3.11 固定，依赖安装为 `uv sync --frozen || uv sync`；
+  `lint-and-test` **不读任何 secrets**，执行全量 pytest（未排除联网冒烟）；`probe` 仅在
   `workflow_dispatch` 下实跑数据源探测，不回写仓库。
 
 ---
@@ -347,7 +361,6 @@ uv run mypy src/ai_scholar       # strict，cli.* 与 utils.* 有放宽
 | arXiv API | `always` | 限速约 1 req / 3s |
 | HF Daily Papers | `always` | ★ availability 描述"源本身是否公开可用"，**不是**"从某台机器能不能访问"；本地 WSL 连不上官方域名是**网络环境问题**，配 `hf_base_url`（镜像）即可解，不可达只 warning + 跳过、**不计失败** |
 | Semantic Scholar（L1+） | `always` | 只走 `POST /graph/v1/paper/batch` |
-| OpenReview（L1，可选增强） | **`optional_enrich`** | ★ 国内访问不稳定是**已知预期**；失败只写 warning、字段留空，**不影响退出码**，不作为 bug 排查 |
 
 ★ 本地（WSL）**可联网**，探测与采集均可在本地完成；Actions 是自动化通道，不是唯一验证途径。
 
