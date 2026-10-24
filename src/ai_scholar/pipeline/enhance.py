@@ -24,7 +24,7 @@ from sqlmodel import Session, SQLModel, col, create_engine, select
 
 from ai_scholar.budget import BudgetState, check_budget, estimate_cost
 from ai_scholar.config import RunMode, Settings, load_settings, load_watchlist, match_watchlist
-from ai_scholar.llm import LLMClient, NullLLM, build_client, parse_json_content
+from ai_scholar.llm import LLMClient, LLMResponse, NullLLM, build_client, parse_json_content
 from ai_scholar.models import WatchlistConfig
 from ai_scholar.store.db import default_db_path
 from ai_scholar.store.models import LINK_TYPE_SIMILARITY, LLMUsage, Paper, PaperLink
@@ -82,6 +82,18 @@ def _estimate_input_tokens(text: str) -> int:
     return max(1, len(text) // 3)
 
 
+def _actual_cost(settings: Settings, provider: str, model: str, response: LLMResponse) -> float:
+    """调用后按**实际 usage** 算成本（把实际输出 token 传进 max_tokens 位）。"""
+    return estimate_cost(
+        settings.budget,
+        provider,
+        model,
+        response.tokens_in,
+        response.tokens_out,
+        input_cached=response.cache_hit,
+    ).cost_cny
+
+
 def _authors(paper: Paper) -> str:
     return ", ".join(json.loads(paper.authors_json or "[]"))
 
@@ -131,6 +143,7 @@ def _select_candidates(
     limit: int,
     report: EnhanceReport,
     watchlist: WatchlistConfig | None = None,
+    force: bool = False,
 ) -> list[tuple[Paper, float]]:
     """watchlist 命中的未增强论文，按 (命中分, first_seen) 降序。"""
     watchlist = watchlist or load_watchlist()
@@ -140,7 +153,8 @@ def _select_candidates(
         if not hit.matched:
             continue
         if (
-            paper.enhance_content_hash is not None
+            not force
+            and paper.enhance_content_hash is not None
             and paper.enhance_content_hash == paper.content_hash
         ):
             report.skipped += 1
@@ -212,6 +226,7 @@ async def run_enhance(
                 limit=effective_limit,
                 report=report,
                 watchlist=watchlist,
+                force=force,
             )
             report.requested = len(candidates)
             by_id = {p.id: p for p in session.exec(select(Paper)).all()}
@@ -266,20 +281,21 @@ async def run_enhance(
                 )
                 paper.enhanced_at = day.isoformat()
                 paper.enhance_content_hash = paper.content_hash
+                papers_cost = _actual_cost(settings, provider, model, response)
                 session.add(
                     LLMUsage(
                         run_id=report.run_id,
                         model=model,
                         tokens_in=response.tokens_in,
                         tokens_out=response.tokens_out,
-                        cost_cny=estimate.cost_cny,
+                        cost_cny=papers_cost,
                         cache_hit=response.cache_hit,
                         purpose="enhance",
                     )
                 )
                 report.enhanced += 1
                 report.llm_calls += 1
-                report.cost_cny += estimate.cost_cny
+                report.cost_cny += papers_cost
 
             # 关联解读（强相似边）
             for edge in _select_links(
@@ -327,20 +343,21 @@ async def run_enhance(
                     report.degraded["link"] = f"{type(exc).__name__}: {exc}"
                     continue
                 edge.interpretation = data.get("interpretation") or None
+                link_cost = _actual_cost(settings, provider, model, response)
                 session.add(
                     LLMUsage(
                         run_id=report.run_id,
                         model=model,
                         tokens_in=response.tokens_in,
                         tokens_out=response.tokens_out,
-                        cost_cny=estimate.cost_cny,
+                        cost_cny=link_cost,
                         cache_hit=response.cache_hit,
                         purpose="enhance_link",
                     )
                 )
                 report.links_interpreted += 1
                 report.llm_calls += 1
-                report.cost_cny += estimate.cost_cny
+                report.cost_cny += link_cost
 
             if not dry_run:
                 session.commit()

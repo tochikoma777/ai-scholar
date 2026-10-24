@@ -132,6 +132,7 @@ async def test_enhance_persists_and_records_usage(tmp_path: Path) -> None:
 
     assert report.enhanced == 2
     assert report.llm_calls == 2
+    assert report.cost_cny < 0.001  # ★ 按实际 token 记账，不是 max_tokens 保守估算
     assert "标题：Retrieval Agents" in fake.last_prompt
     assert "摘要：retrieval augmented generation" in fake.last_prompt
 
@@ -163,6 +164,22 @@ async def test_skip_already_enhanced(tmp_path: Path) -> None:
     assert report.skipped == 1
     assert report.requested == 0
     assert fake2.calls == 0
+
+
+async def test_force_reenhances(tmp_path: Path) -> None:
+    db = tmp_path / "d.db"
+    seed(db, [make_paper("arXiv:A", "RAG Survey")])
+    settings = fast_settings()
+    await run_enhance(settings=settings, db_path=db, client=FakeLLM(), watchlist=WATCHLIST)
+
+    fake2 = FakeLLM(one_line="新一句话")
+    report = await run_enhance(
+        settings=settings, db_path=db, client=fake2, watchlist=WATCHLIST, force=True
+    )
+    assert report.enhanced == 1
+    assert fake2.calls == 1
+    papers = {p.id: p for p in load_papers(db)}
+    assert papers["arXiv:A"].one_line == "新一句话"
 
 
 async def test_budget_gate_blocks(tmp_path: Path) -> None:
