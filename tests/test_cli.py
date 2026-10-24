@@ -329,3 +329,38 @@ def test_doctor_healthcheck_unreachable_is_warning(
     result = runner.invoke(app, ["doctor"], env={"COLUMNS": "200"})
     assert result.exit_code == 0, result.output
     assert "warning" in result.output
+
+
+# ── budget（阶段 0：预算演练，零网络）─────────────────────────────────────
+
+
+def test_budget_cli_estimates_and_allows() -> None:
+    """budget 演练：估算成本并放行（★ 不真正调 LLM）。"""
+    result = runner.invoke(
+        app,
+        ["budget", "--input-tokens", "30000", "--max-tokens", "4000"],
+        env={"COLUMNS": "200"},
+    )
+    assert result.exit_code == 0, result.output
+    assert "deepseek-v4-flash" in result.output
+    assert "放行" in result.output
+
+
+def test_budget_cli_blocks_when_daily_exhausted() -> None:
+    """★ 闸门拦截是硬停但**退出码仍 0**（成本预算 §3.3，不是错误）。"""
+    result = runner.invoke(
+        app,
+        ["budget", "--input-tokens", "30000", "--max-tokens", "4000", "--spent-daily", "2.0"],
+        env={"COLUMNS": "200"},
+    )
+    assert result.exit_code == 0, result.output
+    assert "拦截" in result.output
+
+
+def test_budget_cli_unknown_tier_exits_2() -> None:
+    result = runner.invoke(
+        app,
+        ["budget", "--input-tokens", "1", "--max-tokens", "1", "--tier", "bogus"],
+        env={"COLUMNS": "200"},
+    )
+    assert result.exit_code == 2

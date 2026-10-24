@@ -1,7 +1,7 @@
 """CLI 入口。
 
-五个子命令：`init` / `doctor` / `collect` / `export` / `list`。
-L0-B 实现 `collect`；L0-C 实现 `export` / `list`。
+子命令：`init` / `doctor` / `collect` / `export` / `enrich` / `mark` /
+`signals` / `relate` / `related` / `list` / `budget`。
 """
 
 from __future__ import annotations
@@ -696,6 +696,66 @@ def list_papers(
             )
     console.print(table)
     console.print(f"显示 {shown} 条（★ = watchlist 命中）")
+    raise typer.Exit(0)
+
+
+@app.command()
+def budget(
+    input_tokens: int = typer.Option(..., "--input-tokens", help="输入 token 估算"),
+    max_tokens: int = typer.Option(..., "--max-tokens", help="输出 token 上限（max_tokens）"),
+    tier: str = typer.Option("fast", "--tier", help="档位：fast | strong"),
+    spent_daily: float = typer.Option(0.0, "--spent-daily", help="当日已花费（元）"),
+    spent_weekly: float = typer.Option(0.0, "--spent-weekly", help="本周已花费（元）"),
+    spent_monthly: float = typer.Option(0.0, "--spent-monthly", help="本月已花费（元）"),
+    spent_yearly: float = typer.Option(0.0, "--spent-yearly", help="本年已花费（元）"),
+    calls_this_run: int = typer.Option(0, "--calls-this-run", help="本次 run 已调用次数"),
+) -> None:
+    """预算演练：估算一次 LLM 调用成本并过闸门（★ 不真正调 LLM，零网络）。
+
+    ★ 闸门在调用前拦截（成本预算 §3）：钱不够 = 进队列，**不截断生成**。
+    ★ 拦截不是错误 —— 退出码仍为 0。
+    """
+    from ai_scholar.budget import BudgetState, check_budget, estimate_cost
+
+    if tier not in ("fast", "strong"):
+        console.print(f"[red]未知档位[/]：{tier}（可选 fast / strong）")
+        raise typer.Exit(2)
+
+    settings = load_settings()
+    model = settings.llm.fast_model if tier == "fast" else settings.llm.strong_model
+    provider = settings.llm.provider
+
+    estimate = estimate_cost(settings.budget, provider, model, input_tokens, max_tokens)
+    state = BudgetState(
+        spent_daily=spent_daily,
+        spent_weekly=spent_weekly,
+        spent_monthly=spent_monthly,
+        spent_yearly=spent_yearly,
+        calls_this_run=calls_this_run,
+    )
+    decision = check_budget(settings.budget, state, estimate)
+
+    table = Table(title=f"budget · {provider} / {model}", title_justify="left")
+    table.add_column("项")
+    table.add_column("值")
+    table.add_row("档位", tier)
+    table.add_row("输入 token（按未命中计价）", str(input_tokens))
+    table.add_row("输出上限（max_tokens）", str(max_tokens))
+    table.add_row("预估成本", f"¥{estimate.cost_cny:.4f}")
+    table.add_row(
+        "日额度",
+        f"¥{spent_daily:.4f} + ¥{estimate.cost_cny:.4f} / ¥{settings.budget.daily_limit_cny}",
+    )
+    table.add_row(
+        "单次 run 调用次数",
+        f"{calls_this_run} + 1 / {settings.budget.max_calls_per_run}",
+    )
+    console.print(table)
+
+    if decision.allowed:
+        console.print(f"[green]✓ 放行[/]：预估 ¥{estimate.cost_cny:.4f}")
+    else:
+        console.print(f"[red]✗ 拦截[/]：{decision.reason}（任务进队列，不截断生成）")
     raise typer.Exit(0)
 
 

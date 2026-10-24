@@ -20,8 +20,8 @@ llm:
   provider: deepseek
   base_url: ${AI_SCHOLAR_LLM__BASE_URL}
   api_key: ${AI_SCHOLAR_LLM__API_KEY}
-  fast_model: ${AI_SCHOLAR_LLM__FAST_MODEL:-deepseek-chat}
-  strong_model: ${AI_SCHOLAR_LLM__STRONG_MODEL:-deepseek-reasoner}
+  fast_model: ${AI_SCHOLAR_LLM__FAST_MODEL:-deepseek-v4-flash}
+  strong_model: ${AI_SCHOLAR_LLM__STRONG_MODEL:-deepseek-v4-pro}
   temperature: 0.3
   # strong 档走思维链，比 fast 慢得多，故分开设超时
   timeout_s: ${AI_SCHOLAR_LLM__TIMEOUT_S:-120}
@@ -32,8 +32,22 @@ llm:
 
 budget:
   daily_limit_cny: ${AI_SCHOLAR_BUDGET__DAILY_LIMIT_CNY:-2.0}
-  price_fast_cny_per_1m: 1.0       # 成本估算单价（元/百万 token），可调
-  price_strong_cny_per_1m: 4.0
+  weekly_limit_cny: ${AI_SCHOLAR_BUDGET__WEEKLY_LIMIT_CNY:-10.0}
+  monthly_limit_cny: ${AI_SCHOLAR_BUDGET__MONTHLY_LIMIT_CNY:-40.0}
+  yearly_limit_cny: ${AI_SCHOLAR_BUDGET__YEARLY_LIMIT_CNY:-200.0}
+  max_calls_per_run: 100           # 单次 run 调用次数上限（§3.3）
+  # ★ 三档单价（元/百万 token），按 provider → model 键控。
+  #   来源：DeepSeek 定价页（核对 2026-10-24）；换供应商 = 加一行价格，不改代码。
+  prices:
+    deepseek:
+      deepseek-v4-flash:
+        input_cached_cny_per_1m: 0.02
+        input_miss_cny_per_1m: 1.0
+        output_cny_per_1m: 2.0
+      deepseek-v4-pro:
+        input_cached_cny_per_1m: 0.025
+        input_miss_cny_per_1m: 3.0
+        output_cny_per_1m: 6.0
 
 http:
   timeout_connect_s: 5.0

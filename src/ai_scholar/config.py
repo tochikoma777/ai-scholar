@@ -83,8 +83,8 @@ class LLMSettings(BaseModel):
     provider: str = "deepseek"
     base_url: str = ""
     api_key: str = ""
-    fast_model: str = "deepseek-chat"
-    strong_model: str = "deepseek-reasoner"
+    fast_model: str = "deepseek-v4-flash"
+    strong_model: str = "deepseek-v4-pro"
     temperature: float = 0.3
     timeout_s: int = 120
     # strong 档走思维链，比 fast 慢得多，分开设（否则读超时会打断）
@@ -103,10 +103,36 @@ class LLMSettings(BaseModel):
         return self.max_tokens_strong if model_tier == "strong" else self.max_tokens_fast
 
 
+class ModelPrice(BaseModel):
+    """单个 (provider, model) 的三档单价（元/百万 token）。
+
+    ★ 三档缺一不可（成本预算 C2）：输出单价常是输入的 2 倍，单一数字必系统性低估。
+    """
+
+    input_cached_cny_per_1m: float
+    input_miss_cny_per_1m: float
+    output_cny_per_1m: float
+
+
 class BudgetSettings(BaseModel):
+    """成本闸门配置（成本预算 §4）。★ 四层上限 + 单次 run 调用次数，缺一不可（C1 叠乘）。"""
+
     daily_limit_cny: float = 2.0
-    price_fast_cny_per_1m: float = 1.0
-    price_strong_cny_per_1m: float = 4.0
+    weekly_limit_cny: float = 10.0
+    monthly_limit_cny: float = 40.0
+    yearly_limit_cny: float = 200.0
+    # 单次 run 的 LLM 调用次数上限（§3.3：闸门同时卡"篇数 × 上下文 × 调用次数"）
+    max_calls_per_run: int = 100
+    # 三档单价按 provider → model 键控（§4：换供应商 = 加一行价格，不改代码）
+    prices: dict[str, dict[str, ModelPrice]] = Field(default_factory=dict)
+
+    def price_for(self, provider: str, model: str) -> ModelPrice:
+        tier = self.prices.get(provider, {}).get(model)
+        if tier is None:
+            raise ConfigError(
+                f"预算价格表缺 ({provider}, {model}) 的单价，请补 config/default.yaml"
+            )
+        return tier
 
 
 class SourceSettings(BaseModel):

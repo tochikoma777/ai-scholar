@@ -170,3 +170,19 @@ def test_repo_default_settings_load_without_env(monkeypatch: pytest.MonkeyPatch)
     settings = load_settings()
     assert settings.effective_mode() is RunMode.OFF
     assert settings.app.name == "ai-scholar"
+
+
+def test_default_models_migrated_to_v4() -> None:
+    """★ 模型名已迁到 deepseek-v4-*（旧名 2026-07-24 弃用，见成本预算 §1）。"""
+    settings = load_settings()
+    assert settings.llm.fast_model == "deepseek-v4-flash"
+    assert settings.llm.strong_model == "deepseek-v4-pro"
+
+
+def test_default_yaml_has_v4_model_names() -> None:
+    """仓库那份 default.yaml 的模型名也必须是新名（防止只改代码漏改配置）。"""
+    raw = (project_root() / "config" / "default.yaml").read_text(encoding="utf-8")
+    assert "deepseek-chat" not in raw
+    assert "deepseek-reasoner" not in raw
+    assert "deepseek-v4-flash" in raw
+    assert "deepseek-v4-pro" in raw
