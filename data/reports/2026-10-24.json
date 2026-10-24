@@ -100,19 +100,11 @@
   "new_graded": [],
   "runs": [
     {
-      "run_id": "049cc84fbd14",
+      "run_id": "9b96fedeebec",
       "mode": "off",
       "source": null,
       "fetched": 2195,
       "new": 2109,
-      "degraded": []
-    },
-    {
-      "run_id": "dbd64a4dae88",
-      "mode": "off",
-      "source": null,
-      "fetched": 2195,
-      "new": 0,
       "degraded": []
     }
   ],
