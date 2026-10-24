@@ -9,17 +9,16 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 ---
 
-## ★ 当前阶段：L1-B（signals 采样 + 预筛 + 选集策略）—— 已完成
+## ★ 当前阶段：L1-C（文献耦合 + TF-IDF 语义相似）—— 已完成
 
-- **采样状态机**（`papers.signal_state/signal_next_at/...`）：pending / ready（快路径）/ tracked /
-  dormant / sample，状态**持久化**、靠 `signal_next_at` 到期触发，不每日重算。
-- **零成本预筛**：只决定是否进 pending（`sample` / `rejected`），**不决定入库**。
-- **实测 `p`**：1.00（2174/2174，无 LLM），体积实测 ≈ **27.8 MB/年**（signals 78 B/行 + first_seen 77 B/行）。
-- **选集**：`papers.selected`；`export` 默认只导 selected，`--all` 才按 limit 导最新；
-  `mark <id>` 收藏；`export --check --all` 校验全量笔记。
+- `paper_references`（**只落 db**，41,013 行 / 1,144 篇有引用）→ 倒排索引 → **文献耦合** 294 条边；
+  全量 5.97s，桶内对数 **77,392**（全库两两比较是 236 万）。
+- **TF-IDF 相似**（title×2 + abstract，增量 `similar_at`）→ 1,523 条边，阈值 0.15 / Top-10。
+- 双轨渲染新增「相似」「文献耦合」两节：有笔记 `[[双链]]`，无笔记 文本+外链，**不建空文件**。
+- 实体共现（`entity_cooccur`）**未实现**（卡允许跳过：时间/复杂度）。
 
-上一阶段：L1-A（S2 引用关联 + 补齐队列 + 双轨渲染）。
-下一阶段（**未开始**）：L1-C（TF-IDF 语义相似 / 文献耦合 / 实体共现）。
+上一阶段：L1-B（signals 采样 + 预筛 + 选集）。
+下一阶段（**未开始**）：L2（Actions 自动化 / Daily Note / 每日报告）。
 
 上一阶段：L0-B（DB + 采集 + 三级去重 + `first_seen`）、L0-C（Obsidian 导出器 + `list`）。
 下一阶段（**未开始**）：L1-A Semantic Scholar 关联。
@@ -101,6 +100,7 @@ cli.py (typer)
 | `pipeline/enrich.py` | 引用补齐：S2 → 出边 + 队列状态机 | ★ 方向语义固定为 src 引用 dst；入库前先写方向单测 |
 | `pipeline/prescreen.py` | 零成本预筛（规则负面排除） | ★ 只决定是否跟踪；`r` 是淘汰集留存率 |
 | `pipeline/signals.py` | 采样状态机 + signals 写入 + 月度 JSONL | ★ 状态持久化；两套时钟不可混用 |
+| `pipeline/relate.py` | 文献耦合（倒排）+ TF-IDF 相似（增量） | ★ 禁止全库两两比较；对称边只存一条 |
 | `store/hash.py` | 主键归一化 + `content_hash` | hash 只含 title/abstract/authors/venue |
 | `store/first_seen.py` | `first_seen.jsonl` 读写 | append-only，绝不覆盖已有 id |
 | `store/models.py` | 六张 SQLModel 表 | 时间字段一律 TEXT ISO-8601 UTC |
@@ -125,7 +125,7 @@ cli.py (typer)
 
 | 数据 | 可再生？ | 落点 | 入库？ |
 |---|---|---|---|
-| 论文元数据、关联边 | ✅ 重采即回 | `data/ai_scholar.db`（**可丢弃缓存**） | ✗ |
+| 论文元数据、关联边、引用列表 | ✅ 重采即回 | `data/ai_scholar.db`（**可丢弃缓存**） | ✗ |
 | **`first_seen_at`**（首次见到它的日期） | ❌ | `data/first_seen.jsonl` | **✓ public** |
 | **signals 时序快照**（被引增长曲线） | ❌ | `data/signals/YYYY-MM.jsonl` | **✓ public** |
 | 每日报告 md + json | ✅ | `data/reports/YYYY-MM-DD.{md,json}` | **✓ public** |
@@ -225,6 +225,12 @@ vault 由本地 `export` 写入。任何"让 Actions 写 private vault"的设计
 20. ❌ **预筛决定入库 / 把 `r` 当总体放行率** —— 预筛只决定"是否进 pending"；
     `r=0.2` 是**淘汰集**抽样留存率（总量 = `N×p + N×(1-p)×r`）。
 21. ❌ **导出默认"最新 N 篇"** —— 默认只导 `selected=1`，否则每天 20 篇 = 7,300 篇/年（目标 300–500）。
+22. ❌ **关联计算做全库两两比较** —— 文献耦合必须按 `ref_external_id` 倒排分桶，
+    计算量 = `Σ C(n_bucket, 2)`；23 万篇两两 = 264 亿对，直接崩。
+23. ❌ **`paper_references` 落 public / 存被引论文元数据** —— 只落 db（可丢弃缓存）、**只存外部 ID**
+    （`ARXIV:` / `DOI:` / `S2:`）。它是文献耦合的原料，不是知识库资产。
+24. ❌ **把对称边当引用渲染** —— `similarity` / `bibcoupling` 必须走独立分节（相似 / 文献耦合），
+    不能混进「引用了」；对称边只存一条（`src < dst`），渲染时双向展开。
 
 ---
 
@@ -262,6 +268,8 @@ uv run ai-scholar export --check --all
 uv run ai-scholar mark <paper-id> [--unmark]   # 显式收藏（决定是否生成笔记）
 uv run ai-scholar signals [--limit N] [--force] [--dry-run]
                                  # 按时序状态机采样（signals 表 + data/signals/YYYY-MM.jsonl）
+uv run ai-scholar relate [--type bibcoupling|similarity|all] [--limit N] [--dry-run]
+                                 # 文献耦合（倒排索引）+ TF-IDF 相似（增量）；零 LLM
 uv run ai-scholar enrich [--limit N] [--force] [--dry-run]
                                  # 补查 S2 引用（★ 全程 batch，禁止逐篇 GET）
 uv run ai-scholar related <paper-id>
@@ -292,6 +300,7 @@ uv run mypy src/ai_scholar       # strict，cli.* 与 utils.* 有放宽
 | `utils/http.py` | `pytest -k http`（★ 断言实际发出的请求数；off 档为 0） |
 | `collectors/s2.py` · `pipeline/enrich.py` | `pytest -k enrich`（★ 方向三组 + 降半重试 + 队列状态机） |
 | `pipeline/signals.py` · `pipeline/prescreen.py` | `pytest -k signals`（★ 跨天/跨月时序 + 幂等） + `pytest -k prescreen` |
+| `pipeline/relate.py` | `pytest -k relate`（★ 倒排分桶 / 阈值 / 增量 / 对称边不混入引用） |
 | `scripts/probe_sources.py` | 实跑一次 + 检查 `docs/数据源手册.md`；不可达时确认是 skip 不是伪造 |
 | `cli.py` | `pytest -k cli` + `uv run ai-scholar --help` |
 | `store/hash.py`（content_hash） | `pytest -k content_hash`（★ 三条硬约束） |
