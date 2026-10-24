@@ -150,6 +150,22 @@ async def test_complete_raises_when_all_formats_fail() -> None:
             await make_client(http).complete([{"role": "user", "content": "json"}])
 
 
+@respx.mock
+async def test_json_mode_false_skips_response_format() -> None:
+    """★ 文本/Markdown 输出（定级/深度分析）不强制 JSON：直接走 plain。"""
+    route = respx.post(ENDPOINT).mock(
+        return_value=httpx.Response(200, json=chat_completion("plain text"))
+    )
+    async with HttpClient() as http:
+        result = await make_client(http).complete(
+            [{"role": "user", "content": "text"}], json_mode=False
+        )
+    body = json.loads(route.calls[0].request.content)
+    assert "response_format" not in body
+    assert route.call_count == 1
+    assert result.content == "plain text"
+
+
 def test_parse_json_content_variants() -> None:
     assert parse_json_content('{"a": 1}') == {"a": 1}
     assert parse_json_content('```json\n{"a": 1}\n```') == {"a": 1}

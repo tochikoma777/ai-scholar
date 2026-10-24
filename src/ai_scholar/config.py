@@ -278,6 +278,12 @@ class EnhanceSettings(BaseModel):
     link_pairs_limit: int = 10
 
 
+class GradeSettings(BaseModel):
+    """L3b-1 定级参数（fast）。★ 触发阈值复用 `signals.maturity_days` / `min_citations`。"""
+
+    default_limit: int = 20
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix=ENV_PREFIX,
@@ -299,6 +305,7 @@ class Settings(BaseSettings):
     prescreen: PrescreenSettings = Field(default_factory=PrescreenSettings)
     relate: RelateSettings = Field(default_factory=RelateSettings)
     enhance: EnhanceSettings = Field(default_factory=EnhanceSettings)
+    grade: GradeSettings = Field(default_factory=GradeSettings)
     sources: dict[str, SourceSettings] = Field(default_factory=dict)
 
     def effective_mode(self) -> RunMode:

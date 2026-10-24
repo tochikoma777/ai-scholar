@@ -46,7 +46,11 @@ class NullLLM:
     """
 
     async def complete(
-        self, messages: list[dict[str, str]], *, json_schema: dict[str, Any] | None = None
+        self,
+        messages: list[dict[str, str]],
+        *,
+        json_schema: dict[str, Any] | None = None,
+        json_mode: bool = True,
     ) -> LLMResponse:
         return LLMResponse()
 
@@ -83,13 +87,22 @@ class LLMClient:
         return f"{self.base_url}/chat/completions"
 
     async def complete(
-        self, messages: list[dict[str, str]], *, json_schema: dict[str, Any] | None = None
+        self,
+        messages: list[dict[str, str]],
+        *,
+        json_schema: dict[str, Any] | None = None,
+        json_mode: bool = True,
     ) -> LLMResponse:
-        """发一次补全。三级降级：`json_schema → json_object → plain`。"""
+        """发一次补全。三级降级：`json_schema → json_object → plain`。
+
+        ★ `json_mode=False` 用于**文本/Markdown 输出**（定级/深度分析），
+        直接走 plain，不强制 JSON（否则 `json_object` 会与文本输出冲突）。
+        """
         attempts: list[tuple[str, dict[str, Any] | None]] = []
-        if json_schema is not None:
-            attempts.append(("json_schema", json_schema))
-        attempts.append(("json_object", None))
+        if json_mode:
+            if json_schema is not None:
+                attempts.append(("json_schema", json_schema))
+            attempts.append(("json_object", None))
         attempts.append(("plain", None))
 
         for fmt, schema in attempts:

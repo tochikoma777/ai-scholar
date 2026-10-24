@@ -686,3 +686,15 @@ def test_link_rendering_shows_interpretation() -> None:
     line = render_link_line(ref, {})
     assert "相似 0.42" in line
     assert "同一方向的演进" in line
+
+
+def test_frontmatter_tier_rendered(tmp_path: Path) -> None:
+    """★ L3b-1：定级 tier 进 frontmatter；未定级为 null。"""
+    paper = make_paper()
+    paper.tier = 1
+    text = ObsidianExporter().render(paper, ExportContext(vault_dir=tmp_path, llm_mode="fast"))
+    assert "tier: 1" in text
+
+    plain = make_paper()
+    text2 = ObsidianExporter().render(plain, ExportContext(vault_dir=tmp_path, llm_mode="off"))
+    assert "tier: null" in text2

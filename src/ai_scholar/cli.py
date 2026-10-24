@@ -479,6 +479,39 @@ def enhance(
 
 
 @app.command()
+def grade(
+    limit: int | None = typer.Option(
+        None, "--limit", "-n", help="定级论文数（默认 grade.default_limit）"
+    ),
+    force: bool = typer.Option(False, "--force", help="忽略 grade_content_hash，重做全部"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="只统计，不写库 / 不调 LLM"),
+) -> None:
+    """文献定级（fast）：三判据 → Tier 1/2/3。
+
+    ★ 延迟定级：只处理成熟或引用达标的论文；结果持久化，同条目不重复定级。
+    ★ off 档零调用；预算闸门超限即停；失败只 warning，退出码仍 0。
+    """
+    from ai_scholar.pipeline.grade import run_grade
+
+    report = asyncio.run(run_grade(limit=limit, force=force, dry_run=dry_run))
+
+    table = Table(title=f"grade · run {report.run_id}（{report.mode}）", title_justify="left")
+    table.add_column("项")
+    table.add_column("值")
+    table.add_row("本次选中", str(report.requested))
+    table.add_row("定级成功", str(report.graded))
+    table.add_row("预算拦截", str(report.blocked))
+    table.add_row("已定级跳过", str(report.skipped))
+    table.add_row("LLM 调用", str(report.llm_calls))
+    table.add_row("成本（元）", f"{report.cost_cny:.4f}")
+    console.print(table)
+    if report.degraded:
+        for key, reason in report.degraded.items():
+            console.print(f"[yellow]warning[/] {key}：{reason}")
+    raise typer.Exit(0)
+
+
+@app.command()
 def mark(
     paper_id: str,
     unmark: bool = typer.Option(False, "--unmark", help="取消收藏"),

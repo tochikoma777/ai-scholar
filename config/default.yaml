@@ -157,3 +157,7 @@ enhance:
   default_limit: 20
   # 关联解读：每次最多处理的强相似边对数（weight ≥ relate.similarity_strong_weight）
   link_pairs_limit: 10
+
+grade:
+  # ★ L3b-1 定级：成熟（published_at ≥ signals.maturity_days）或引用达标才定级
+  default_limit: 20

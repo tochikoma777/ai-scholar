@@ -15,24 +15,27 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import date
 from pathlib import Path
-from typing import Any
 
-from jinja2 import Environment, FileSystemLoader
 from sqlmodel import Session, SQLModel, col, create_engine, select
 
-from ai_scholar.budget import BudgetState, check_budget, estimate_cost
+from ai_scholar.budget import check_budget, estimate_cost
 from ai_scholar.config import RunMode, Settings, load_settings, load_watchlist, match_watchlist
-from ai_scholar.llm import LLMClient, LLMResponse, NullLLM, build_client, parse_json_content
+from ai_scholar.llm import LLMClient, NullLLM, build_client, parse_json_content
 from ai_scholar.models import WatchlistConfig
+from ai_scholar.pipeline.llm_support import (
+    actual_cost,
+    authors_text,
+    estimate_input_tokens,
+    render_prompt,
+    spent_in_windows,
+    year_text,
+)
 from ai_scholar.store.db import default_db_path
 from ai_scholar.store.models import LINK_TYPE_SIMILARITY, LLMUsage, Paper, PaperLink
 from ai_scholar.utils.errors import LLMError
-from ai_scholar.utils.timeutil import today_local, tz
-
-_PROMPT_DIR = Path(__file__).resolve().parent.parent / "prompts"
-_ENV = Environment(loader=FileSystemLoader(str(_PROMPT_DIR)), autoescape=False)
+from ai_scholar.utils.timeutil import today_local
 
 ENHANCE_SCHEMA = {
     "type": "object",
@@ -71,69 +74,6 @@ class EnhanceReport:
     links_interpreted: int = 0
     degraded: dict[str, str] = field(default_factory=dict)
     dry_run: bool = False
-
-
-def _render_prompt(name: str, **kwargs: Any) -> str:
-    return _ENV.get_template(name).render(**kwargs)
-
-
-def _estimate_input_tokens(text: str) -> int:
-    """调用前的输入 token 粗估（保守：英中混合按 3 字符/token）。"""
-    return max(1, len(text) // 3)
-
-
-def _actual_cost(settings: Settings, provider: str, model: str, response: LLMResponse) -> float:
-    """调用后按**实际 usage** 算成本（把实际输出 token 传进 max_tokens 位）。"""
-    return estimate_cost(
-        settings.budget,
-        provider,
-        model,
-        response.tokens_in,
-        response.tokens_out,
-        input_cached=response.cache_hit,
-    ).cost_cny
-
-
-def _authors(paper: Paper) -> str:
-    return ", ".join(json.loads(paper.authors_json or "[]"))
-
-
-def _year(paper: Paper) -> str:
-    return (paper.published_at or "")[:4] or "—"
-
-
-def _window_starts(day: date) -> dict[str, datetime]:
-    """日/周/月/年窗口起点（本地 Asia/Shanghai 起算 → UTC）。"""
-    zone = tz()
-    day_start = datetime.combine(day, time.min, tzinfo=zone)
-    week_start = datetime.combine(day - timedelta(days=day.weekday()), time.min, tzinfo=zone)
-    month_start = datetime.combine(day.replace(day=1), time.min, tzinfo=zone)
-    year_start = datetime.combine(day.replace(month=1, day=1), time.min, tzinfo=zone)
-    return {
-        "daily": day_start.astimezone(UTC),
-        "weekly": week_start.astimezone(UTC),
-        "monthly": month_start.astimezone(UTC),
-        "yearly": year_start.astimezone(UTC),
-    }
-
-
-def spent_in_windows(session: Session, *, today: date, calls_this_run: int = 0) -> BudgetState:
-    """从 `llm_usage` 汇总各窗口已花费（成本预算 §3.4 记账闭环）。"""
-    starts = _window_starts(today)
-    spent = {"daily": 0.0, "weekly": 0.0, "monthly": 0.0, "yearly": 0.0}
-    for row in session.exec(select(LLMUsage)).all():
-        if row.cost_cny is None or not row.created_at:
-            continue
-        for key, start in starts.items():
-            if row.created_at >= start.isoformat(timespec="seconds"):
-                spent[key] += row.cost_cny
-    return BudgetState(
-        spent_daily=spent["daily"],
-        spent_weekly=spent["weekly"],
-        spent_monthly=spent["monthly"],
-        spent_yearly=spent["yearly"],
-        calls_this_run=calls_this_run,
-    )
 
 
 def _select_candidates(
@@ -232,20 +172,20 @@ async def run_enhance(
             by_id = {p.id: p for p in session.exec(select(Paper)).all()}
 
             for i, (paper, _score) in enumerate(candidates):
-                prompt = _render_prompt(
+                prompt = render_prompt(
                     "enhance.j2",
                     paper_id=paper.id,
                     title=paper.title,
                     abstract=paper.abstract or "",
-                    authors_and_affiliations=_authors(paper),
-                    year=_year(paper),
+                    authors_and_affiliations=authors_text(paper),
+                    year=year_text(paper),
                     venue=paper.venue or "—",
                 )
                 estimate = estimate_cost(
                     settings.budget,
                     provider,
                     model,
-                    _estimate_input_tokens(prompt),
+                    estimate_input_tokens(prompt),
                     max_tokens,
                 )
                 state = spent_in_windows(session, today=day, calls_this_run=calls)
@@ -281,7 +221,7 @@ async def run_enhance(
                 )
                 paper.enhanced_at = day.isoformat()
                 paper.enhance_content_hash = paper.content_hash
-                papers_cost = _actual_cost(settings, provider, model, response)
+                papers_cost = actual_cost(settings, provider, model, response)
                 session.add(
                     LLMUsage(
                         run_id=report.run_id,
@@ -305,7 +245,7 @@ async def run_enhance(
                 paper_b = by_id.get(edge.dst_id)
                 if paper_a is None or paper_b is None:
                     continue
-                prompt = _render_prompt(
+                prompt = render_prompt(
                     "link_interpret.j2",
                     paper_a_id=paper_a.id,
                     paper_a_title=paper_a.title,
@@ -319,7 +259,7 @@ async def run_enhance(
                     settings.budget,
                     provider,
                     model,
-                    _estimate_input_tokens(prompt),
+                    estimate_input_tokens(prompt),
                     max_tokens,
                 )
                 state = spent_in_windows(session, today=day, calls_this_run=calls)
@@ -343,7 +283,7 @@ async def run_enhance(
                     report.degraded["link"] = f"{type(exc).__name__}: {exc}"
                     continue
                 edge.interpretation = data.get("interpretation") or None
-                link_cost = _actual_cost(settings, provider, model, response)
+                link_cost = actual_cost(settings, provider, model, response)
                 session.add(
                     LLMUsage(
                         run_id=report.run_id,

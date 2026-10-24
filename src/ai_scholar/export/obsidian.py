@@ -258,8 +258,8 @@ class ObsidianExporter(Exporter):
             "first_seen": (paper.first_seen_at or "")[:10] or None,
             "source": sources,
             "primary_source": paper.primary_source,
-            "score": None,  # ★ 本阶段不计算，留 null
-            "tier": None,  # 定级属 L3
+            "score": None,  # ★ 排序用客观信号分，属 L4（本阶段留 null）
+            "tier": paper.tier,  # ★ L3b-1 定级：1/2/3；未定级 null
             "tags": tags,
             "status": "待读",  # ★ 用户区字段，生成时不覆盖（读-合并-写回保住）
             "arxiv_id": paper.arxiv_id,

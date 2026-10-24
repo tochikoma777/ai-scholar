@@ -61,6 +61,9 @@ jobs:
       - name: Enhance
         run: uv run ai-scholar enhance
 
+      - name: Grade
+        run: uv run ai-scholar grade
+
       - name: Report
         run: uv run ai-scholar report
 

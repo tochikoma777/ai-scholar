@@ -149,11 +149,16 @@ def build_daily_report(
         for key, reason in degraded_map.items():
             degraded.setdefault(key, reason)
 
+    graded_today = list(session.exec(select(Paper).where(col(Paper.graded_at) == day)).all())
+    graded_today.sort(key=lambda p: (p.tier or 9, p.title))
+    new_graded = [ReportHit(id=p.id, title=p.title, score=0.0, groups=[]) for p in graded_today]
+
     return DailyReport(
         date=day,
         total_papers=total,
         new_today=len(new_papers),
         watchlist_hits=hits,
+        new_graded=new_graded,
         runs=runs,
         degraded=degraded,
     )

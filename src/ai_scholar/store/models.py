@@ -108,6 +108,12 @@ class Paper(SQLModel, table=True):
     enhanced_at: str | None = None  # 增强时间（本地日 YYYY-MM-DD）
     # ★ 增强时的内容身份：与 content_hash 不同 ⇒ 论文元数据已变，需要重新增强
     enhance_content_hash: str | None = None
+    # ★ L3b-1 定级（fast）：Tier 1/2/3；NULL = 未定级
+    tier: int | None = None
+    grade_text: str | None = None  # grading.j2 原始文本（保留证据）
+    grade_confidence: str | None = None  # 高/中/低
+    graded_at: str | None = None  # 定级时间（本地日 YYYY-MM-DD）
+    grade_content_hash: str | None = None  # 幂等：与 content_hash 比较
     content_hash: str
     created_at: str = Field(default_factory=_now)
     updated_at: str = Field(default_factory=_now)
