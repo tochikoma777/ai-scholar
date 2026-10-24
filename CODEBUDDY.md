@@ -21,11 +21,7 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 上一阶段：L1-B（signals 采样 + 预筛 + 选集）。
 下一阶段（**未开始**）：L2（Actions 自动化 / Daily Note / 每日报告）。
 
-上一阶段：L0-B（DB + 采集 + 三级去重 + `first_seen`）、L0-C（Obsidian 导出器 + `list`）。
-下一阶段（**未开始**）：L1-A Semantic Scholar 关联。
-
-`docs/设计方案.md` 与 `docs/执行手册.md` 由项目负责人维护，**Agent 只读**；
-当前阶段以任务卡为准。
+当前阶段以任务卡为准（文档维护分级见下方「文档归属」）。
 
 ---
 
@@ -93,10 +89,11 @@ cli.py (typer)
 
 | 路径 | 职责 | 关键点 |
 |---|---|---|
-| `cli.py` | 五个子命令 + `doctor` 体检 | 退出码：正常恒 0、`ConfigError` 1、参数错误 2 |
+| `cli.py` | 十个子命令：`init`/`doctor`/`collect`/`export`/`enrich`/`mark`/`signals`/`relate`/`related`/`list` | 退出码：正常恒 0、`ConfigError` 1、参数错误 2 |
 | `config.py` | YAML 加载、`${ENV}` 插值、watchlist 双文件合并、`Settings` | `load_settings` 带 `lru_cache`；环境变量前缀 `AI_SCHOLAR_`，嵌套分隔 `__` |
 | `models.py` | pydantic 域模型：`WatchlistConfig` / `Availability` / `TimeSemantics` | **与 `store/models.py` 不是一回事** |
 | `collectors/base.py` | `RawPaper` 统一中间表示 | 只有元数据，**没有正文字段** |
+| `collectors/s2.py` | S2 `paper/batch` 客户端 | ★ 未命中返回 `null`（位置对齐）；超限降半重试；无 key 不发 `x-api-key` |
 | `pipeline/collect.py` | 编排、三级去重、upsert、`runs` | 源码级禁止 import watchlist |
 | `pipeline/enrich.py` | 引用补齐：S2 → 出边 + 队列状态机 | ★ 方向语义固定为 src 引用 dst；入库前先写方向单测 |
 | `pipeline/prescreen.py` | 零成本预筛（规则负面排除） | ★ 只决定是否跟踪；`r` 是淘汰集留存率 |
