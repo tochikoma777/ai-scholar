@@ -26,6 +26,7 @@ from ai_scholar.pipeline.llm_support import (
     actual_cost,
     authors_text,
     estimate_input_tokens,
+    references_text,
     render_prompt,
     spent_in_windows,
     year_text,
@@ -36,14 +37,12 @@ from ai_scholar.store.models import (
     SIGNAL_SAMPLE,
     LLMUsage,
     Paper,
-    PaperReference,
 )
 from ai_scholar.utils.errors import LLMError
 from ai_scholar.utils.timeutil import age_days_since, today_local
 
 _TIER_RE = re.compile(r"Tier\s*([123])", re.IGNORECASE)
 _CONF_RE = re.compile(r"【置信度】\s*(高|中|低)")
-_REFERENCES_LIMIT = 30
 
 
 @dataclass
@@ -69,12 +68,6 @@ def parse_grade(text: str) -> tuple[int | None, str | None]:
     tier = int(tier_match.group(1)) if tier_match else None
     confidence = conf_match.group(1) if conf_match else None
     return tier, confidence
-
-
-def _references_text(session: Session, paper_id: str) -> str:
-    rows = session.exec(select(PaperReference).where(PaperReference.paper_id == paper_id)).all()
-    refs = [row.ref_external_id for row in rows][:_REFERENCES_LIMIT]
-    return ", ".join(refs) if refs else "（暂无）"
 
 
 def _trigger_met(paper: Paper, *, day: date, settings: Settings) -> bool:
@@ -157,7 +150,7 @@ async def run_grade(
                     year=year_text(paper),
                     venue=paper.venue or "—",
                     abstract=paper.abstract or "",
-                    references=_references_text(session, paper.id),
+                    references=references_text(session, paper.id),
                     citation_count=paper.citation_count or 0,
                     citing_titles=None,
                     lens_answer_5=None,

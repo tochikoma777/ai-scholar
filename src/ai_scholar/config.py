@@ -284,6 +284,27 @@ class GradeSettings(BaseModel):
     default_limit: int = 20
 
 
+class LensSettings(BaseModel):
+    """背景透镜五问（默认芯片/硬件背景，可按方向替换）。"""
+
+    profile: str = "chip"
+    column_header: str = "芯片/硬件背景"
+    q1_hint: str = "算力/带宽/显存"
+    q2_hint: str = "访存换计算"
+    q3_hint: str = "额外 kernel/通信"
+    q4_hint: str = "序列短 / batch 小"
+    q5_hint: str = "稀疏化/流水线"
+
+
+class DeepAnalysisSettings(BaseModel):
+    """L3b-2 深度分析参数（strong）。★ 注意力预算：每周最多 N 篇。"""
+
+    weekly_limit: int = 5
+    default_limit: int = 5
+    max_fulltext_chars: int = 60000
+    lens: LensSettings = Field(default_factory=LensSettings)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix=ENV_PREFIX,
@@ -306,6 +327,7 @@ class Settings(BaseSettings):
     relate: RelateSettings = Field(default_factory=RelateSettings)
     enhance: EnhanceSettings = Field(default_factory=EnhanceSettings)
     grade: GradeSettings = Field(default_factory=GradeSettings)
+    deep_analysis: DeepAnalysisSettings = Field(default_factory=DeepAnalysisSettings)
     sources: dict[str, SourceSettings] = Field(default_factory=dict)
 
     def effective_mode(self) -> RunMode:

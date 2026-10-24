@@ -161,3 +161,18 @@ enhance:
 grade:
   # ★ L3b-1 定级：成熟（published_at ≥ signals.maturity_days）或引用达标才定级
   default_limit: 20
+
+deep_analysis:
+  # ★ 注意力预算：每周最多 5 篇 strong 分析；超限进队列，不降单篇质量
+  weekly_limit: 5
+  default_limit: 5
+  max_fulltext_chars: 60000
+  # 背景透镜（默认芯片/硬件；可换 generic/backend）
+  lens:
+    profile: chip
+    column_header: 芯片/硬件背景
+    q1_hint: 算力/带宽/显存
+    q2_hint: 访存换计算
+    q3_hint: 额外 kernel/通信
+    q4_hint: 序列短 / batch 小
+    q5_hint: 稀疏化/流水线

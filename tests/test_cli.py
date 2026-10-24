@@ -371,3 +371,10 @@ def test_enhance_command_has_help() -> None:
     result = runner.invoke(app, ["enhance", "--help"], env={"COLUMNS": "200"})
     assert result.exit_code == 0
     assert "enhance" in result.output
+
+
+def test_analyze_command_has_help() -> None:
+    """★ L3b-2：analyze 命令可见且 --help 正常。"""
+    result = runner.invoke(app, ["analyze", "--help"], env={"COLUMNS": "200"})
+    assert result.exit_code == 0
+    assert "analyze" in result.output

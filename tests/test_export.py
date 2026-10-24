@@ -698,3 +698,13 @@ def test_frontmatter_tier_rendered(tmp_path: Path) -> None:
     plain = make_paper()
     text2 = ObsidianExporter().render(plain, ExportContext(vault_dir=tmp_path, llm_mode="off"))
     assert "tier: null" in text2
+
+
+def test_deep_analysis_rendered(tmp_path: Path) -> None:
+    """★ L3b-2：深度分析 Markdown 追加到生成区。"""
+    paper = make_paper()
+    paper.deep_analysis_md = "## TL;DR\n坐标：演进\n## 六段\n### 总体介绍\n内容"
+    text = ObsidianExporter().render(paper, ExportContext(vault_dir=tmp_path, llm_mode="strong"))
+    assert "## TL;DR" in text
+    assert "### 总体介绍" in text
+    assert "内容" in text

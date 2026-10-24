@@ -153,11 +153,19 @@ def build_daily_report(
     graded_today.sort(key=lambda p: (p.tier or 9, p.title))
     new_graded = [ReportHit(id=p.id, title=p.title, score=0.0, groups=[]) for p in graded_today]
 
+    analyzed_today = list(
+        session.exec(select(Paper).where(col(Paper.deep_analyzed_at) == day)).all()
+    )
+    deep_analyzed = [
+        ReportHit(id=p.id, title=p.title, score=0.0, groups=[]) for p in analyzed_today
+    ]
+
     return DailyReport(
         date=day,
         total_papers=total,
         new_today=len(new_papers),
         watchlist_hits=hits,
+        deep_analyzed=deep_analyzed,
         new_graded=new_graded,
         runs=runs,
         degraded=degraded,

@@ -114,6 +114,11 @@ class Paper(SQLModel, table=True):
     grade_confidence: str | None = None  # 高/中/低
     graded_at: str | None = None  # 定级时间（本地日 YYYY-MM-DD）
     grade_content_hash: str | None = None  # 幂等：与 content_hash 比较
+    # ★ L3b-2 深度分析（strong）：Markdown 全文 + 幂等指纹 + 状态
+    deep_analysis_md: str | None = None
+    deep_analyzed_at: str | None = None
+    deep_content_hash: str | None = None
+    deep_status: str | None = None  # done | failed
     content_hash: str
     created_at: str = Field(default_factory=_now)
     updated_at: str = Field(default_factory=_now)

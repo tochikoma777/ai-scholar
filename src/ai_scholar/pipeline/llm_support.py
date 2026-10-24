@@ -16,7 +16,7 @@ from sqlmodel import Session, select
 from ai_scholar.budget import BudgetState, estimate_cost
 from ai_scholar.config import Settings
 from ai_scholar.llm import LLMResponse
-from ai_scholar.store.models import LLMUsage, Paper
+from ai_scholar.store.models import LLMUsage, Paper, PaperReference
 from ai_scholar.utils.timeutil import tz
 
 _PROMPT_DIR = Path(__file__).resolve().parent.parent / "prompts"
@@ -38,6 +38,13 @@ def authors_text(paper: Paper) -> str:
 
 def year_text(paper: Paper) -> str:
     return (paper.published_at or "")[:4] or "—"
+
+
+def references_text(session: Session, paper_id: str, *, limit: int = 30) -> str:
+    """参考文献外部 ID（定级/深度分析 prompt 用）。"""
+    rows = session.exec(select(PaperReference).where(PaperReference.paper_id == paper_id)).all()
+    refs = [row.ref_external_id for row in rows][:limit]
+    return ", ".join(refs) if refs else "（暂无）"
 
 
 def window_starts(day: date) -> dict[str, datetime]:

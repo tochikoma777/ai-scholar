@@ -479,6 +479,42 @@ def enhance(
 
 
 @app.command()
+def analyze(
+    ids: str | None = typer.Option(None, "--ids", help="显式指定论文 id（逗号分隔）"),
+    limit: int | None = typer.Option(
+        None, "--limit", "-n", help="分析篇数（默认 deep_analysis.default_limit）"
+    ),
+    force: bool = typer.Option(False, "--force", help="忽略 deep_content_hash，重做全部"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="只统计，不写库 / 不调 LLM"),
+) -> None:
+    """深度分析（strong）：三句半 + 六段 + 背景透镜。
+
+    ★ 通道 A（意图触发，不看 Tier）+ B（Tier1 补读）；周配额 5 篇。
+    ★ 正文临时抓取、抓完即弃；off 档零调用；失败只 warning，退出码仍 0。
+    """
+    from ai_scholar.pipeline.deep_analysis import run_deep_analysis
+
+    id_list = [s.strip() for s in ids.split(",") if s.strip()] if ids else None
+    report = asyncio.run(run_deep_analysis(ids=id_list, limit=limit, force=force, dry_run=dry_run))
+
+    table = Table(title=f"analyze · run {report.run_id}（{report.mode}）", title_justify="left")
+    table.add_column("项")
+    table.add_column("值")
+    table.add_row("本次选中", str(report.requested))
+    table.add_row("分析成功", str(report.analyzed))
+    table.add_row("预算/配额拦截", str(report.blocked))
+    table.add_row("已分析跳过", str(report.skipped))
+    table.add_row("全文命中", str(report.fulltext_hits))
+    table.add_row("LLM 调用", str(report.llm_calls))
+    table.add_row("成本（元）", f"{report.cost_cny:.4f}")
+    console.print(table)
+    if report.degraded:
+        for key, reason in report.degraded.items():
+            console.print(f"[yellow]warning[/] {key}：{reason}")
+    raise typer.Exit(0)
+
+
+@app.command()
 def grade(
     limit: int | None = typer.Option(
         None, "--limit", "-n", help="定级论文数（默认 grade.default_limit）"

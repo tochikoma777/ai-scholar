@@ -208,6 +208,9 @@ class ObsidianExporter(Exporter):
         tags = json.loads(paper.method_tags_json or "[]")
         tags_text = " ".join(f"`{t}`" for t in tags) if tags else "—"
         lines = ["", "## 一句话", one_line, "", "## 为什么重要", why, "", "## 方法标签", tags_text]
+        if paper.deep_analysis_md:
+            # ★ L3b-2：深度分析是系统产物，放在生成区内（可重算）
+            lines += ["", paper.deep_analysis_md.strip()]
         if context.watchlist_groups:
             # ★ 只打★，不决定是否导出（红线 9）
             stars = ", ".join(context.watchlist_groups)
