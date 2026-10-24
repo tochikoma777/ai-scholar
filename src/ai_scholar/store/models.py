@@ -25,6 +25,10 @@ def _now() -> str:
 # `paper_links(src, dst, references)` 的语义固定为：**src 引用了 dst**
 LINK_TYPE_REFERENCES = "references"
 EVIDENCE_S2_REFERENCES = "s2_references"
+# ★ 对称关联（A↔B 等价）：只存一条（按 id 字典序 src<dst），查询时双向取
+LINK_TYPE_BIBCOUPLING = "bibcoupling"  # 文献耦合：引用同一批文献
+LINK_TYPE_SIMILARITY = "similarity"  # TF-IDF 语义相似
+LINK_TYPE_ENTITY = "entity_cooccur"  # 实体共现（L1-C 未实现，预留）
 
 # 补齐队列状态（★ 复用 papers 表字段，不新建队列表）
 ENRICH_PENDING = "pending"
@@ -95,6 +99,8 @@ class Paper(SQLModel, table=True):
     prescreen_reason: str | None = None  # 预筛淘汰原因（NULL = 通过）
     # ★ 选集：export 默认**只导出** selected=1（§5.6 v1.7，防每天造 20 篇新笔记）
     selected: bool = False
+    # ★ 相似度计算标记（L1-C 增量）：NULL = 还没参与过 TF-IDF 比对
+    similar_at: str | None = None
     content_hash: str
     created_at: str = Field(default_factory=_now)
     updated_at: str = Field(default_factory=_now)
@@ -114,8 +120,22 @@ class PaperAlias(SQLModel, table=True):
     created_at: str = Field(default_factory=_now)
 
 
+class PaperReference(SQLModel, table=True):
+    """③ 引用列表（v1.7）—— 文献耦合的输入。
+
+    ★ 只落 db（可丢弃缓存）、**只存外部 ID，不存元数据**。
+    ★ `idx_refs_external` 是倒排索引：按被引 id 分桶，避免全库两两比较。
+    """
+
+    __tablename__ = "paper_references"
+    __table_args__ = (Index("idx_refs_external", "ref_external_id"),)
+
+    paper_id: str = Field(primary_key=True, foreign_key="papers.id")
+    ref_external_id: str = Field(primary_key=True)
+
+
 class PaperLink(SQLModel, table=True):
-    """③ 关联边。本阶段只建表，不写数据（L1 由 S2 填充）。"""
+    """④ 关联边（references / bibcoupling / similarity / entity_cooccur）。"""
 
     __tablename__ = "paper_links"
     # ★ 反向索引：按 dst 回写（关联必须是双向可见的）

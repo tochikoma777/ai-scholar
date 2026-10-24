@@ -212,6 +212,21 @@ class ObsidianExporter(Exporter):
             max_items=self.links_max_per_section,
             empty_hint="（暂无 — 需等引用它的论文入库后由出边反向生成）",
         )
+        # ★ 对称关联只在**有数据时**出现：避免给整个 vault 制造无意义 diff
+        if context.similar:
+            lines += render_link_section(
+                "相似",
+                context.similar,
+                context.note_index,
+                max_items=self.links_max_per_section,
+            )
+        if context.coupled:
+            lines += render_link_section(
+                "文献耦合",
+                context.coupled,
+                context.note_index,
+                max_items=self.links_max_per_section,
+            )
         return "\n".join(lines)
 
     def _fields(self, paper: Paper, context: ExportContext) -> dict[str, object]:

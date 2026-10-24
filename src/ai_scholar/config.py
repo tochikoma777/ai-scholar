@@ -229,6 +229,20 @@ class PrescreenSettings(BaseModel):
     )
 
 
+class RelateSettings(BaseModel):
+    """关联计算（L1-C）：文献耦合 + TF-IDF 语义相似（★ 零 LLM）。"""
+
+    # 文献耦合：每篇保留 Top-N，相似度低于阈值丢弃
+    bibcoupling_top_n: int = 10
+    bibcoupling_min_weight: float = 0.1
+    # 语义相似：§5.2 阈值 进池 0.15 / 强关联 0.30
+    similarity_top_k: int = 10
+    similarity_min_weight: float = 0.15
+    similarity_strong_weight: float = 0.30
+    similarity_title_weight: float = 2.0  # 标题权重（重复次数近似）
+    similarity_max_features: int = 50000
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix=ENV_PREFIX,
@@ -248,6 +262,7 @@ class Settings(BaseSettings):
     enrich: EnrichSettings = Field(default_factory=EnrichSettings)
     signals: SignalsSettings = Field(default_factory=SignalsSettings)
     prescreen: PrescreenSettings = Field(default_factory=PrescreenSettings)
+    relate: RelateSettings = Field(default_factory=RelateSettings)
     sources: dict[str, SourceSettings] = Field(default_factory=dict)
 
     def effective_mode(self) -> RunMode:

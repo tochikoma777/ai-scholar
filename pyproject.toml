@@ -26,6 +26,7 @@ dependencies = [
     # YAML 是配置层的载体（config/*.yaml + watchlist 双文件），必须显式声明：
     # 不能指望它作为别的包的传递依赖存在，否则换个解析环境就直接 ImportError。
     "pyyaml>=6.0",
+    "scikit-learn>=1.9.1",
 ]
 
 [project.scripts]

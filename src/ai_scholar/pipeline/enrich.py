@@ -29,7 +29,12 @@ from sqlmodel import Session, SQLModel, col, create_engine, select
 from ai_scholar.collectors.s2 import S2Record, S2Reference, fetch_s2_papers
 from ai_scholar.config import Settings, load_settings
 from ai_scholar.store.db import default_db_path
-from ai_scholar.store.hash import paper_id_for_arxiv, paper_id_for_doi
+from ai_scholar.store.hash import (
+    canonical_arxiv_id,
+    normalize_doi,
+    paper_id_for_arxiv,
+    paper_id_for_doi,
+)
 from ai_scholar.store.models import (
     ENRICH_DONE,
     ENRICH_PENDING,
@@ -38,6 +43,7 @@ from ai_scholar.store.models import (
     LINK_TYPE_REFERENCES,
     Paper,
     PaperLink,
+    PaperReference,
 )
 from ai_scholar.utils.errors import SourceError
 from ai_scholar.utils.http import HttpClient
@@ -62,6 +68,7 @@ class EnrichReport:
     stale: int = 0
     degraded: dict[str, str] = field(default_factory=dict)
     dry_run: bool = False
+    refs_stored: int = 0  # 写入 paper_references 的新行数（文献耦合的原料）
 
 
 def s2_id_for(paper: Paper) -> str | None:
@@ -80,6 +87,28 @@ def canonical_for_ref(ref: S2Reference) -> str | None:
     if ref.doi:
         return paper_id_for_doi(ref.doi)
     return None
+
+
+def external_id_for_ref(ref: S2Reference) -> str | None:
+    """被引条目 → **外部 ID**（`ARXIV:` / `DOI:` / `S2:`），只用于文献耦合。
+
+    ★ 优先级与库内主键一致；都没有时退回 S2 paperId，保证耦合信号不丢。
+    """
+    if ref.arxiv_id:
+        return f"ARXIV:{canonical_arxiv_id(ref.arxiv_id)}"
+    if ref.doi:
+        return f"DOI:{normalize_doi(ref.doi)}"
+    if ref.paper_id:
+        return f"S2:{ref.paper_id}"
+    return None
+
+
+def _write_reference(session: Session, paper_id: str, ref_external_id: str) -> bool:
+    """写一行引用列表（幂等）。返回是否新增。"""
+    if session.get(PaperReference, (paper_id, ref_external_id)) is not None:
+        return False
+    session.add(PaperReference(paper_id=paper_id, ref_external_id=ref_external_id))
+    return True
 
 
 def select_candidates(session: Session, *, limit: int, force: bool = False) -> list[Paper]:
@@ -198,6 +227,10 @@ async def run_enrich(
                     paper.refs_count = record.reference_count
                 for ref in record.references:
                     refs_seen += 1
+                    # ★ 引用列表落 db（文献耦合的原料）：只存外部 ID，不存元数据
+                    ext = external_id_for_ref(ref)
+                    if ext and not dry_run and _write_reference(session, paper.id, ext):
+                        report.refs_stored += 1
                     dst = canonical_for_ref(ref)
                     if not dst or dst == paper.id:
                         continue  # ★ 自引 / 无法归一化 → 跳过

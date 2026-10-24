@@ -127,3 +127,13 @@ prescreen:
   # ★ 淘汰集抽样留存率（不是总体放行率）：总量 = N×p + N×(1-p)×r
   retain_ratio: 0.2
   exclude_title_patterns: [erratum, corrigendum, retraction, retracted, withdrawn, "comment on"]
+
+relate:
+  # ★ 关联计算（零 LLM）：文献耦合（倒排索引）+ TF-IDF 语义相似（增量）
+  bibcoupling_top_n: 10
+  bibcoupling_min_weight: 0.1        # Jaccard 阈值
+  similarity_top_k: 10
+  similarity_min_weight: 0.15        # §5.2 进池阈值
+  similarity_strong_weight: 0.30     # §5.2 强关联阈值（仅用于展示标注）
+  similarity_title_weight: 2.0       # 标题 ×2 + 摘要 ×1
+  similarity_max_features: 50000

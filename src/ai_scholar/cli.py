@@ -519,6 +519,53 @@ def signals(
     raise typer.Exit(0)
 
 
+@app.command()
+def relate(
+    limit: int | None = typer.Option(
+        None, "--limit", "-n", help="只处理最近 N 篇（小规模验证用；默认全量）"
+    ),
+    kind: str = typer.Option("all", "--type", help="bibcoupling | similarity | all"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="只统计，不写库"),
+) -> None:
+    """计算关联：文献耦合（倒排索引）+ TF-IDF 语义相似（增量）。★ 零 LLM。
+
+    ★ 文献耦合按 `ref_external_id` 分桶，只比较**同桶**论文对，绝不做全库两两比较。
+    ★ 相似度只算 `similar_at IS NULL` 的论文 vs 存量；无 sklearn 时降级跳过。
+    """
+    from ai_scholar.pipeline.relate import KINDS, run_relate
+
+    if kind not in (*KINDS, "all"):
+        console.print(f"[red]未知类型[/]：{kind}（可选 {' / '.join(KINDS)} / all）")
+        raise typer.Exit(2)
+
+    report = run_relate(kind=kind, limit=limit, dry_run=dry_run)
+
+    table = Table(
+        title=f"relate · {report.kind} · run {report.run_id}" + ("（dry-run）" if dry_run else ""),
+        title_justify="left",
+    )
+    table.add_column("项")
+    table.add_column("值")
+    table.add_row("参与论文", str(report.papers))
+    table.add_row("引用行（paper_references）", str(report.ref_rows))
+    table.add_row("倒排桶（≥2 篇）", str(report.buckets))
+    table.add_row("桶内对数 ΣC(n,2)", str(report.pairs_compared))
+    table.add_row("平均共现数", str(report.avg_cooccur))
+    table.add_row("相似度比对文档", str(report.docs))
+    for name in sorted(set(report.edges_new) | set(report.edges_existing)):
+        table.add_row(
+            f"边 {name}（新增 / 已存在）",
+            f"{report.edges_new.get(name, 0)} / {report.edges_existing.get(name, 0)}",
+        )
+    table.add_row("耗时", f"{report.duration_s}s")
+    console.print(table)
+    console.print("说明：对称边只存一条（src<dst），渲染时双向展开；不会把「文献耦合」误标成引用。")
+    if report.degraded:
+        for key, reason in report.degraded.items():
+            console.print(f"[yellow]warning[/] {key}：{reason}")
+    raise typer.Exit(0)
+
+
 def _titles_for(session: Session, ids: list[str]) -> dict[str, str]:
     """id → 标题（`related` 展示用，避免只显示内部主键）。"""
     from ai_scholar.store.models import Paper

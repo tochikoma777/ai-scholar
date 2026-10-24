@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 
-from sqlalchemy import desc
+from sqlalchemy import desc, or_
 from sqlmodel import Session, SQLModel, col, create_engine, select
 
 from ai_scholar.config import (
@@ -27,7 +27,14 @@ from ai_scholar.config import (
 from ai_scholar.export.base import ExportContext, ExportDoc, LinkRef
 from ai_scholar.export.obsidian import ObsidianExporter, note_name
 from ai_scholar.store.db import default_db_path
-from ai_scholar.store.models import Paper, PaperLink, Run
+from ai_scholar.store.models import (
+    LINK_TYPE_BIBCOUPLING,
+    LINK_TYPE_REFERENCES,
+    LINK_TYPE_SIMILARITY,
+    Paper,
+    PaperLink,
+    Run,
+)
 from ai_scholar.utils.errors import UnsafeOutputPath
 from ai_scholar.utils.timeutil import utcnow
 
@@ -80,30 +87,58 @@ def ensure_outside_repo(path: Path, *, root: Path | None = None) -> None:
 
 def load_link_refs(
     session: Session, paper_ids: list[str]
-) -> tuple[dict[str, list[LinkRef]], dict[str, list[LinkRef]]]:
-    """取选集内论文的**出边 / 入边**（★ 方向语义见 `pipeline/enrich.py`）。
+) -> tuple[
+    dict[str, list[LinkRef]],
+    dict[str, list[LinkRef]],
+    dict[str, list[LinkRef]],
+    dict[str, list[LinkRef]],
+]:
+    """取选集内论文的关联：`(出边, 入边, 相似, 文献耦合)`。
 
     - 出边 `(A → B)` = A 引用了 B：查 `src_id`
     - 入边 `(B → A)` = B 引用了 A：查 `dst_id`（**不单独存储**，反向查询得到）
+    - 对称边（`similarity` / `bibcoupling`）：只存一条（a<b），这里双向展开
     """
     out_map: dict[str, list[LinkRef]] = {pid: [] for pid in paper_ids}
     in_map: dict[str, list[LinkRef]] = {pid: [] for pid in paper_ids}
+    similar_map: dict[str, list[LinkRef]] = {pid: [] for pid in paper_ids}
+    coupled_map: dict[str, list[LinkRef]] = {pid: [] for pid in paper_ids}
     if not paper_ids:
-        return out_map, in_map
+        return out_map, in_map, similar_map, coupled_map
 
+    ids = set(paper_ids)
     out_rows = list(
-        session.exec(select(PaperLink).where(col(PaperLink.src_id).in_(paper_ids))).all()
-    )
-    in_rows = list(
-        session.exec(select(PaperLink).where(col(PaperLink.dst_id).in_(paper_ids))).all()
-    )
-    papers = {
-        p.id: p
-        for p in session.exec(
-            select(Paper).where(
-                col(Paper.id).in_({r.dst_id for r in out_rows} | {r.src_id for r in in_rows})
+        session.exec(
+            select(PaperLink).where(
+                col(PaperLink.src_id).in_(paper_ids),
+                PaperLink.link_type == LINK_TYPE_REFERENCES,
             )
         ).all()
+    )
+    in_rows = list(
+        session.exec(
+            select(PaperLink).where(
+                col(PaperLink.dst_id).in_(paper_ids),
+                PaperLink.link_type == LINK_TYPE_REFERENCES,
+            )
+        ).all()
+    )
+    sym_rows = list(
+        session.exec(
+            select(PaperLink).where(
+                col(PaperLink.link_type).in_((LINK_TYPE_BIBCOUPLING, LINK_TYPE_SIMILARITY)),
+                or_(
+                    col(PaperLink.src_id).in_(paper_ids),
+                    col(PaperLink.dst_id).in_(paper_ids),
+                ),
+            )
+        ).all()
+    )
+
+    target_ids = {r.dst_id for r in out_rows} | {r.src_id for r in in_rows}
+    target_ids |= {r.dst_id for r in sym_rows} | {r.src_id for r in sym_rows}
+    papers = {
+        p.id: p for p in session.exec(select(Paper).where(col(Paper.id).in_(target_ids))).all()
     }
 
     def to_ref(pid: str, link: PaperLink) -> LinkRef:
@@ -124,7 +159,13 @@ def load_link_refs(
     for row in in_rows:
         if row.dst_id in in_map:
             in_map[row.dst_id].append(to_ref(row.src_id, row))
-    return out_map, in_map
+    for row in sym_rows:
+        bucket = similar_map if row.link_type == LINK_TYPE_SIMILARITY else coupled_map
+        if row.src_id in ids:
+            bucket[row.src_id].append(to_ref(row.dst_id, row))
+        if row.dst_id in ids:
+            bucket[row.dst_id].append(to_ref(row.src_id, row))
+    return out_map, in_map, similar_map, coupled_map
 
 
 def _file_matches(path: Path, content: str) -> bool:
@@ -263,10 +304,15 @@ def run_export(
         note_index = {p.id: note_name(p, max_len=settings.export.filename_max_len) for p in papers}
 
         # ★ 关联边（出边 / 入边）→ 渲染用 LinkRef
-        out_map, in_map = load_link_refs(session, [p.id for p in papers])
+        out_map, in_map, similar_map, coupled_map = load_link_refs(session, [p.id for p in papers])
         target_ids = {
             ref.paper_id
-            for refs in [*out_map.values(), *in_map.values()]
+            for refs in [
+                *out_map.values(),
+                *in_map.values(),
+                *similar_map.values(),
+                *coupled_map.values(),
+            ]
             for ref in refs
             if ref.paper_id not in note_index
         }
@@ -287,6 +333,8 @@ def run_export(
                 note_index=note_index,
                 out_links=out_map.get(paper.id, []),
                 in_links=in_map.get(paper.id, []),
+                similar=similar_map.get(paper.id, []),
+                coupled=coupled_map.get(paper.id, []),
                 watchlist_groups=hit.groups if hit.matched else [],
                 degraded=report.degraded,
             )
