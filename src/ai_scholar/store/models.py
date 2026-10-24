@@ -188,6 +188,9 @@ class LLMUsage(SQLModel, table=True):
     model: str | None = None
     tokens_in: int | None = None
     tokens_out: int | None = None
+    # ★ 成本记账（成本预算 §3.4）：每次调用回填估算成本与缓存命中与否
+    cost_cny: float | None = None
+    cache_hit: bool = False
     purpose: str | None = None  # prescreen | grading | deep_analysis | enhance
     created_at: str = Field(default_factory=_now)
 
