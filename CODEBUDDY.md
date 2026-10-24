@@ -9,17 +9,23 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 ---
 
-## ★ 当前阶段：L1-C（文献耦合 + TF-IDF 语义相似）—— 已完成
+## ★ 当前阶段：L2（Actions 自动化 + 每日报告）—— 已完成（tag `l2`）
 
-- `paper_references`（**只落 db**，41,013 行 / 1,144 篇有引用）→ 倒排索引 → **文献耦合** 294 条边；
-  全量 5.97s，桶内对数 **77,392**（全库两两比较是 236 万）。
-- **TF-IDF 相似**（title×2 + abstract，增量 `similar_at`）→ 1,523 条边，阈值 0.15 / Top-10。
-- 双轨渲染新增「相似」「文献耦合」两节：有笔记 `[[双链]]`，无笔记 文本+外链，**不建空文件**；
-  ★ **双轨都带相似度 / 共现数**（§5.4 可解释性 —— 关联的目标多数没有笔记）。
-- 实体共现（`entity_cooccur`）**未实现**（卡允许跳过：时间/复杂度）。
+- **L2-前置**：模型名迁移（`deepseek-v4-flash`/`v4-pro`）+ 预算闸门（`budget.py`：
+  `estimate_cost` + `check_budget`，四层上限 + 单次 run 次数）。
+- **L2-A**：每日报告产物（`pipeline/report.py` + `templates/report/daily.md.j2` + `report` 命令），
+  产出 `data/reports/YYYY-MM-DD.{md,json}`。
+- **L2-B**：`daily.yml`（cron UTC 16:30 + workflow_dispatch）：collect → enrich → signals → relate → report，
+  真源（first_seen / signals / 报告）commit 回 public，db 走 actions-cache 跨天续命。
+- ★ **L2-C Daily Note**（vault `40-日志/`）**推迟到 L3 之后** —— 依赖深度分析/新定级数据，届时再做。
 
-上一阶段：L1-B（signals 采样 + 预筛 + 选集）。
-下一阶段（**未开始**）：L2（Actions 自动化 / Daily Note / 每日报告）。
+上一阶段：L1-C（文献耦合 + TF-IDF 相似）。
+下一阶段（**未开始**）：L3a（LLM 增强 fast：一句话 / 为什么重要 / 方法标签 / 关联解读）。
+
+★ L3a 开工前必读：
+- LLM 客户端层**尚未实现**（无 build_client / NullLLM / 三级降级）—— 从零实现，httpx 直连，**不用 openai SDK**。
+- `llm_usage` 记账闭环（`cost_cny` / `cache_hit` 字段 + migration）待办在 `budget.py` docstring。
+- 预算闸门已就绪（L2 前置），L3 调用前接上；off 档必须零请求。
 
 当前阶段以任务卡为准（文档维护分级见下方「文档归属」）。
 
@@ -280,6 +286,10 @@ uv run ai-scholar related <paper-id>
 uv run python scripts/probe_s2.py --n 50     # S2 实测（产出 docs/数据源手册.md §2.6）
 uv run ai-scholar list [--limit N] [--since DATE] [--watchlist-only]
                                  # ★ = watchlist 命中（只做展示筛选）
+uv run ai-scholar report [--date YYYY-MM-DD] [--out DIR]
+                                 # 每日报告（★ 只读，写 data/reports/YYYY-MM-DD.{md,json}）
+uv run ai-scholar budget --input-tokens N --max-tokens M [--tier fast|strong]
+                                 # 预算演练（★ 不调 LLM，只估算成本 + 过闸门）
 uv run alembic upgrade head      # 建库（★ 空 data/ 目录也能跑）
 
 uv run python scripts/probe_sources.py        # 数据源探测（需联网，产出 docs/数据源手册.md）
