@@ -139,11 +139,10 @@ groups:
 - [x] **L1-A** S2 引用关联：`paper/batch` → 出边入库 + 补齐队列 + 双轨渲染（`enrich` / `related`）
 - [x] **L1-B** signals 采样状态机 + 零成本预筛 + `papers.selected` 选集（`signals` / `mark` / `--all`）
 - [x] **L1-C** 文献耦合（倒排索引）+ TF-IDF 语义相似 + 双轨渲染（`relate`）
-- [ ] **L2** Actions 自动化：Daily Note / 每日报告
-- [ ] **L2** 推演层：LLM 三档（off / fast / strong）+ 预算护栏 + 结果持久化
-- [ ] **L3** 沉淀层增强：主题 MOC（`20-主题/`）+ Daily Note（`40-日志/`）+ 六段深度分析正文
-      （vault 基础导出已在 **L0-C** 落地：标记块 / frontmatter 合并 / 原子写入）
-- [ ] **深度分析**：六段结构 + 三句半 + 背景透镜（延迟定级，有施引数据才输出"历史地位"）
+- [x] **L2** Actions 自动化：每日报告 + JSONL 持久化 + commit 回 public（tag `l2`）
+      ★ **Daily Note**（vault `40-日志/`）**推迟到 L3 之后** —— 依赖深度分析/新定级数据，届时再做
+- [ ] **L3a** LLM 增强（fast）：一句话 / 为什么重要 / 方法标签 / 关联解读 + 预算闸门记账
+- [ ] **L3b** 文献定级 + 深度分析（六段结构 + 三句半 + 背景透镜，延迟定级）
 
 ---
 
