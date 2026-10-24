@@ -11,24 +11,25 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 ---
 
-## ★ 当前阶段：L2（Actions 自动化 + 每日报告）—— 已完成（tag `l2`）
+## ★ 当前阶段：L3a（LLM 增强 · fast）—— 已完成（tag `l3a`）
 
-- **L2-前置**：模型名迁移（`deepseek-v4-flash`/`v4-pro`）+ 预算闸门（`budget.py`：
-  `estimate_cost` + `check_budget`，四层上限 + 单次 run 次数）。
-- **L2-A**：每日报告产物（`pipeline/report.py` + `templates/report/daily.md.j2` + `report` 命令），
-  产出 `data/reports/YYYY-MM-DD.{md,json}`。
-- **L2-B**：`daily.yml`（cron UTC 16:30 + workflow_dispatch）：migrate → collect → enrich → signals → relate → report，
-  真源（first_seen / signals / 报告）commit 回 public，db 走 actions-cache 跨天续命；
-  缓存只用单个 cache 步骤恢复并在 post 阶段保存，不要加第二个固定 key 的 Save 步骤。
-- ★ **L2-C Daily Note**（vault `40-日志/`）**推迟到 L3 之后** —— 依赖深度分析/新定级数据，届时再做。
+- **L3a-1**：`llm.py` 客户端层（`build_client` / `NullLLM` / 三级降级
+  `json_schema → json_object → plain`，降级状态按 `(model, format)` 记忆）+
+  `llm_usage.cost_cny` / `cache_hit`。
+- **L3a-2**：`enhance` 命令（watchlist 命中分降序 Top N）+ `prompts/enhance.j2` /
+  `link_interpret.j2` + 预算闸门 + **按实际 token 记账** + 结果持久化 +
+  强相似边关联解读（写 `paper_links.interpretation`）。
+- **实跑证据（2026-10-24）**：DeepSeek `deepseek-v4-flash` 不支持 `json_schema`（400）
+  → 自动降级 `json_object` 成功；1 篇增强 + 10 条关联解读 = 11 次调用，实测 **¥0.0027**。
+- ★ **L2-C Daily Note**（vault `40-日志/`）**推迟到 L3 之后** —— 依赖深度分析/新定级数据。
 
-上一阶段：L1-C（文献耦合 + TF-IDF 相似）。
-下一阶段（**未开始**）：L3a（LLM 增强 fast：一句话 / 为什么重要 / 方法标签 / 关联解读）。
+上一阶段：L2（Actions 自动化 + 每日报告，tag `l2`）。
+下一阶段（**未开始**）：L3b（文献定级 + 深度分析）。
 
-★ L3a 开工前必读：
-- LLM 客户端层**尚未实现**（无 build_client / NullLLM / 三级降级）—— 从零实现，httpx 直连，**不用 openai SDK**。
-- `llm_usage` 记账闭环（`cost_cny` / `cache_hit` 字段 + migration）待办在 `budget.py` docstring。
-- 预算闸门已就绪（L2 前置），L3 调用前接上；off 档必须零请求。
+★ L3b 开工前必读：
+- `grading.j2` / `deep_analysis.j2` 已在 `prompts/`，但尚未接管道。
+- 记账闭环已接上（调用前 `estimate_cost` + `check_budget`，调用后按实际 token 回填）。
+- `build_client(tier="strong")` 已支持；off 档仍必须零请求。
 
 当前阶段以任务卡为准（文档维护分级见下方「文档归属」）。
 
@@ -105,14 +106,16 @@ cli.py (typer)
 
 | 路径 | 职责 | 关键点 |
 |---|---|---|
-| `cli.py` | 十二个子命令：`init`/`doctor`/`collect`/`export`/`enrich`/`mark`/`signals`/`relate`/`related`/`list`/`budget`/`report` | 退出码：正常恒 0、`ConfigError` 1、参数错误 2 |
+| `cli.py` | 十三个子命令：`init`/`doctor`/`collect`/`export`/`enrich`/`enhance`/`mark`/`signals`/`relate`/`related`/`list`/`budget`/`report` | 退出码：正常恒 0、`ConfigError` 1、参数错误 2 |
 | `config.py` | YAML 加载、`${ENV}` 插值、watchlist 双文件合并、`Settings` | `load_settings` 带 `lru_cache`；环境变量前缀 `AI_SCHOLAR_`，嵌套分隔 `__` |
 | `models.py` | pydantic 域模型：`WatchlistConfig` / `Availability` / `TimeSemantics` | **与 `store/models.py` 不是一回事** |
-| `budget.py` | `estimate_cost` + `check_budget` | 纯逻辑；L3 真实调用前接入，记账闭环尚未实现 |
+| `budget.py` | `estimate_cost` + `check_budget` | 纯逻辑；调用前过闸门，调用后按实际 token 记账 |
+| `llm.py` | `build_client` / `NullLLM` / `LLMClient` | 三级降级按 `(model, format)` 记忆；off 档零请求 |
 | `collectors/base.py` | `RawPaper` 统一中间表示 | 只有元数据，**没有正文字段** |
 | `collectors/s2.py` | S2 `paper/batch` 客户端 | ★ 未命中返回 `null`（位置对齐）；超限降半重试；无 key 不发 `x-api-key` |
 | `pipeline/collect.py` | 编排、三级去重、upsert、`runs` | 源码级禁止 import watchlist |
 | `pipeline/enrich.py` | 引用补齐：S2 → 出边 + 队列状态机 | ★ 方向语义固定为 src 引用 dst；入库前先写方向单测 |
+| `pipeline/enhance.py` | LLM 增强 + 强相似边关联解读 | watchlist Top N；预算闸门；幂等 `enhance_content_hash` |
 | `pipeline/prescreen.py` | 零成本预筛（规则负面排除） | ★ 只决定是否跟踪；`r` 是淘汰集留存率 |
 | `pipeline/signals.py` | 采样状态机 + signals 写入 + 月度 JSONL | ★ 状态持久化；两套时钟不可混用；JSONL 是跨 DB 重建的幂等真源 |
 | `pipeline/relate.py` | 文献耦合（倒排）+ TF-IDF 相似（增量） | ★ 禁止全库两两比较；对称边只存一条 |
@@ -293,6 +296,8 @@ uv run ai-scholar relate [--type bibcoupling|similarity|all] [--limit N] [--dry-
                                  # 文献耦合（倒排索引）+ TF-IDF 相似（增量）；零 LLM
 uv run ai-scholar enrich [--limit N] [--force] [--dry-run]
                                  # 补查 S2 引用（★ 全程 batch，禁止逐篇 GET）
+uv run ai-scholar enhance [--limit N] [--force] [--dry-run]
+                                 # LLM 增强（fast）：一句话/为什么重要/方法标签 + 关联解读
 uv run ai-scholar related <paper-id>
                                  # 查看关联（分「引用了」「被引用」两栏，验证方向）
 uv run python scripts/probe_s2.py --n 50     # S2 实测（产出 docs/数据源手册.md §2.6）
@@ -327,6 +332,7 @@ uv build                         # hatchling：构建 sdist + wheel（默认写 
 | `collectors/s2.py` · `pipeline/enrich.py` | `pytest -k enrich`（★ 方向三组 + 降半重试 + 队列状态机） |
 | `pipeline/signals.py` · `pipeline/prescreen.py` | `pytest -k signals`（★ 跨天/跨月时序 + 幂等） + `pytest -k prescreen` |
 | `pipeline/relate.py` | `pytest -k relate`（★ 倒排分桶 / 阈值 / 增量 / 对称边不混入引用） |
+| `pipeline/enhance.py` · `llm.py` | `pytest -k "enhance or llm"` + 实跑 1 篇（★ off 全绿 ≠ fast 可用） |
 | `pipeline/report.py` · `templates/report/` | `pytest -k report`（★ 当天重跑无 diff；只读 DB） |
 | `budget.py` · 预算配置 | `pytest -k budget` + `ai-scholar budget ...` 演练（零网络） |
 | `scripts/probe_sources.py` | 实跑一次 + 检查 `docs/数据源手册.md`；不可达时确认是 skip 不是伪造 |
