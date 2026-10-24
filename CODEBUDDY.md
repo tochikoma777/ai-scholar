@@ -11,24 +11,27 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 ---
 
-## ★ 当前阶段：L3b-1（文献定级 · fast）—— 已完成（tag `l3b1`）
+## ★ 当前阶段：L3b-2（深度分析 · strong）—— 已完成（tag `l3b2`）
 
 - **L3b-1**：`grade` 命令（延迟定级：成熟 `published_at ≥ 180 天` 或
   `citation_count ≥ signals.min_citations`）+ `grading.j2` 文本输出解析
-  `Tier N` / 置信度 + 原始证据落库 + 预算闸门 + 实际 token 记账；
-  报告「新定级」与导出 frontmatter `tier` 已接线。
-- **实跑证据（2026-10-24/25）**：1 篇真实定级成功（Tier 3 / 置信度中，证据表完整），
-  实测 **¥0.0056/次**；重复运行跳过已定级论文、零调用。
-- 共享预算 helper 抽到 `pipeline/llm_support.py`（enhance / grade 共用）。
-- ★ **L2-C Daily Note**（vault `40-日志/`）**推迟到 L3 之后** —— 依赖深度分析/新定级数据。
+  `Tier N` / 置信度 + 原始证据落库；报告「新定级」与导出 `tier` 已接线。
+- **L3b-2**：`analyze` 命令（通道 A：`--ids` / watchlist / 当日 Top N；通道 B：Tier1 补读；
+  周配额 5）+ `deep_analysis.j2` Markdown 输出 + arXiv HTML **临时抓取**（抓完即弃）+
+  `deep_analysis_md` 持久化 + 导出生成区渲染；**不进 daily.yml**（强成本）。
+- **实跑证据（2026-10-25）**：1 篇真实深度分析（六段 + 三句半 + 透镜完整；
+  历史地位无数据 → 「待观察」；无 HTML → 透镜标【需正文】），实测 **¥0.054/次**；
+  重复运行跳过、零调用。
+- 共享 helper `pipeline/llm_support.py`（预算 / 成本 / prompt / 参考文献）三个管道共用。
+- ★ **L2-C Daily Note**（vault `40-日志/`）**推迟到 L3 之后** —— 依赖 L4 数据。
 
-上一阶段：L3a（LLM 增强，tag `l3a`）。
-下一阶段（**未开始**）：L3b-2（深度分析 strong：六段 + 三句半 + 背景透镜）。
+上一阶段：L3b-1（定级，tag `l3b1`）。
+下一阶段（**未开始**）：L4（推演与演化：趋势 / 主题演化 / 影响分析）。
 
-★ L3b-2 开工前必读：
-- `deep_analysis.j2` 已在 `prompts/`，但尚未接管道。
-- 正文抓取模块**尚未实现**（arXiv HTML 临时抓取、抓完即弃，永不入库）。
-- `build_client(tier="strong")` 已支持；周配额 5 篇（注意力预算）待接。
+★ L4 开工前必读：
+- `score`（排序用客观信号分）仍为 null；L4 定级校准需要 `tier` + 半年后引用。
+- `analyze` 不进 daily.yml；强成本由用户显式触发。
+- L2-C Daily Note 仍待办。
 
 当前阶段以任务卡为准（文档维护分级见下方「文档归属」）。
 
@@ -105,7 +108,7 @@ cli.py (typer)
 
 | 路径 | 职责 | 关键点 |
 |---|---|---|
-| `cli.py` | 十四个子命令：`init`/`doctor`/`collect`/`export`/`enrich`/`enhance`/`grade`/`mark`/`signals`/`relate`/`related`/`list`/`budget`/`report` | 退出码：正常恒 0、`ConfigError` 1、参数错误 2 |
+| `cli.py` | 十五个子命令：`init`/`doctor`/`collect`/`export`/`enrich`/`enhance`/`grade`/`analyze`/`mark`/`signals`/`relate`/`related`/`list`/`budget`/`report` | 退出码：正常恒 0、`ConfigError` 1、参数错误 2 |
 | `config.py` | YAML 加载、`${ENV}` 插值、watchlist 双文件合并、`Settings` | `load_settings` 带 `lru_cache`；环境变量前缀 `AI_SCHOLAR_`，嵌套分隔 `__` |
 | `models.py` | pydantic 域模型：`WatchlistConfig` / `Availability` / `TimeSemantics` | **与 `store/models.py` 不是一回事** |
 | `budget.py` | `estimate_cost` + `check_budget` | 纯逻辑；调用前过闸门，调用后按实际 token 记账 |
@@ -117,6 +120,8 @@ cli.py (typer)
 | `pipeline/enrich.py` | 引用补齐：S2 → 出边 + 队列状态机 | ★ 方向语义固定为 src 引用 dst；入库前先写方向单测 |
 | `pipeline/enhance.py` | LLM 增强 + 强相似边关联解读 | watchlist Top N；预算闸门；幂等 `enhance_content_hash` |
 | `pipeline/grade.py` | 定级：Tier 1/2/3 + 原始证据 | 延迟定级；幂等 `grade_content_hash`；解析失败不写指纹 |
+| `pipeline/deep_analysis.py` | 深度分析（strong）+ 通道 A/B | 周配额 5；正文临时抓取；幂等 `deep_content_hash` |
+| `collectors/fulltext.py` | arXiv HTML 临时抓取 | ★ 只在内存，抓完即弃，**永不入库** |
 | `pipeline/prescreen.py` | 零成本预筛（规则负面排除） | ★ 只决定是否跟踪；`r` 是淘汰集留存率 |
 | `pipeline/signals.py` | 采样状态机 + signals 写入 + 月度 JSONL | ★ 状态持久化；两套时钟不可混用；JSONL 是跨 DB 重建的幂等真源 |
 | `pipeline/relate.py` | 文献耦合（倒排）+ TF-IDF 相似（增量） | ★ 禁止全库两两比较；对称边只存一条 |
@@ -301,6 +306,8 @@ uv run ai-scholar enhance [--limit N] [--force] [--dry-run]
                                  # LLM 增强（fast）：一句话/为什么重要/方法标签 + 关联解读
 uv run ai-scholar grade [--limit N] [--force] [--dry-run]
                                  # 文献定级（fast）：延迟定级 → Tier 1/2/3 + 原始证据
+uv run ai-scholar analyze [--ids a,b] [--limit N] [--force] [--dry-run]
+                                 # 深度分析（strong）：三句半/六段/透镜 + 正文临时抓取
 uv run ai-scholar related <paper-id>
                                  # 查看关联（分「引用了」「被引用」两栏，验证方向）
 uv run python scripts/probe_s2.py --n 50     # S2 实测（产出 docs/数据源手册.md §2.6）
@@ -337,6 +344,7 @@ uv build                         # hatchling：构建 sdist + wheel（默认写 
 | `pipeline/relate.py` | `pytest -k relate`（★ 倒排分桶 / 阈值 / 增量 / 对称边不混入引用） |
 | `pipeline/enhance.py` · `llm.py` | `pytest -k "enhance or llm"` + 实跑 1 篇（★ off 全绿 ≠ fast 可用） |
 | `pipeline/grade.py` | `pytest -k grade` + 实跑 1 篇（★ Tier 解析 / 幂等 / 记账） |
+| `pipeline/deep_analysis.py` · `collectors/fulltext.py` | `pytest -k "deep_analysis or fulltext"` + 实跑 1 篇（★ strong 成本 / 正文不落库） |
 | `pipeline/report.py` · `templates/report/` | `pytest -k report`（★ 当天重跑无 diff；只读 DB） |
 | `budget.py` · 预算配置 | `pytest -k budget` + `ai-scholar budget ...` 演练（零网络） |
 | `scripts/probe_sources.py` | 实跑一次 + 检查 `docs/数据源手册.md`；不可达时确认是 skip 不是伪造 |
