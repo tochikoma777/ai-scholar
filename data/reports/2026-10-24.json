@@ -1,0 +1,113 @@
+{
+  "date": "2026-10-24",
+  "schema_version": 1,
+  "total_papers": 2109,
+  "new_today": 135,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2610.26855",
+      "title": "Ropedia W0: Scaling Loco-Manipulation World Models across Embodiments with Human Experience",
+      "score": 2.9,
+      "groups": [
+        "multimodal",
+        "efficient-inference",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.25404",
+      "title": "MT Forcing: Towards Stable and Consistent Multi-Turn Image Editing with Autoregressive Diffusion",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ]
+    },
+    {
+      "id": "arXiv:2610.30753",
+      "title": "FilmFlow: Agentic System for 3D Virtual Film Cinematography",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.30043",
+      "title": "TARSphere: A Robot-Oriented Full-Stack Framework for Long-Horizon Embodied Agents in Evolving Physical and Social Environments",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.28630",
+      "title": "SolarRenderer: Few-Step Generative Reference Rendering",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.26711",
+      "title": "PVBench: Quantifying Physical Plausibility in Video Generation with Object-Level Physical Measurements",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.26765",
+      "title": "HandsOn: A Large-Scale Simulation Benchmark for Generalizable Dexterous Manipulation",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.24738",
+      "title": "Editing Images into Reusable Layers via Compositional Edit-Prior Distillation",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.23194",
+      "title": "OfficeTown: Generative Organizations for Evolving Agent Intelligence",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.22444",
+      "title": "Event-STVG: Spatio-Temporal Video Grounding for Long-Form Event Reasoning",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ]
+    }
+  ],
+  "deep_analyzed": [],
+  "new_graded": [],
+  "runs": [
+    {
+      "run_id": "049cc84fbd14",
+      "mode": "off",
+      "source": null,
+      "fetched": 2195,
+      "new": 2109,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": null
+}
