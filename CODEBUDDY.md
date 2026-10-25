@@ -33,8 +33,11 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 ★ L4 开工前必读：
 - `score`（排序用客观信号分）仍为 null；L4 定级校准需要 `tier` + 半年后引用。
 - `analyze` 不进 daily.yml；强成本由用户显式触发。
-- **正文抓取**：`arxiv.org/html` 实测命中率高（8/8），但个别论文无 HTML（404，不重试）；
-  `max_fulltext_chars=60000` 会截断长文 —— 增强项待做。
+- **正文抓取（2026-10-25 实测）**：`arxiv.org/html` 抽样 8/8 命中（正文 38k–184k 字符）：
+  - 上限 `max_fulltext_chars=100000`，超限走**中间省略**（保开头 + 实验/结论段）；
+  - 下限 `min_fulltext_chars=2000`，短于此视为元数据占位页、**绝不冒充正文**；
+  - ★ **ar5iv 不是回退源**：实测它对有/无 HTML 的论文都只返回约 5k 的 **arXiv 摘要页**，
+    拿它当正文比返回 `None` 更糟（已写入 `collectors/fulltext.py` 文档头，勿再试）。
 
 当前阶段以任务卡为准（文档维护分级见下方「文档归属」）。
 
