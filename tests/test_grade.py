@@ -111,6 +111,22 @@ def test_parse_grade() -> None:
     assert parse_grade("没有结构化结果") == (None, None)
 
 
+def test_parse_grade_truncated_table_returns_none() -> None:
+    """★ L6-4 实测回归：max_tokens 被推理 token 吃光时，答案会停在定级表表头。
+
+    该形态必须解析失败（返回 None）而不是蒙一个 Tier ——
+    `grade.py` 靠"解析失败 ⇒ 不写指纹 ⇒ 下次重试"来自愈，
+    修法是把 `max_tokens_fast` 抬到 8000（2026-10-25 已改并复跑通过）。
+    """
+    truncated = (
+        "【读者画像】paper_id：arXiv:2610.28912；推断方向：Prolog 教学\n"
+        "【定级表】\n"
+        "| 判据 | 分 | 证据（≤20字） | 事实/推测 |\n"
+        "|"
+    )
+    assert parse_grade(truncated) == (None, None)
+
+
 async def test_off_mode_returns_zero_calls() -> None:
     settings = Settings(llm=LLMSettings(api_key="", base_url=""))
     report = await run_grade(settings=settings, today=DAY)

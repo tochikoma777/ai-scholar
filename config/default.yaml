@@ -26,7 +26,10 @@ llm:
   # strong 档走思维链，比 fast 慢得多，故分开设超时
   timeout_s: ${AI_SCHOLAR_LLM__TIMEOUT_S:-120}
   timeout_strong_s: ${AI_SCHOLAR_LLM__TIMEOUT_STRONG_S:-180}
-  max_tokens_fast: ${AI_SCHOLAR_LLM__MAX_TOKENS_FAST:-4000}
+  # ★ 2026-10-25 端到端实测：deepseek-v4-flash 会把 token 花在推理上，
+  #   4000 会被推理吃光导致正式答案被截断（定级表停在表头，Tier 解析失败）。
+  #   抬到 8000 让答案完整；输出单价 ¥2/M，抬高上限不强制多产出，成本基本不变。
+  max_tokens_fast: ${AI_SCHOLAR_LLM__MAX_TOKENS_FAST:-8000}
   max_tokens_strong: ${AI_SCHOLAR_LLM__MAX_TOKENS_STRONG:-8000}
   max_retries: 3
 
