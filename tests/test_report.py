@@ -16,7 +16,7 @@ from ai_scholar.pipeline.report import (
     render_markdown,
     write_report,
 )
-from ai_scholar.store.models import Paper, Run
+from ai_scholar.store.models import LLMUsage, Paper, Run
 from ai_scholar.utils.timeutil import day_window
 
 TODAY = date(2026, 10, 24)
@@ -178,6 +178,54 @@ def test_md_frontmatter_carries_schema_version(tmp_path: Path) -> None:
     md = render_markdown(report)
     assert "date: 2026-10-24" in md
     assert "schema_version: 1" in md
+
+
+def test_report_cost_cny_sums_llm_usage_of_local_day(tmp_path: Path) -> None:
+    """L6-2：当日成本按本地日窗口汇总 llm_usage；窗口外与空表都不得算进来。"""
+    engine = create_engine(f"sqlite:///{tmp_path / 'c.db'}")
+    SQLModel.metadata.create_all(engine)
+    start, end = day_window(TODAY)
+    with Session(engine) as session:
+        session.add(
+            LLMUsage(
+                run_id="r-in",
+                model="deepseek-v4-flash",
+                tokens_in=100,
+                tokens_out=100,
+                purpose="enhance",
+                created_at=start.isoformat(timespec="seconds"),
+                cost_cny=0.1234,
+                cache_hit=0,
+            )
+        )
+        session.add(
+            LLMUsage(
+                run_id="r-out",
+                model="deepseek-v4-flash",
+                tokens_in=100,
+                tokens_out=100,
+                purpose="enhance",
+                created_at=end.isoformat(timespec="seconds"),  # 次日 00:00 = 下一窗口
+                cost_cny=9.9,
+                cache_hit=0,
+            )
+        )
+        session.commit()
+        report = build_daily_report(session, today=TODAY, watchlist=_watchlist())
+
+    assert report.cost_cny == 0.1234
+    assert "当日实际：¥0.1234" in render_markdown(report)
+
+
+def test_report_cost_cny_zero_without_usage(tmp_path: Path) -> None:
+    """off 档（无 llm_usage 行）显示 ¥0，而不是 None / 「—」。"""
+    engine = create_engine(f"sqlite:///{tmp_path / 'c.db'}")
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        report = build_daily_report(session, today=TODAY, watchlist=_watchlist())
+
+    assert report.cost_cny == 0.0
+    assert "当日实际：¥0.0000" in render_markdown(report)
 
 
 def test_report_renders_predictions_without_merging_opinions(tmp_path: Path) -> None:

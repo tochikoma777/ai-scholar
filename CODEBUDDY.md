@@ -18,11 +18,13 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 ---
 
-## ★ 当前阶段：L6（运营修复与维护）—— 进行中
+## ★ 当前阶段：L6（运营修复与维护）—— 进行中（L6-1 / L6-2 已修）
 
-- **只修不增**：HF daily 400 诊断、成本可见性（`DailyReport.cost_cny`）、
-  公共数据不被本地覆盖。范围与 DoD 见 `docs/handoff/L6-开工.md`。
-- **不自动切换 HF 镜像**：是否在 Actions 显式配 `hf_base_url` 由负责人决定。
+- **只修不增**：L6-1 HF 400（采集窗口从昨天开始 + 失败带响应体）、
+  L6-2 成本可见性（`DailyReport.cost_cny` + site 卡片）、公共数据不被本地覆盖。
+  范围与 DoD 见 `docs/handoff/L6-开工.md`。
+- **HF 400 根因**：官方 API 的 `date` 上限是"昨天"（榜单滞后发布），请求当天必 400；
+  镜像同行为 ⇒ 不是网络问题，**不自动切换镜像**。
 - **不改数据落点**；Actions 仍为 `off`（无 key）⇒ 每日 LLM 成本 ¥0。
 
 上一阶段：**L5（呈现形态）已完成**（tag `l5a` / `l5b`）：
@@ -143,6 +145,7 @@ cli.py (typer)
 | `pipeline/score.py` | 热度 / 跨源 / 主题三分量 | ★ 无 `total` 字段，不做加权求和（红线 11） |
 | `store/scoreboard.py` | 记分板 JSONL + 可证伪门禁 | append-only 快照；代码判定可证伪性 |
 | `collectors/fulltext.py` | arXiv HTML 临时抓取 | ★ 只在内存，抓完即弃，**永不入库** |
+| `collectors/hf.py` | HF Daily Papers 抓取 | ★ 窗口**从昨天开始**（榜单滞后发布，请求当天必 400，L6-1）；失败带截断响应体 |
 | `pipeline/prescreen.py` | 零成本预筛（规则负面排除） | ★ 只决定是否跟踪；`r` 是淘汰集留存率 |
 | `pipeline/signals.py` | 采样状态机 + signals 写入 + 月度 JSONL | ★ 状态持久化；两套时钟不可混用；JSONL 是跨 DB 重建的幂等真源 |
 | `pipeline/relate.py` | 文献耦合（倒排）+ TF-IDF 相似（增量） | ★ 禁止全库两两比较；对称边只存一条 |

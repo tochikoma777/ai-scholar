@@ -25,14 +25,14 @@ from sqlmodel import Session, col, func, select
 
 from ai_scholar.config import match_watchlist
 from ai_scholar.models import WatchlistConfig
-from ai_scholar.store.models import Paper, Run
+from ai_scholar.store.models import LLMUsage, Paper, Run
 from ai_scholar.store.scoreboard import (
     load_latest,
     load_opinions,
     opinions_path,
     scoreboard_path,
 )
-from ai_scholar.utils.timeutil import day_window, parse_iso_date
+from ai_scholar.utils.timeutil import DEFAULT_TZ, day_window, parse_iso_date
 
 SCHEMA_VERSION = 1
 WATCHLIST_TOP_N = 10
@@ -137,6 +137,22 @@ def _prediction_briefs(
     return verified, due, new, opinions
 
 
+def _daily_cost(session: Session, *, today: date, timezone: str = DEFAULT_TZ) -> float:
+    """当日（本地日窗口）实际 LLM 花费（成本预算 §6：让「实际花费」可见）。
+
+    ★ `llm_usage.created_at` 是 UTC ISO；按本地日窗口过滤，四舍五入到 4 位。
+    ★ 没有行 ⇒ 0.0（off 档显示 ¥0，不是「—」）。
+    """
+    start, end = day_window(today, timezone)
+    total = session.exec(
+        select(func.sum(col(LLMUsage.cost_cny))).where(
+            col(LLMUsage.created_at) >= start.isoformat(timespec="seconds"),
+            col(LLMUsage.created_at) < end.isoformat(timespec="seconds"),
+        )
+    ).one()
+    return round(float(total or 0.0), 4)
+
+
 def build_daily_report(
     session: Session,
     *,
@@ -144,6 +160,7 @@ def build_daily_report(
     watchlist: WatchlistConfig,
     top_n: int = WATCHLIST_TOP_N,
     data_dir: Path | None = None,
+    timezone: str = DEFAULT_TZ,
 ) -> DailyReport:
     """聚合库内现状，生成当日报告快照（★ 只读，不写库）。"""
     day = today.isoformat()
@@ -216,6 +233,7 @@ def build_daily_report(
     verified, due, new, opinions = _prediction_briefs(data_dir, today=today)
     return DailyReport(
         date=day,
+        cost_cny=_daily_cost(session, today=today, timezone=timezone),
         total_papers=total,
         new_today=len(new_papers),
         watchlist_hits=hits,

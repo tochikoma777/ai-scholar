@@ -1119,7 +1119,11 @@ def report(
     watchlist = load_watchlist()
     with Session(engine) as session:
         daily = build_daily_report(
-            session, today=today, watchlist=watchlist, data_dir=settings.data_dir()
+            session,
+            today=today,
+            watchlist=watchlist,
+            data_dir=settings.data_dir(),
+            timezone=settings.app.timezone,
         )
 
     outcome = write_report(daily, out_dir)

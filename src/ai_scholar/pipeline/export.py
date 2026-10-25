@@ -505,7 +505,11 @@ def run_export(
         # 40-日志/YYYY-MM-DD.md（L2-C Daily Note：本地 export 产物，§6.6）
         day = today or today_local()
         daily = build_daily_report(
-            session, today=day, watchlist=watchlist, data_dir=settings.data_dir()
+            session,
+            today=day,
+            watchlist=watchlist,
+            data_dir=settings.data_dir(),
+            timezone=settings.app.timezone,
         )
         note_lines = _daily_note_lines(
             session,

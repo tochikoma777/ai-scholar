@@ -102,6 +102,7 @@ def _seed_report(tmp_path: Path, day: str = TODAY.isoformat()) -> None:
         date=day,
         total_papers=6,
         new_today=2,
+        cost_cny=0.2812,
         watchlist_hits=[ReportHit(id="arXiv:2610.00001", title="A Paper", score=1.0)],
         predictions_new=[
             PredictionBrief(
@@ -189,6 +190,9 @@ def test_site_renders_required_sections(tmp_path: Path, monkeypatch: pytest.Monk
     # 命中率分母 = hit + miss（insufficient 不进分母）
     assert "50.0%" in html
     assert "数据不足（不计入分母）" in html
+    # L6-2：当日 LLM 成本来自报告字段
+    assert "今日 LLM 成本" in html
+    assert "¥0.2812" in html
     # 校准 + 论文元数据
     assert "Tier 1" in html and "Tier 2" in html
     assert "A Paper About Agents" in html
@@ -346,6 +350,8 @@ def test_site_empty_inputs_declare_degraded_state(tmp_path: Path) -> None:
     assert "降级状态" in html
     # ★ public 产物不得带本机绝对路径（降级文案也不能）
     assert str(tmp_path) not in html
+    # off 档显示 ¥0，不是「—」
+    assert "¥0.0000" in html
 
 
 def test_site_calibration_insufficient_does_not_conclude(tmp_path: Path) -> None:

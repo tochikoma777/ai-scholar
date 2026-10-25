@@ -481,6 +481,71 @@ def test_hf_parse_tolerates_missing_fields() -> None:
     assert items[0].arxiv_id == "2610.1"
 
 
+def test_hf_collect_days_excludes_today() -> None:
+    """L6-1：HF 榜单滞后发布 —— 采集窗口必须从昨天开始，绝不请求今天。
+
+    根因（2026-10-25 实测）：官方与镜像都对「今天」返回 400：
+    `"date" must be less than or equal to "<今天>T00:00:00.000Z"`。
+    若照旧请求今天，每天第一次 daily 必然降级，且错误像"源挂了"。
+    """
+    from datetime import date
+
+    from ai_scholar.collectors.hf import hf_collect_days
+
+    assert hf_collect_days(date(2026, 10, 25), 7) == [
+        date(2026, 10, 24),
+        date(2026, 10, 23),
+        date(2026, 10, 22),
+        date(2026, 10, 21),
+        date(2026, 10, 20),
+        date(2026, 10, 19),
+        date(2026, 10, 18),
+    ]
+    assert date(2026, 10, 25) not in hf_collect_days(date(2026, 10, 25), 7)
+    assert hf_collect_days(date(2026, 10, 25), 0) == []
+
+
+@respx.mock
+async def test_hf_error_message_carries_body(tmp_path: Path) -> None:
+    """L6-1：非 200 必须带截断响应体 —— 只有状态码无法区分网络/API 变更/日期超限。"""
+    respx.get(HF_URL).mock(
+        return_value=httpx.Response(
+            400,
+            json={"error": '✖ "date" must be less than or equal to "2026-10-25T00:00:00.000Z"'},
+        )
+    )
+    from datetime import date
+
+    from ai_scholar.utils.http import HttpClient
+
+    async with HttpClient() as client:
+        with pytest.raises(RuntimeError, match=r"HTTP 400.*date"):
+            await fetch_hf_day(client, date(2026, 10, 25), HF_URL)
+
+
+@respx.mock
+async def test_collect_hf_skips_today_even_on_failure(tmp_path: Path) -> None:
+    """L6-1：采集不请求今天 ⇒ 即使 HF 整体失败，degraded 原因也不再是「日期超限」。"""
+    from datetime import date
+
+    respx.get(ARXIV_URL).mock(
+        return_value=httpx.Response(200, text=atom_feed(arxiv_entry(), total=1))
+    )
+    respx.get(HF_URL).mock(return_value=httpx.Response(400, json={"error": "date too new"}))
+    await run_collect(
+        days=3,
+        settings=Settings(),
+        db_path=tmp_path / "c.db",
+        first_seen_path=tmp_path / "fs.jsonl",
+        today=date(2026, 10, 25),
+    )
+    requested = [
+        str(call.request.url) for call in respx.calls if "daily_papers" in str(call.request.url)
+    ]
+    assert all("date=2026-10-25" not in url for url in requested)
+    assert any("date=2026-10-24" in url for url in requested)
+
+
 @respx.mock
 async def test_hf_http_error_becomes_runtime_error() -> None:
     """HF 非 200 / 连接失败 ⇒ 抛错（由 pipeline 转成 warning + 跳过）。"""

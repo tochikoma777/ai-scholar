@@ -24,7 +24,7 @@ from sqlmodel import Session, SQLModel, col, select
 
 from ai_scholar.collectors.arxiv import fetch_arxiv_day
 from ai_scholar.collectors.base import SOURCE_HF, RawPaper
-from ai_scholar.collectors.hf import fetch_hf_day
+from ai_scholar.collectors.hf import fetch_hf_day, hf_collect_days
 from ai_scholar.config import Settings, load_settings
 from ai_scholar.store.db import default_db_path, engine_for
 from ai_scholar.store.first_seen import FirstSeenStore, default_first_seen_path
@@ -251,7 +251,9 @@ async def _collect_source(
     elif name == "hf_daily":
         cfg = settings.source("hf_daily")
         base_url = cfg.hf_url() if cfg else "https://huggingface.co/api/daily_papers"
-        for day in days:
+        # ★ L6-1：HF 榜单滞后发布，请求「今天」必 400 ⇒ 窗口从昨天开始（不含今天）
+        hf_days = hf_collect_days(days[0], len(days))
+        for day in hf_days:
             items.extend(await fetch_hf_day(client, day, base_url))
     return items, None
 

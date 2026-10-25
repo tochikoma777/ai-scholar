@@ -209,6 +209,8 @@ class SiteData:
     total_papers: int = 0
     new_today: int = 0
     hits_today: int = 0
+    # ★ L6-2：当日实际 LLM 成本（off 档为 0.0，不是 None）
+    cost_cny: float = 0.0
     open: int = 0
     hit: int = 0
     miss: int = 0
@@ -339,6 +341,7 @@ class HtmlExporter(Exporter):
             ("★ 今日命中", str(data.hits_today)),
             ("已判定推演", str(decided)),
             ("命中率", _pct(data.hit_rate)),
+            ("今日 LLM 成本", f"¥{data.cost_cny:.4f}"),
         ]
         cards = "\n".join(
             f'<div class="stat"><div class="n">{_e(value)}</div>'

@@ -193,6 +193,7 @@ def build_site_data(
         total_papers=latest.total_papers if latest else db_total,
         new_today=latest.new_today if latest else 0,
         hits_today=len(latest.watchlist_hits) if latest else 0,
+        cost_cny=latest.cost_cny if latest and latest.cost_cny is not None else 0.0,
         open=summary.open,
         hit=summary.hit,
         miss=summary.miss,
