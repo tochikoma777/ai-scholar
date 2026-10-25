@@ -179,6 +179,10 @@ def build_site_data(
         )
     elif broken:
         degraded["reports"] = f"{broken} 个报告文件解析失败（已跳过）"
+    if latest is not None:
+        # ★ 报告自身的降级（HF 400 / S2 429 等）必须出现在页面 —— 这是"静默失败"的
+        #   第一现场。只显示"输入缺失"会把「源在报错但报告照样生成」的情况藏起来。
+        degraded.update(latest.degraded)
 
     summary = summarize(settings=settings, today=day)
     calibration, calibration_error = _calibration_section(settings, day=day)

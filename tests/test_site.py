@@ -190,6 +190,11 @@ def test_site_renders_required_sections(tmp_path: Path, monkeypatch: pytest.Monk
     # 命中率分母 = hit + miss（insufficient 不进分母）
     assert "50.0%" in html
     assert "数据不足（不计入分母）" in html
+    # ★ L6-1：报告自身的降级必须透出到页面（静默失败第一现场），
+    #   不能只显示"输入缺失"——否则源在报错而页面照样"正常"
+    assert "降级状态" in html
+    assert "HF Daily Papers" in html
+    assert "不可达（测试）" in html
     # L6-2：当日 LLM 成本来自报告字段
     assert "今日 LLM 成本" in html
     assert "¥0.2812" in html
