@@ -8,7 +8,7 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 > ★ 全程中文回复（技术术语 / 代码 / 路径除外）。
 > ★ **每次 clear / init 后第一件事**：读 `docs/经验固化.md`（尤其「输出规范类 O1」：
 >   两张进度表 + 待决策子格式），再读 `docs/handoff/` 下**阶段号最大**的 `L*-开工.md`
->   （当前 `L4-开工.md`；已完成阶段的文件是归档，不作开工入口）。**未读即开工或输出 = 违规。**
+>   （当前 `L5-开工.md`；已完成阶段的文件是归档，不作开工入口）。**未读即开工或输出 = 违规。**
 > ★ **阶段收尾硬门禁（宣布“已完成”前逐项打勾）**：
 >   1) 代码 / 测试 / tag / push 完成；
 >   2) **新建 `docs/handoff/L{下一阶段}-开工.md`**，当前阶段 handoff 标「已归档」并指向新文件；
@@ -147,9 +147,12 @@ cli.py (typer)
 | `store/hash.py` | 主键归一化 + `content_hash` | hash 只含 title/abstract/authors/venue |
 | `store/first_seen.py` | `first_seen.jsonl` 读写 | append-only，绝不覆盖已有 id |
 | `store/models.py` | 七张 SQLModel 表 | 运行时间戳为 UTC ISO 文本；`first_seen_at`/`observed_at` 按本地日存 `YYYY-MM-DD` |
+| `store/db.py` | 引擎 / 会话 / 建库前 `mkdir` | ★ 空 `data/` 目录也能 `alembic upgrade head` |
 | `export/base.py` | `Exporter` ABC + 原子写 | 不为"将来"加 Registry / 插件机制 |
 | `export/obsidian.py` | 标记块、frontmatter 合并、双轨链接渲染 | 标记块注释里**不能有时间戳** |
 | `utils/http.py` | 限速 / 重试 / 代理 / UA | 只重试 408/425/429/5xx 与超时 |
+| `utils/errors.py` | 异常层级：`ConfigError` / `SourceError` / `UnsafeOutputPath` / `StoreError` / `LLMError` | CLI 退出码映射依据；单源异常在 pipeline 转 `degraded` |
+| `utils/logging.py` | structlog 配置与 `get_logger` | 日志出口唯一，不在模块内各自 print |
 | `utils/timeutil.py` | UTC 工具 + 三态时间语义 | 代码内取"现在"只用 `utcnow()` |
 
 ### 配置与路径解析
@@ -158,6 +161,8 @@ cli.py (typer)
 - 数据路径全部由 `Settings` 派生：`data_dir()` / `db_path()`；`first_seen.jsonl` 在 `data_dir()` 下。
 - `export.out_dir` 默认 `~/projects/ai-scholar-vault`（`expanduser`）；`--out` 的相对路径按
   仓库根解析，且最终必须落在仓库**之外**，否则抛 `UnsafeOutputPath`（含 `example_vault/`）。
+- `example_vault/` 是仓库内的**合成演示数据**（frontmatter `example: true`），只用于展示导出物形态，
+  **不是真实采集产物，也绝不能作为导出目标**。
 - `load_settings()` 先 `load_dotenv(override=False)` 再插值：不这么做，写进 `.env` 的 key 读不到
   （`Settings(**yaml)` 的 init 参数优先级高于 `env_file`）。
 - watchlist 合并：`watchlist.local.yaml` 的**同名组整组覆盖** `watchlist.yaml`，不做逐字段合并。
@@ -357,6 +362,7 @@ uv run ai-scholar list --score   # 分项分（热度/跨源/主题），不合�
 uv run ai-scholar related <paper-id>
                                  # 查看关联（分「引用了」「被引用」两栏，验证方向）
 uv run python scripts/probe_s2.py --n 50     # S2 实测（产出 docs/数据源手册.md §2.6）
+uv run python scripts/probe_prescreen.py     # 预筛通过率 p + SQLite 行字节实测（体积公式重算）
 uv run ai-scholar list [--limit N] [--since DATE] [--watchlist-only]
                                  # ★ = watchlist 命中（只做展示筛选）
 uv run ai-scholar report [--date YYYY-MM-DD] [--out DIR]
