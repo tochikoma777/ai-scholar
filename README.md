@@ -9,7 +9,7 @@ AI 文献的 **采集 → 关联 → 推演 → 沉淀**，外加**论文深度�
 
 - 许可证：**MIT**（只管代码，不管数据 —— 数据署名见文末）
 - 姊妹项目：[aipulse](https://github.com/tochikoma777/aipulse)（三档模式 / 三级降级 / 静默失败治理 全盘继承）
-- 当前阶段：**L1-C**（文献耦合 + TF-IDF 语义相似）—— 已完成
+- 当前阶段：**L3 已完成**（LLM 增强 + 文献定级 + 深度分析）+ **Daily Note**（tag 至 `l3b2` / `l2c`）；下一阶段 L4（推演与演化）
 
 ---
 
@@ -36,6 +36,9 @@ uv run ai-scholar export    # 导出**已收藏**的论文（默认只导 select
 uv run ai-scholar enrich     # 补查 S2 引用（★ 全程 batch，无 key 也能跑）
 uv run ai-scholar signals    # 时序采样（★ 状态持久化，按到期采样，不每日全量重算）
 uv run ai-scholar relate     # 文献耦合 + TF-IDF 相似（★ 倒排分桶，零 LLM）
+uv run ai-scholar enhance    # LLM 增强：一句话 / 为什么重要 / 方法标签（fast；需 key）
+uv run ai-scholar grade      # 文献定级：Tier 1/2/3（fast；延迟定级）
+uv run ai-scholar analyze --ids arXiv:2610.30132   # 深度分析（strong；正文临时抓取）
 uv run ai-scholar mark arXiv:2610.30122      # 显式收藏（export 默认只导收藏的）
 uv run ai-scholar related arXiv:2610.30122   # 看某篇的关联（引用了 / 被引用 两栏）
 ```
@@ -140,16 +143,19 @@ groups:
 - [x] **L1-B** signals 采样状态机 + 零成本预筛 + `papers.selected` 选集（`signals` / `mark` / `--all`）
 - [x] **L1-C** 文献耦合（倒排索引）+ TF-IDF 语义相似 + 双轨渲染（`relate`）
 - [x] **L2** Actions 自动化：每日报告 + JSONL 持久化 + commit 回 public（tag `l2`）
-      ★ **Daily Note**（vault `40-日志/`）**推迟到 L3 之后** —— 依赖深度分析/新定级数据，届时再做
-- [ ] **L3a** LLM 增强（fast）：一句话 / 为什么重要 / 方法标签 / 关联解读 + 预算闸门记账
-- [ ] **L3b** 文献定级 + 深度分析（六段结构 + 三句半 + 背景透镜，延迟定级）
+- [x] **L2-C** Daily Note（vault `40-日志/`）：本地 `export` 生成 + 用户区标记块保护 + 幂等（tag `l2c`）
+- [x] **L3a** LLM 增强（fast）：一句话 / 为什么重要 / 方法标签 / 关联解读 + 预算闸门记账（tag `l3a`）
+- [x] **L3b-1** 文献定级（fast）：三判据 + 六硬约束 + 延迟定级/幂等（tag `l3b1`）
+- [x] **L3b-2** 深度分析（strong）：六段 + 三句半 + 背景透镜 + 正文临时抓取（tag `l3b2`）
+- [ ] **L4** 推演与演化：趋势 / 主题演化 / 影响分析 / 定级校准
+- [ ] **L5** 呈现形态（待定：交互式 Web 看板）
 
 ---
 
 ## 开发
 
 ```bash
-uv run pytest                     # 全量测试（respx mock，不发真实网络）
+uv run pytest                     # 全量测试（含 2 个联网冒烟；其余 respx mock）
 uv run ruff check . && uv run ruff format --check .
 uv run mypy src/ai_scholar
 uv run python scripts/probe_sources.py    # 数据源探测（需联网，产出 docs/数据源手册.md）
