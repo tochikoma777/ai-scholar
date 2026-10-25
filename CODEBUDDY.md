@@ -18,7 +18,7 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 ---
 
-## ★ 当前阶段：L5（呈现形态）—— 进行中（L5a 静态 HTML）
+## ★ 当前阶段：L5（呈现形态）—— 进行中（L5a 已验收，L5b 未开始）
 
 - **形态已定**：先做 `L5a` **静态 HTML 单文件**（Exporter 第二实现，零新增依赖）；
   `L5b` 交互式看板在 L5a 验收后单独做，优先单文件 + 原生 JS + 内嵌 JSON，零后端。
