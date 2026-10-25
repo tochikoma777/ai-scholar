@@ -198,6 +198,7 @@ async def run_deep_analysis(
                         http,
                         paper.arxiv_id,
                         max_chars=settings.deep_analysis.max_fulltext_chars,
+                        min_chars=settings.deep_analysis.min_fulltext_chars,
                     )
                 if fulltext:
                     report.fulltext_hits += 1

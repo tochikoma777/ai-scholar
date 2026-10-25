@@ -226,7 +226,7 @@ async def test_fulltext_is_used_and_not_persisted(tmp_path: Path, monkeypatch) -
     db = tmp_path / "d.db"
     seed(db, [make_paper("arXiv:A", arxiv_id="2610.00001")])
 
-    async def fake_fetch(http, arxiv_id, *, max_chars=60000):
+    async def fake_fetch(http, arxiv_id, *, max_chars=60000, min_chars=2000):
         return "FULLTEXT BODY"
 
     monkeypatch.setattr("ai_scholar.pipeline.deep_analysis.fetch_arxiv_html", fake_fetch)

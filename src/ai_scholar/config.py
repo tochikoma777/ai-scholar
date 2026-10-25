@@ -301,7 +301,10 @@ class DeepAnalysisSettings(BaseModel):
 
     weekly_limit: int = 5
     default_limit: int = 5
-    max_fulltext_chars: int = 60000
+    # ★ 正文上限：实测 arXiv HTML 正文 38k–184k 字符；超限走**中间省略**（保首尾）
+    max_fulltext_chars: int = 100000
+    # ★ 正文下限：短于此视为元数据/占位页（如 ar5iv 只给 ~5k 的 abs 页），丢弃不用
+    min_fulltext_chars: int = 2000
     lens: LensSettings = Field(default_factory=LensSettings)
 
 

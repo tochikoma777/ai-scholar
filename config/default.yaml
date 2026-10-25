@@ -166,7 +166,10 @@ deep_analysis:
   # ★ 注意力预算：每周最多 5 篇 strong 分析；超限进队列，不降单篇质量
   weekly_limit: 5
   default_limit: 5
-  max_fulltext_chars: 60000
+  # ★ 正文上限：实测 arXiv 正文 38k–184k 字符；超限**中间省略**（保开头与实验/结论段）
+  max_fulltext_chars: 100000
+  # ★ 正文下限：短于此视为元数据/占位页（ar5iv 实测只给约 5k 的 abs 页），丢弃
+  min_fulltext_chars: 2000
   # 背景透镜（默认芯片/硬件；可换 generic/backend）
   lens:
     profile: chip
