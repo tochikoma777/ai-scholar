@@ -1,31 +1,11 @@
 {
   "date": "2026-10-25",
   "schema_version": 1,
-  "total_papers": 2174,
-  "new_today": 0,
+  "total_papers": 2110,
+  "new_today": 1,
   "watchlist_hits": [],
-  "deep_analyzed": [
-    {
-      "id": "arXiv:2610.30132",
-      "title": "LongZero: Enhancing Long-Context Reasoning in LLMs from Zero Data",
-      "score": 0.0,
-      "groups": []
-    },
-    {
-      "id": "arXiv:2610.30940",
-      "title": "Vision Transformers for Estimating Irradiance Using Data Scarce Sky Images",
-      "score": 0.0,
-      "groups": []
-    }
-  ],
-  "new_graded": [
-    {
-      "id": "arXiv:2610.30940",
-      "title": "Vision Transformers for Estimating Irradiance Using Data Scarce Sky Images",
-      "score": 0.0,
-      "groups": []
-    }
-  ],
+  "deep_analyzed": [],
+  "new_graded": [],
   "predictions_verified": [],
   "predictions_due": [],
   "predictions_new": [
@@ -68,10 +48,63 @@
       "due_at": "2026-11-24",
       "observed": null,
       "threshold": 72
+    },
+    {
+      "id": "p-f9d8d06e7c68",
+      "claim": "方向 cs.CR 在 2026-11-24 前新增论文 ≥ 63 篇（最近 30 天观测 57 篇）",
+      "status": "open",
+      "due_at": "2026-11-24",
+      "observed": null,
+      "threshold": 63
+    },
+    {
+      "id": "p-f224f1158e16",
+      "claim": "方向 stat.ML 在 2026-11-24 前新增论文 ≥ 57 篇（最近 30 天观测 51 篇）",
+      "status": "open",
+      "due_at": "2026-11-24",
+      "observed": null,
+      "threshold": 57
+    },
+    {
+      "id": "p-b55508f3b462",
+      "claim": "方向 cs.SE 在 2026-11-24 前新增论文 ≥ 38 篇（最近 30 天观测 34 篇）",
+      "status": "open",
+      "due_at": "2026-11-24",
+      "observed": null,
+      "threshold": 38
+    },
+    {
+      "id": "p-69bf59adb31a",
+      "claim": "方向 cs.SD 在 2026-11-24 前新增论文 ≥ 33 篇（最近 30 天观测 30 篇）",
+      "status": "open",
+      "due_at": "2026-11-24",
+      "observed": null,
+      "threshold": 33
     }
   ],
   "opinions_total": 0,
-  "runs": [],
-  "degraded": {},
-  "cost_cny": null
+  "runs": [
+    {
+      "run_id": "062435dd1dbf",
+      "mode": "off",
+      "source": null,
+      "fetched": 1717,
+      "new": 0,
+      "degraded": [
+        "RuntimeError: HF HTTP 400"
+      ]
+    },
+    {
+      "run_id": "4f3639458f72",
+      "mode": "off",
+      "source": null,
+      "fetched": 1966,
+      "new": 1,
+      "degraded": []
+    }
+  ],
+  "degraded": {
+    "hf_daily": "RuntimeError: HF HTTP 400"
+  },
+  "cost_cny": 0.0
 }
