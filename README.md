@@ -53,7 +53,7 @@ AI_SCHOLAR_LLM__BASE_URL=https://api.deepseek.com
 AI_SCHOLAR_LLM__API_KEY=sk-...
 ```
 
-运行档位三档：`off`（零花费）/ `fast`（`deepseek-chat`）/ `strong`（`deepseek-reasoner`）。
+运行档位三档：`off`（零花费）/ `fast`（`deepseek-v4-flash`）/ `strong`（`deepseek-v4-pro`）。
 
 ### 第一个 vault 在哪？
 

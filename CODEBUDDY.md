@@ -82,6 +82,12 @@ cli.py (typer)
 横切层：config.py（YAML + ${ENV} + watchlist 合并） · utils/http.py（唯一网络出口）
 ```
 
+**自动化编排**（`.github/workflows/daily.yml`，每天 UTC 16:30）：
+`alembic upgrade head → collect → enrich → signals → relate → enhance → grade → report`，
+末尾只 commit `data/first_seen.jsonl` / `data/signals/` / `data/reports/` 三类真源
+（db 走 actions-cache，按 `run_id` 作 key，**不入库**）。
+★ `analyze`（strong）与 `export`（写私有 vault）**都不在 daily**：前者成本高、后者只本地跑。
+
 分层规则（违反就会重新引入已踩过的坑）：
 
 - **arXiv / HF collectors 只产出 `RawPaper`**，不碰 DB、不碰 watchlist。新增采集源 = 一个
@@ -127,6 +133,7 @@ cli.py (typer)
 | `budget.py` | `estimate_cost` + `check_budget` | 纯逻辑；调用前过闸门，调用后按实际 token 记账 |
 | `llm.py` | `build_client` / `NullLLM` / `LLMClient` | 三级降级按 `(model, format)` 记忆；off 档零请求 |
 | `pipeline/llm_support.py` | 预算窗口汇总 + 实际成本 + prompt 渲染 | enhance / grade / deep_analysis 共用 |
+| `prompts/*.j2` | 四个 LLM 模板：`enhance` / `link_interpret` / `grading` / `deep_analysis` | 模板内写死输出格式；改格式要同步改对应 `pipeline/*.py` 的解析 |
 | `collectors/base.py` | `RawPaper` 统一中间表示 | 只有元数据，**没有正文字段** |
 | `collectors/s2.py` | S2 `paper/batch` 客户端 | ★ 未命中返回 `null`（位置对齐）；超限降半重试；无 key 不发 `x-api-key` |
 | `pipeline/collect.py` | 编排、三级去重、upsert、`runs` | 源码级禁止 import watchlist |
@@ -156,6 +163,8 @@ cli.py (typer)
 - `load_settings()` 先 `load_dotenv(override=False)` 再插值：不这么做，写进 `.env` 的 key 读不到
   （`Settings(**yaml)` 的 init 参数优先级高于 `env_file`）。
 - watchlist 合并：`watchlist.local.yaml` 的**同名组整组覆盖** `watchlist.yaml`，不做逐字段合并。
+- LLM 凭据只走环境变量：`AI_SCHOLAR_LLM__BASE_URL` / `AI_SCHOLAR_LLM__API_KEY`（前缀 + `__` 嵌套）。
+  未配 key ⇒ 自动降级 `off`，**不得报错退出**。
 
 ---
 
@@ -200,6 +209,18 @@ vault 由本地 `export` 写入。任何"让 Actions 写 private vault"的设计
 | `README.md` · `CHANGELOG.md` · `CONTRIBUTING.md` · `CODEBUDDY.md` · `pyproject.toml` | **Agent** |
 
 ★ **先提交代码 + 打 tag，再刷新文档**（否则维护日志的 tag 栏对不上）。
+
+### 文档索引（不确定读哪份时看这里）
+
+| 问题 | 读 |
+|---|---|
+| 为什么这样设计、核心判据从哪来 | `docs/设计方案.md`（正文引用的 § 编号都出自这里） |
+| 怎么跑、阶段划分、踩过哪些坑 | `docs/执行手册.md`（§4 坑位 / §5 阶段） |
+| 某个数据源的真实响应长什么样 | `docs/数据源手册.md`（解析字段的唯一依据） |
+| 单价、闸门、实测花费 | `docs/成本预算.md` |
+| 可迁移的原则 / 指南 | `docs/经验固化.md`（G/C/E/D/O 编号） |
+| 当前阶段怎么开工 | `docs/handoff/L*-开工.md`（阶段号最大的那份） |
+| 按时间发生的事实 / 文档版本账 | `docs/开发日志.md` · `docs/文档维护日志.md` |
 
 ---
 
@@ -381,6 +402,8 @@ uv build                         # hatchling：构建 sdist + wheel（默认写 
 - 除 `test_live_arxiv_parse` / `test_live_hf_parse_may_skip` 外，网络一律 respx 拦截；
   这两个联网冒烟在连接失败、非 200 或无数据时 skip，但解析断言失败仍会让测试红。
 - 断言要落在**实际收到的值**上（如 `settings.llm.base_url`），不是"加载成功"。
+- `tests/test_docs_consistency.py` 是阶段收尾的机械门禁：若 CODEBUDDY 标记当前阶段「已完成」，
+  则 `docs/handoff/` 下必须存在**下一阶段**的 `L*-开工.md`（未归档），且维护日志已登记。
 - CI：`ubuntu-24.04` + Python 3.11 固定，依赖安装为 `uv sync --frozen || uv sync`；
   `lint-and-test` **不读任何 secrets**，执行全量 pytest（未排除联网冒烟）；`probe` 仅在
   `workflow_dispatch` 下实跑数据源探测，不回写仓库。
