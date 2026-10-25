@@ -18,33 +18,30 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 ---
 
-## ★ 当前阶段：L3b-2（深度分析 · strong）—— 已完成（tag `l3b2`）
+## ★ 当前阶段：L4（推演与演化）—— 已完成（tag `l4`）
 
-- **L3b-1**：`grade` 命令（延迟定级：成熟 `published_at ≥ 180 天` 或
-  `citation_count ≥ signals.min_citations`）+ `grading.j2` 文本输出解析
-  `Tier N` / 置信度 + 原始证据落库；报告「新定级」与导出 `tier` 已接线。
-- **L3b-2**：`analyze` 命令（通道 A：`--ids` / watchlist / 当日 Top N；通道 B：Tier1 补读；
-  周配额 5）+ `deep_analysis.j2` Markdown 输出 + arXiv HTML **临时抓取**（抓完即弃）+
-  `deep_analysis_md` 持久化 + 导出生成区渲染；**不进 daily.yml**（强成本）。
-- **实跑证据（2026-10-25）**：1 篇真实深度分析（六段 + 三句半 + 透镜完整；
-  历史地位无数据 → 「待观察」；无 HTML → 透镜标【需正文】），实测 **¥0.054/次**；
-  重复运行跳过、零调用。
-- 共享 helper `pipeline/llm_support.py`（预算 / 成本 / prompt / 参考文献）三个管道共用。
-- **L2-C Daily Note**：vault `40-日志/YYYY-MM-DD.md`，本地 `export` 生成（不进 Actions）；
-  生成区（今日新增 / 补齐引用 / 深度分析 / 新定级 / ★命中 / 运行状态）在标记块内，
-  「我的笔记摘要 / 待办」在标记块外**永不覆盖**；连续两次导出无 diff。
+- **记分板**：`data/predictions/scoreboard.jsonl`（public、append-only 快照流）；
+  同 `id` 最后一行即最新状态；验证 = 追加新快照，不改历史。
+- **可证伪性由代码判定**：只认 `arxiv_paper_count` / `entity_mentions` /
+  `citation_reach` 三种判据，必须有正阈值、正窗口、未来到期日
+  （`store/scoreboard.py:falsifiability_errors`）。LLM / 用户无权自判"不可验证"。
+- **两类推演分家**：`opinions.jsonl` 只存长期观点，**永不进记分板、不进命中率**。
+- **`predict`（零 LLM / 零网络）**：方向新增量、方法标签提及量、论文被引量
+  按配置增长系数外推；同目标已有 `open` 则跳过（防通胀）。
+- **`stats`**：`--verify` 到期验证（hit / miss / insufficient）；默认命中率**只算 hit/miss**，
+  `insufficient` 单独展示、不进分母；`--calibration` 看 `(tier, 成熟论文当前引用)`；
+  `--impact` 看被引增长与「开创/跟风**候选**」，样本不足时只报数字。
+- **分项 score**：`热度 / 跨源 / 主题` 三分量，`list --score` 展示，**不合成单一总分**。
+- **实跑证据（2026-10-25）**：真实库 2174 篇 → 生成 5 条方向推演（cs.LG 636→700 等），
+  到期 2026-11-24；校准/影响分析均正确输出「样本不足」而非编造结论。
 
-上一阶段：L3b-1（定级，tag `l3b1`）。
-下一阶段（**未开始**）：L4（推演与演化：趋势 / 主题演化 / 影响分析）。
+上一阶段：L3b-2（深度分析，tag `l3b2`）。
+下一阶段（**未开始**）：L5（呈现形态，待定）。
 
-★ L4 开工前必读：
-- `score`（排序用客观信号分）仍为 null；L4 定级校准需要 `tier` + 半年后引用。
-- `analyze` 不进 daily.yml；强成本由用户显式触发。
-- **正文抓取（2026-10-25 实测）**：`arxiv.org/html` 抽样 8/8 命中（正文 38k–184k 字符）：
-  - 上限 `max_fulltext_chars=100000`，超限走**中间省略**（保开头 + 实验/结论段）；
-  - 下限 `min_fulltext_chars=2000`，短于此视为元数据占位页、**绝不冒充正文**；
-  - ★ **ar5iv 不是回退源**：实测它对有/无 HTML 的论文都只返回约 5k 的 **arXiv 摘要页**，
-    拿它当正文比返回 `None` 更糟（已写入 `collectors/fulltext.py` 文档头，勿再试）。
+★ L5 开工前必读：
+- L5 是**呈现形态**（静态 HTML / 交互看板），不改变已有数据落点与成本模型。
+- 任何新导出形态必须仍是**自包含、可直接喂给别的 AI 工具**的合成文档。
+- `score` 只有分项、没有总分；展示层不得偷偷加权成一个数字。
 
 当前阶段以任务卡为准（文档维护分级见下方「文档归属」）。
 
@@ -77,16 +74,19 @@ cli.py (typer)
 ├─ relate ─→ pipeline/relate.py ─→ paper_links（文献耦合 / TF-IDF 相似）
 ├─ export ─→ pipeline/export.py ─→ export/obsidian.py（db → Markdown）
 ├─ report ─→ pipeline/report.py ─→ templates/report/ ─→ data/reports/
+├─ predict ─→ pipeline/predict.py ─→ store/scoreboard.py ─→ data/predictions/*.jsonl
+├─ stats ─→ pipeline/stats.py（验证 / 校准 / 影响分析，只读 JSONL + db）
 └─ budget ─→ budget.py（纯成本估算与闸门；无网络、无 DB）
 
 横切层：config.py（YAML + ${ENV} + watchlist 合并） · utils/http.py（唯一网络出口）
 ```
 
 **自动化编排**（`.github/workflows/daily.yml`，每天 UTC 16:30）：
-`alembic upgrade head → collect → enrich → signals → relate → enhance → grade → report`，
-末尾只 commit `data/first_seen.jsonl` / `data/signals/` / `data/reports/` 三类真源
-（db 走 actions-cache，按 `run_id` 作 key，**不入库**）。
-★ `analyze`（strong）与 `export`（写私有 vault）**都不在 daily**：前者成本高、后者只本地跑。
+`alembic upgrade head → collect → enrich → signals → relate → enhance → grade → predict → stats --verify → report`，
+末尾只 commit `data/first_seen.jsonl` / `data/signals/` / `data/reports/` / `data/predictions/`
+四类真源（db 走 actions-cache，按 `run_id` 作 key，**不入库**）。
+★ `predict` / `stats --verify` 零 LLM、零网络；`analyze`（strong）与 `export`（写私有 vault）
+**都不在 daily**：前者成本高、后者只本地跑。
 
 分层规则（违反就会重新引入已踩过的坑）：
 
@@ -127,7 +127,7 @@ cli.py (typer)
 
 | 路径 | 职责 | 关键点 |
 |---|---|---|
-| `cli.py` | 十五个子命令：`init`/`doctor`/`collect`/`export`/`enrich`/`enhance`/`grade`/`analyze`/`mark`/`signals`/`relate`/`related`/`list`/`budget`/`report` | 退出码：正常恒 0、`ConfigError` 1、参数错误 2 |
+| `cli.py` | 十七个子命令：`init`/`doctor`/`collect`/`export`/`enrich`/`enhance`/`grade`/`analyze`/`predict`/`stats`/`mark`/`signals`/`relate`/`related`/`list`/`budget`/`report` | 退出码：正常恒 0、`ConfigError` 1、参数错误 2 |
 | `config.py` | YAML 加载、`${ENV}` 插值、watchlist 双文件合并、`Settings` | `load_settings` 带 `lru_cache`；环境变量前缀 `AI_SCHOLAR_`，嵌套分隔 `__` |
 | `models.py` | pydantic 域模型：`WatchlistConfig` / `Availability` / `TimeSemantics` | **与 `store/models.py` 不是一回事** |
 | `budget.py` | `estimate_cost` + `check_budget` | 纯逻辑；调用前过闸门，调用后按实际 token 记账 |
@@ -141,6 +141,10 @@ cli.py (typer)
 | `pipeline/enhance.py` | LLM 增强 + 强相似边关联解读 | watchlist Top N；预算闸门；幂等 `enhance_content_hash` |
 | `pipeline/grade.py` | 定级：Tier 1/2/3 + 原始证据 | 延迟定级；幂等 `grade_content_hash`；解析失败不写指纹 |
 | `pipeline/deep_analysis.py` | 深度分析（strong）+ 通道 A/B | 周配额 5；正文临时抓取；幂等 `deep_content_hash` |
+| `pipeline/predict.py` | L4 推演生成（★ 零 LLM） | 3 类判据；同目标 open 则跳过；观点另存 |
+| `pipeline/stats.py` | 到期验证 / 记分板 / 校准 / 影响分析 | ★ `insufficient` 不进命中率分母；样本不足不下结论 |
+| `pipeline/score.py` | 热度 / 跨源 / 主题三分量 | ★ 无 `total` 字段，不做加权求和（红线 11） |
+| `store/scoreboard.py` | 记分板 JSONL + 可证伪门禁 | append-only 快照；代码判定可证伪性 |
 | `collectors/fulltext.py` | arXiv HTML 临时抓取 | ★ 只在内存，抓完即弃，**永不入库** |
 | `pipeline/prescreen.py` | 零成本预筛（规则负面排除） | ★ 只决定是否跟踪；`r` 是淘汰集留存率 |
 | `pipeline/signals.py` | 采样状态机 + signals 写入 + 月度 JSONL | ★ 状态持久化；两套时钟不可混用；JSONL 是跨 DB 重建的幂等真源 |
@@ -176,6 +180,8 @@ cli.py (typer)
 | **`first_seen_at`**（首次见到它的日期） | ❌ | `data/first_seen.jsonl` | **✓ public** |
 | **signals 时序快照**（被引增长曲线） | ❌ | `data/signals/YYYY-MM.jsonl` | **✓ public** |
 | 每日报告 md + json | ✅ | `data/reports/YYYY-MM-DD.{md,json}` | **✓ public** |
+| **推演记分板**（可验证判断快照） | ❌ | `data/predictions/scoreboard.jsonl` | **✓ public** |
+| **长期观点**（不可证伪） | ❌ | `data/predictions/opinions.jsonl` | **✓ public**（但不进统计） |
 | 用户笔记 | ❌ | **独立 private vault 仓库**：`~/projects/ai-scholar-vault/` | ✗（不进本仓库） |
 | 论文正文 / 全文 | — | **永不入库**（临时抓取、抓完即弃） | ❌ 绝对禁止 |
 | `config/watchlist.local.yaml` | — | 本地（配置洁癖：不该让别人 clone 到你的兴趣清单） | ✗ |
@@ -295,6 +301,13 @@ vault 由本地 `export` 写入。任何"让 Actions 写 private vault"的设计
     （`ARXIV:` / `DOI:` / `S2:`）。它是文献耦合的原料，不是知识库资产。
 24. ❌ **把对称边当引用渲染** —— `similarity` / `bibcoupling` 必须走独立分节（相似 / 文献耦合），
     不能混进「引用了」；对称边只存一条（`src < dst`），渲染时双向展开。
+25. ❌ **让 LLM / 用户判定"这条推演不可验证"** —— 可证伪性**只由代码判定**
+    （量化判据 + 未来到期日，见 `store/scoreboard.py`）。不可证伪的洞察只能进
+    `opinions.jsonl`，**不得进记分板**。
+26. ❌ **把 `insufficient` 计入命中率分母** —— 数据不足不是 miss；
+    它单独展示、不进 hit/(hit+miss)。观点同理，**永不进统计**。
+27. ❌ **样本不足时给"开创 / 跟风"定论** —— 影响分析必须显式标
+    「样本不足」或「候选判断」；校准样本不足时只报数、不下结论。
 
 ---
 
@@ -342,6 +355,11 @@ uv run ai-scholar grade [--limit N] [--force] [--dry-run]
                                  # 文献定级（fast）：延迟定级 → Tier 1/2/3 + 原始证据
 uv run ai-scholar analyze [--ids a,b] [--limit N] [--force] [--dry-run]
                                  # 深度分析（strong）：三句半/六段/透镜 + 正文临时抓取
+uv run ai-scholar predict [--limit N] [--dry-run] [--insight TEXT]
+                                 # 可验证推演（零 LLM）：写 data/predictions/scoreboard.jsonl
+uv run ai-scholar stats [--verify] [--calibration] [--impact] [--limit N]
+                                 # 记分板；--verify 只验收到期项；insufficient 不进命中率
+uv run ai-scholar list --score   # 分项分（热度/跨源/主题），不合成单一总分
 uv run ai-scholar related <paper-id>
                                  # 查看关联（分「引用了」「被引用」两栏，验证方向）
 uv run python scripts/probe_s2.py --n 50     # S2 实测（产出 docs/数据源手册.md §2.6）
@@ -379,6 +397,9 @@ uv build                         # hatchling：构建 sdist + wheel（默认写 
 | `pipeline/enhance.py` · `llm.py` | `pytest -k "enhance or llm"` + 实跑 1 篇（★ off 全绿 ≠ fast 可用） |
 | `pipeline/grade.py` | `pytest -k grade` + 实跑 1 篇（★ Tier 解析 / 幂等 / 记账） |
 | `pipeline/deep_analysis.py` · `collectors/fulltext.py` | `pytest -k "deep_analysis or fulltext"` + 实跑 1 篇（★ strong 成本 / 正文不落库） |
+| `store/scoreboard.py` · `pipeline/predict.py` | `pytest -k predict`（★ 可证伪门禁 / 幂等 / 观点不进记分板）+ 实跑 `predict --dry-run` |
+| `pipeline/stats.py` | `pytest -k stats`（★ insufficient 不计分母 / 样本不足不下结论）+ 实跑 `stats --verify` |
+| `pipeline/score.py` | `pytest -k score`（★ 三分量独立 / 无 total） |
 | `pipeline/report.py` · `templates/report/` | `pytest -k report`（★ 当天重跑无 diff；只读 DB） |
 | `budget.py` · 预算配置 | `pytest -k budget` + `ai-scholar budget ...` 演练（零网络） |
 | `scripts/probe_sources.py` | 实跑一次 + 检查 `docs/数据源手册.md`；不可达时确认是 skip 不是伪造 |

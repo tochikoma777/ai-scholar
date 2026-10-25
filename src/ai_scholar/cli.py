@@ -748,6 +748,9 @@ def list_papers(
     watchlist_only: bool = typer.Option(
         False, "--watchlist-only", help="只显示 watchlist 命中的（★ 展示筛选，不改库）"
     ),
+    score: bool = typer.Option(
+        False, "--score", help="显示客观信号分项（热度/跨源/主题；★ 不合成单一分）"
+    ),
 ) -> None:
     """列出库内论文，**★ 显示 watchlist 命中标记**。
 
@@ -780,8 +783,12 @@ def list_papers(
     table.add_column("first_seen")
     table.add_column("title", max_width=60)
     table.add_column("HF")
+    if score:
+        table.add_column("热度")
+        table.add_column("跨源")
+        table.add_column("主题")
 
-    shown = 0
+    shown_papers = []
     with Session(engine) as session:
         # ★ `list` 是"看库里有什么"，不受选集限制（export 才默认只导 selected）
         papers = select_papers(session, limit=limit, since=since_date, all_papers=True)
@@ -789,16 +796,28 @@ def list_papers(
             hit = match_watchlist(watchlist, paper.title, paper.abstract or "")
             if watchlist_only and not hit.matched:
                 continue
-            shown += 1
-            table.add_row(
-                "★" if hit.matched else "",
-                paper.id,
-                (paper.first_seen_at or "")[:10],
-                paper.title[:60],
-                str(paper.hf_score) if paper.hf_score is not None else "",
-            )
+            shown_papers.append((paper, hit.matched))
+
+    if score:
+        from ai_scholar.pipeline.score import fmt, score_many
+
+        breakdowns = score_many([paper for paper, _ in shown_papers], watchlist)
+    for paper, matched in shown_papers:
+        row = [
+            "★" if matched else "",
+            paper.id,
+            (paper.first_seen_at or "")[:10],
+            paper.title[:60],
+            str(paper.hf_score) if paper.hf_score is not None else "",
+        ]
+        if score:
+            item = breakdowns[paper.id]
+            row += [fmt(item.heat), fmt(item.cross_source), fmt(item.topic)]
+        table.add_row(*row)
     console.print(table)
-    console.print(f"显示 {shown} 条（★ = watchlist 命中）")
+    console.print(f"显示 {len(shown_papers)} 条（★ = watchlist 命中）")
+    if score:
+        console.print("分项分只在本次结果内归一化，不可跨批比较；★ 不合成单一总分")
     raise typer.Exit(0)
 
 
@@ -863,6 +882,168 @@ def budget(
 
 
 @app.command()
+def predict(
+    limit: int | None = typer.Option(None, "--limit", help="本次最多新增条数"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="只预览，不写记分板"),
+    insight: list[str] | None = typer.Option(
+        None, "--insight", help="记录一条长期观点（★ 不进记分板、不计入统计）"
+    ),
+) -> None:
+    """生成可验证推演（★ 零 LLM）：写入 `data/predictions/scoreboard.jsonl`。"""
+    from ai_scholar.pipeline.predict import run_predict
+
+    settings = load_settings()
+    report = run_predict(
+        settings=settings,
+        dry_run=dry_run,
+        limit=limit,
+        insights=insight,
+    )
+
+    table = Table(title=f"predict · {report.today}", title_justify="left")
+    table.add_column("类型")
+    table.add_column("目标")
+    table.add_column("阈值")
+    table.add_column("到期")
+    table.add_column("判断", max_width=58)
+    for prediction in report.predictions:
+        table.add_row(
+            prediction.criterion.type,
+            prediction.criterion.target,
+            str(prediction.criterion.threshold),
+            prediction.due_at,
+            prediction.claim,
+        )
+    console.print(table)
+
+    title = "预览（未写入）" if dry_run else "新增"
+    console.print(
+        f"{title} {report.created} 条 · 跳过 {report.skipped} 条 · 观点 {report.opinions} 条"
+    )
+    console.print(f"记分板：{report.scoreboard_path}")
+    if report.degraded:
+        for key, reason in report.degraded.items():
+            console.print(f"[yellow]warning[/] {key}：{reason}")
+    for rejected in report.rejected:
+        console.print(f"[red]拒绝[/] {rejected}（未通过可证伪门禁）")
+    raise typer.Exit(0)
+
+
+@app.command()
+def stats(
+    verify: bool = typer.Option(False, "--verify", help="验证所有到期推演（零网络）"),
+    calibration: bool = typer.Option(False, "--calibration", help="定级校准（Tier vs 引用）"),
+    impact: bool = typer.Option(False, "--impact", help="被引增长与开创/跟风候选"),
+    limit: int = typer.Option(20, "--limit", help="影响分析显示条数"),
+) -> None:
+    """记分板统计：命中率只算 hit/miss，`insufficient` 与观点都不进分母。"""
+    from ai_scholar.pipeline.stats import (
+        calibration as run_calibration,
+    )
+    from ai_scholar.pipeline.stats import (
+        impact as run_impact,
+    )
+    from ai_scholar.pipeline.stats import (
+        summarize,
+        verify_due,
+    )
+    from ai_scholar.utils.timeutil import today_local
+
+    settings = load_settings()
+    today = today_local()
+
+    if verify:
+        report = verify_due(settings=settings, today=today)
+        table = Table(title=f"stats --verify · {today}", title_justify="left")
+        table.add_column("状态")
+        table.add_column("判据")
+        table.add_column("观测 / 阈值")
+        table.add_column("判断", max_width=50)
+        for detail in report.details:
+            observed = "—" if detail.observed is None else str(detail.observed)
+            table.add_row(
+                detail.status,
+                detail.id,
+                f"{observed} / {detail.threshold}",
+                detail.note or detail.claim,
+            )
+        console.print(table)
+        console.print(
+            f"验证 {report.checked} 条：hit {report.hit} · miss {report.miss}"
+            f" · insufficient {report.insufficient}"
+        )
+        for key, reason in report.degraded.items():
+            console.print(f"[yellow]warning[/] {key}：{reason}")
+
+    summary = summarize(settings=settings, today=today)
+    hit_rate = "—" if summary.hit_rate is None else f"{summary.hit_rate:.1%}"
+    table = Table(title="记分板", title_justify="left")
+    table.add_column("项")
+    table.add_column("值")
+    table.add_row("未到期 / 到期未验证", f"{summary.open}（其中已到期 {summary.due_open}）")
+    table.add_row("命中 / 未命中", f"{summary.hit} / {summary.miss}")
+    table.add_row("命中率（不含 insufficient）", hit_rate)
+    table.add_row("数据不足（不计入分母）", str(summary.insufficient))
+    table.add_row("观点（★ 不进统计）", str(summary.opinions))
+    console.print(table)
+
+    if calibration:
+        if not settings.db_path().exists():
+            console.print("[yellow]warning[/] 数据库不存在，跳过定级校准")
+        else:
+            engine = create_engine(f"sqlite:///{settings.db_path()}", echo=False)
+            with Session(engine) as session:
+                cal = run_calibration(session, settings.calibration, today=today)
+            table = Table(title="定级校准（成熟论文当前引用）", title_justify="left")
+            table.add_column("Tier")
+            table.add_column("n")
+            table.add_column("引用均值")
+            table.add_column("引用中位")
+            for cal_row in cal.rows:
+                table.add_row(
+                    f"Tier {cal_row.tier}",
+                    str(cal_row.n),
+                    f"{cal_row.mean_citations:.2f}",
+                    f"{cal_row.median_citations:.2f}",
+                )
+            console.print(table)
+            spearman = "—" if cal.spearman is None else f"{cal.spearman:+.3f}"
+            console.print(f"Spearman(tier, 引用)：{spearman}")
+            if not cal.enough:
+                console.print(f"[yellow]结论[/] {cal.reason}")
+
+    if impact:
+        if not settings.db_path().exists():
+            console.print("[yellow]warning[/] 数据库不存在，跳过影响分析")
+        else:
+            engine = create_engine(f"sqlite:///{settings.db_path()}", echo=False)
+            with Session(engine) as session:
+                imp = run_impact(session, settings.impact, limit=limit)
+            table = Table(title="影响分析（被引增长）", title_justify="left")
+            table.add_column("论文", max_width=44)
+            table.add_column("快照")
+            table.add_column("跨度")
+            table.add_column("被引")
+            table.add_column("每 30 天")
+            table.add_column("判断", max_width=30)
+            for imp_row in imp.rows:
+                table.add_row(
+                    imp_row.title[:44],
+                    str(imp_row.snapshots),
+                    f"{imp_row.span_days}d",
+                    f"{imp_row.first_citations}→{imp_row.last_citations}",
+                    f"{imp_row.velocity_per_30d:+.2f}",
+                    imp_row.verdict,
+                )
+            console.print(table)
+            if not imp.enough:
+                console.print(f"[yellow]结论[/] {imp.reason}")
+            else:
+                console.print("★ 开创/跟风是**候选判断**，依据仅为引用增速，不作定论")
+    raise typer.Exit(0)
+
+
+@app.command()
 def report(
     day: str | None = typer.Option(None, "--date", help="报告日期（默认今天，YYYY-MM-DD）"),
     out: str | None = typer.Option(None, "--out", help="输出目录（默认 data/reports）"),
@@ -894,7 +1075,9 @@ def report(
     engine = create_engine(f"sqlite:///{settings.db_path()}", echo=False)
     watchlist = load_watchlist()
     with Session(engine) as session:
-        daily = build_daily_report(session, today=today, watchlist=watchlist)
+        daily = build_daily_report(
+            session, today=today, watchlist=watchlist, data_dir=settings.data_dir()
+        )
 
     outcome = write_report(daily, out_dir)
 

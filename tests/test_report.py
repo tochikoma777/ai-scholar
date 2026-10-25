@@ -178,3 +178,75 @@ def test_md_frontmatter_carries_schema_version(tmp_path: Path) -> None:
     md = render_markdown(report)
     assert "date: 2026-10-24" in md
     assert "schema_version: 1" in md
+
+
+def test_report_renders_predictions_without_merging_opinions(tmp_path: Path) -> None:
+    from ai_scholar.store.scoreboard import (
+        Criterion,
+        Opinion,
+        Prediction,
+        append_opinion,
+        append_snapshot,
+        opinions_path,
+        scoreboard_path,
+    )
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    path = scoreboard_path(data_dir)
+    append_snapshot(
+        path,
+        Prediction(
+            id="p-1",
+            claim="cs.AI 未来 30 天新增 ≥ 10 篇",
+            criterion=Criterion(
+                type="arxiv_paper_count", target="cs.AI", threshold=10, window_days=30
+            ),
+            created_at="2026-10-01",
+            due_at="2026-10-24",
+            status="hit",
+            verified_at="2026-10-24",
+            observed=12,
+        ),
+    )
+    append_snapshot(
+        path,
+        Prediction(
+            id="p-2",
+            claim="cs.LG 未来 30 天新增 ≥ 99 篇",
+            criterion=Criterion(
+                type="arxiv_paper_count", target="cs.LG", threshold=99, window_days=30
+            ),
+            created_at="2026-10-01",
+            due_at="2026-10-24",
+        ),
+    )
+    append_snapshot(
+        path,
+        Prediction(
+            id="p-3",
+            claim="cs.CV 未来 30 天新增 ≥ 5 篇",
+            criterion=Criterion(
+                type="arxiv_paper_count", target="cs.CV", threshold=5, window_days=30
+            ),
+            created_at="2026-10-24",
+            due_at="2026-11-23",
+        ),
+    )
+    append_opinion(
+        opinions_path(data_dir), Opinion(id="o-1", text="a trend", created_at="2026-10-24")
+    )
+
+    engine = _engine(tmp_path)
+    with Session(engine) as session:
+        daily = build_daily_report(session, today=TODAY, watchlist=_watchlist(), data_dir=data_dir)
+
+    assert [item.id for item in daily.predictions_verified] == ["p-1"]
+    assert [item.id for item in daily.predictions_due] == ["p-2"]
+    assert [item.id for item in daily.predictions_new] == ["p-3"]
+    assert daily.opinions_total == 1
+    md = render_markdown(daily)
+    assert "今日推演" in md
+    assert "观测 12 / 阈值 10" in md
+    assert "🆕" in md
+    assert "观点 1 条" in md

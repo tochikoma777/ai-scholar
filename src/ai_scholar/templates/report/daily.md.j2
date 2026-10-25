@@ -40,6 +40,27 @@ schema_version: {{ report.schema_version }}
 - 暂无（L3 实现后填充）
 {%- endif %}
 
+## 今日推演
+
+{% if report.predictions_new -%}
+{% for item in report.predictions_new %}
+- 🆕 `{{ item.id }}` — {{ item.claim }}（到期 {{ item.due_at }}）
+{% endfor -%}
+{%- endif %}
+{% if report.predictions_verified -%}
+{% for item in report.predictions_verified %}
+- {{ "✅" if item.status == "hit" else ("❌" if item.status == "miss" else "⚠️") }} `{{ item.id }}` — {{ item.claim }}{% if item.observed is not none %}（观测 {{ item.observed }} / 阈值 {{ item.threshold }}）{% endif %}
+{% endfor -%}
+{%- elif report.predictions_due -%}
+{% for item in report.predictions_due %}
+- ⏳ `{{ item.id }}` 已到期未验证 — {{ item.claim }}
+{% endfor -%}
+{%- endif %}
+{%- if not report.predictions_new and not report.predictions_verified and not report.predictions_due -%}
+- 今日无新增、到期或已验证的推演
+{%- endif %}
+- 观点 {{ report.opinions_total }} 条（★ 不可证伪，不进统计）
+
 ## 运行状态
 
 {% if report.runs -%}

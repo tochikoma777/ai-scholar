@@ -64,6 +64,13 @@ jobs:
       - name: Grade
         run: uv run ai-scholar grade
 
+      # ★ L4：零 LLM / 零网络。先生成可验证推演（同目标已有 open 则跳过），再验证到期项
+      - name: Predict
+        run: uv run ai-scholar predict
+
+      - name: Verify predictions
+        run: uv run ai-scholar stats --verify
+
       - name: Report
         run: uv run ai-scholar report
 
@@ -75,7 +82,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/first_seen.jsonl data/signals data/reports
+          git add data/first_seen.jsonl data/signals data/reports data/predictions
           if git diff --cached --quiet; then
             echo "无变更，跳过 commit"
             exit 0

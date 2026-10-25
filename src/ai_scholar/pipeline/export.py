@@ -331,7 +331,26 @@ def _daily_note_lines(
         lines.append("（无降级）")
     lines.append("")
 
-    lines += ["## 今日推演", "- （L4）"]
+    lines += ["## 今日推演"]
+    if daily.predictions_new:
+        for item in daily.predictions_new:
+            lines.append(f"- 🆕 {item.claim}（到期 {item.due_at}）")
+    if daily.predictions_verified:
+        for item in daily.predictions_verified:
+            icon = "✅" if item.status == "hit" else ("❌" if item.status == "miss" else "⚠️")
+            suffix = (
+                f"（观测 {item.observed} / 阈值 {item.threshold}）"
+                if item.observed is not None
+                else ""
+            )
+            lines.append(f"- {icon} {item.claim}{suffix}")
+    elif daily.predictions_due:
+        for item in daily.predictions_due:
+            lines.append(f"- ⏳ 已到期未验证 — {item.claim}")
+    if not (daily.predictions_new or daily.predictions_verified or daily.predictions_due):
+        lines.append("- （今日无新增、到期或已验证的推演）")
+    if daily.opinions_total:
+        lines.append(f"- 观点 {daily.opinions_total} 条（★ 不进统计）")
     return lines
 
 
@@ -485,7 +504,9 @@ def run_export(
 
         # 40-日志/YYYY-MM-DD.md（L2-C Daily Note：本地 export 产物，§6.6）
         day = today or today_local()
-        daily = build_daily_report(session, today=day, watchlist=watchlist)
+        daily = build_daily_report(
+            session, today=day, watchlist=watchlist, data_dir=settings.data_dir()
+        )
         note_lines = _daily_note_lines(
             session,
             day=day,

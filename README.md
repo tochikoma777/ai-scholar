@@ -9,7 +9,7 @@ AI 文献的 **采集 → 关联 → 推演 → 沉淀**，外加**论文深度�
 
 - 许可证：**MIT**（只管代码，不管数据 —— 数据署名见文末）
 - 姊妹项目：[aipulse](https://github.com/tochikoma777/aipulse)（三档模式 / 三级降级 / 静默失败治理 全盘继承）
-- 当前阶段：**L3 已完成**（LLM 增强 + 文献定级 + 深度分析）+ **Daily Note**（tag 至 `l3b2` / `l2c`）；下一阶段 L4（推演与演化）
+- 当前阶段：**L4 已完成**（推演 + 记分板 + 定级校准 + 影响分析）+ L3 全部能力；下一阶段 L5（呈现形态，待定）
 
 ---
 
@@ -39,6 +39,8 @@ uv run ai-scholar relate     # 文献耦合 + TF-IDF 相似（★ 倒排分桶�
 uv run ai-scholar enhance    # LLM 增强：一句话 / 为什么重要 / 方法标签（fast；需 key）
 uv run ai-scholar grade      # 文献定级：Tier 1/2/3（fast；延迟定级）
 uv run ai-scholar analyze --ids arXiv:2610.30132   # 深度分析（strong；正文临时抓取）
+uv run ai-scholar predict    # 可验证推演（零 LLM）：进记分板，到期自动验证
+uv run ai-scholar stats      # 记分板命中率；--calibration / --impact 看校准与影响
 uv run ai-scholar mark arXiv:2610.30122      # 显式收藏（export 默认只导收藏的）
 uv run ai-scholar related arXiv:2610.30122   # 看某篇的关联（引用了 / 被引用 两栏）
 ```
@@ -147,7 +149,7 @@ groups:
 - [x] **L3a** LLM 增强（fast）：一句话 / 为什么重要 / 方法标签 / 关联解读 + 预算闸门记账（tag `l3a`）
 - [x] **L3b-1** 文献定级（fast）：三判据 + 六硬约束 + 延迟定级/幂等（tag `l3b1`）
 - [x] **L3b-2** 深度分析（strong）：六段 + 三句半 + 背景透镜 + 正文临时抓取（tag `l3b2`）
-- [ ] **L4** 推演与演化：趋势 / 主题演化 / 影响分析 / 定级校准
+- [x] **L4** 推演与演化：可验证推演进记分板 / 观点不计分 / 定级校准 / 影响分析（tag `l4`）
 - [ ] **L5** 呈现形态（待定：交互式 Web 看板）
 
 ---

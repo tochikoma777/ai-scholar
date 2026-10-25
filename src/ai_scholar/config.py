@@ -308,6 +308,46 @@ class DeepAnalysisSettings(BaseModel):
     lens: LensSettings = Field(default_factory=LensSettings)
 
 
+class PredictionSettings(BaseModel):
+    """L4 推演参数（★ 零 LLM：确定性外推，成本恒 0）。
+
+    所有阈值都可解释：`baseline × growth_factor` 向上取整。
+    """
+
+    # 方向推演：看最近 N 天的新增，预测未来 M 天
+    direction_window_days: int = 30
+    direction_horizon_days: int = 30
+    min_direction_papers: int = 30
+    direction_growth_factor: float = 1.1
+    # 方法实体推演
+    entity_window_days: int = 90
+    entity_horizon_days: int = 30
+    min_entity_mentions: int = 5
+    entity_growth_factor: float = 1.2
+    # 被引推演（只对已有引用的论文，长周期）
+    citation_min_current: int = 5
+    citation_horizon_days: int = 180
+    citation_growth_factor: float = 1.5
+    # 单次最多新增多少条（★ 防推演通胀）
+    max_new_per_run: int = 10
+
+
+class CalibrationSettings(BaseModel):
+    """定级校准：回看 (tier, 成熟后引用)。★ 样本不足时只报数字、不下结论。"""
+
+    maturity_days: int = 180
+    min_sample_per_tier: int = 20
+
+
+class ImpactSettings(BaseModel):
+    """影响分析：被引增长曲线 + 开创/跟风候选判断。"""
+
+    min_snapshots: int = 2
+    min_span_days: int = 60
+    min_cohort: int = 20
+    default_limit: int = 20
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix=ENV_PREFIX,
@@ -331,6 +371,9 @@ class Settings(BaseSettings):
     enhance: EnhanceSettings = Field(default_factory=EnhanceSettings)
     grade: GradeSettings = Field(default_factory=GradeSettings)
     deep_analysis: DeepAnalysisSettings = Field(default_factory=DeepAnalysisSettings)
+    predictions: PredictionSettings = Field(default_factory=PredictionSettings)
+    calibration: CalibrationSettings = Field(default_factory=CalibrationSettings)
+    impact: ImpactSettings = Field(default_factory=ImpactSettings)
     sources: dict[str, SourceSettings] = Field(default_factory=dict)
 
     def effective_mode(self) -> RunMode:

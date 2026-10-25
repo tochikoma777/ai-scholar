@@ -179,3 +179,31 @@ deep_analysis:
     q3_hint: 额外 kernel/通信
     q4_hint: 序列短 / batch 小
     q5_hint: 稀疏化/流水线
+
+predictions:
+  # ★ L4 推演（零 LLM）：阈值 = 基线 × 增长系数，向上取整
+  direction_window_days: 30
+  direction_horizon_days: 30
+  min_direction_papers: 30
+  direction_growth_factor: 1.1
+  entity_window_days: 90
+  entity_horizon_days: 30
+  min_entity_mentions: 5
+  entity_growth_factor: 1.2
+  citation_min_current: 5
+  citation_horizon_days: 180
+  citation_growth_factor: 1.5
+  # 单次最多新增条数：防推演通胀，到期后自动验证
+  max_new_per_run: 10
+
+calibration:
+  # ★ 定级校准：只看成熟论文（published_at + N 天），样本不足时不下结论
+  maturity_days: 180
+  min_sample_per_tier: 20
+
+impact:
+  # ★ 影响分析：至少 2 个快照且跨 N 天，才谈增长；同期样本不足只报数字
+  min_snapshots: 2
+  min_span_days: 60
+  min_cohort: 20
+  default_limit: 20

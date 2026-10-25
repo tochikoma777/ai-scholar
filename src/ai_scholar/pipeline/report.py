@@ -26,7 +26,13 @@ from sqlmodel import Session, col, func, select
 from ai_scholar.config import match_watchlist
 from ai_scholar.models import WatchlistConfig
 from ai_scholar.store.models import Paper, Run
-from ai_scholar.utils.timeutil import day_window
+from ai_scholar.store.scoreboard import (
+    load_latest,
+    load_opinions,
+    opinions_path,
+    scoreboard_path,
+)
+from ai_scholar.utils.timeutil import day_window, parse_iso_date
 
 SCHEMA_VERSION = 1
 WATCHLIST_TOP_N = 10
@@ -53,6 +59,17 @@ class RunStatus(BaseModel):
     degraded: list[str] = Field(default_factory=list)
 
 
+class PredictionBrief(BaseModel):
+    """报告里的推演摘要（★ 只读记分板 JSONL，不生成新推演）。"""
+
+    id: str
+    claim: str
+    status: str
+    due_at: str
+    observed: int | None = None
+    threshold: int | None = None
+
+
 class DailyReport(BaseModel):
     """当日报告（md 与 json 共用同一份数据，§6.6）。
 
@@ -69,6 +86,11 @@ class DailyReport(BaseModel):
     # L3 才填，本阶段恒空
     deep_analyzed: list[ReportHit] = Field(default_factory=list)
     new_graded: list[ReportHit] = Field(default_factory=list)
+    # L4 推演：只读记分板；观点单独计数，★ 不进统计
+    predictions_verified: list[PredictionBrief] = Field(default_factory=list)
+    predictions_due: list[PredictionBrief] = Field(default_factory=list)
+    predictions_new: list[PredictionBrief] = Field(default_factory=list)
+    opinions_total: int = 0
     # 运行状态
     runs: list[RunStatus] = Field(default_factory=list)
     degraded: dict[str, str] = Field(default_factory=dict)
@@ -85,12 +107,43 @@ class ReportOutcome:
     json_path: Path
 
 
+def _prediction_briefs(
+    data_dir: Path | None, *, today: date
+) -> tuple[list[PredictionBrief], list[PredictionBrief], list[PredictionBrief], int]:
+    """读记分板（★ 只读；文件不存在 ⇒ 空，不伪造）。"""
+    if data_dir is None:
+        return [], [], [], 0
+    day = today.isoformat()
+    predictions = load_latest(scoreboard_path(data_dir))
+    verified: list[PredictionBrief] = []
+    due: list[PredictionBrief] = []
+    new: list[PredictionBrief] = []
+    for item in predictions:
+        brief = PredictionBrief(
+            id=item.id,
+            claim=item.claim,
+            status=item.status,
+            due_at=item.due_at,
+            observed=item.observed,
+            threshold=item.criterion.threshold,
+        )
+        if item.verified_at == day:
+            verified.append(brief)
+        elif item.status == "open" and (parse_iso_date(item.due_at) or today) <= today:
+            due.append(brief)
+        elif item.created_at == day:
+            new.append(brief)
+    opinions = len(load_opinions(opinions_path(data_dir)))
+    return verified, due, new, opinions
+
+
 def build_daily_report(
     session: Session,
     *,
     today: date,
     watchlist: WatchlistConfig,
     top_n: int = WATCHLIST_TOP_N,
+    data_dir: Path | None = None,
 ) -> DailyReport:
     """聚合库内现状，生成当日报告快照（★ 只读，不写库）。"""
     day = today.isoformat()
@@ -160,6 +213,7 @@ def build_daily_report(
         ReportHit(id=p.id, title=p.title, score=0.0, groups=[]) for p in analyzed_today
     ]
 
+    verified, due, new, opinions = _prediction_briefs(data_dir, today=today)
     return DailyReport(
         date=day,
         total_papers=total,
@@ -167,6 +221,10 @@ def build_daily_report(
         watchlist_hits=hits,
         deep_analyzed=deep_analyzed,
         new_graded=new_graded,
+        predictions_verified=verified,
+        predictions_due=due,
+        predictions_new=new,
+        opinions_total=opinions,
         runs=runs,
         degraded=degraded,
     )
@@ -178,6 +236,8 @@ def render_markdown(report: DailyReport) -> str:
         loader=FileSystemLoader(str(_TEMPLATE_DIR)),
         autoescape=False,
         keep_trailing_newline=True,
+        trim_blocks=True,
+        lstrip_blocks=True,
     )
     template = env.get_template("daily.md.j2")
     return template.render(report=report)
