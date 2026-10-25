@@ -18,18 +18,18 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 ---
 
-## ★ 当前阶段：L6（运营修复与维护）—— 进行中（L6-1 / L6-2 已修）
+## ★ 当前阶段：L7（接线阶段）—— 进行中（不新增方案）
 
-- **只修不增**：L6-1 HF 400（采集窗口从昨天开始 + 失败带响应体）、
-  L6-2 成本可见性（`DailyReport.cost_cny` + site 卡片）、公共数据不被本地覆盖。
-  范围与 DoD 见 `docs/handoff/L6-开工.md`。
-- **HF 400 根因**：官方 API 的 `date` 上限是"昨天"（榜单滞后发布），请求当天必 400；
-  镜像同行为 ⇒ 不是网络问题，**不自动切换镜像**。
-- **不改数据落点**；Actions 仍为 `off`（无 key）⇒ 每日 LLM 成本 ¥0。
+- **只接线不新建**：把已定案但从未接线的链路接上 —— 范围与 DoD 见
+  `docs/handoff/L7-开工.md`（8 项：analyze 入自动管道、D 排序、深度分析置 `selected`、
+  public 真源 `data/analyses/`、经典种子清单、报告点读、links.json、frontmatter score）。
+- **已定决策（v1.11，勿推翻）**：D 排序（热度/经典交替+去重）；Tier 1 不是深度分析门槛
+  （通道 B 是并行补读）；经典获取=种子清单 `config/classics.yaml` 为主；
+  深度分析产物用 Option B 写成 public 真源。
+- ★ 前置审计教训（E7）：能力已实现≠已接线 —— 各阶段 DoD 必须回答「产出凭什么被下一阶段拿到」。
 
-上一阶段：**L5（呈现形态）已完成**（tag `l5a` / `l5b`）：
-- L5a 静态 HTML 单文件 + L5b 原生 JS 筛选/排序/搜索；单文件、零后端、不读 vault。
-- 分项分（热度 / 跨源 / 主题）并列展示，**不合成总分**；`site --check` 逐字节幂等。
+上一阶段：**L6（运营修复）已完成**（tag `l6`）：HF 400 根因修复、成本可见性、端到端实测。
+上一阶段：**L5（呈现形态）已完成**（tag `l5a` / `l5b`）：静态 HTML + 交互看板。
 - `daily.yml` **不接入** `site`（负责人 2026-10-25 决定）。
 
 上一阶段：**L4（推演与演化）已完成**（tag `l4`）：
