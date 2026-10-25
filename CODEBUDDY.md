@@ -18,30 +18,24 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 ---
 
-## ★ 当前阶段：L4（推演与演化）—— 已完成（tag `l4`）
+## ★ 当前阶段：L5（呈现形态）—— 进行中（L5a 静态 HTML）
 
-- **记分板**：`data/predictions/scoreboard.jsonl`（public、append-only 快照流）；
-  同 `id` 最后一行即最新状态；验证 = 追加新快照，不改历史。
-- **可证伪性由代码判定**：只认 `arxiv_paper_count` / `entity_mentions` /
-  `citation_reach` 三种判据，必须有正阈值、正窗口、未来到期日
-  （`store/scoreboard.py:falsifiability_errors`）。LLM / 用户无权自判"不可验证"。
-- **两类推演分家**：`opinions.jsonl` 只存长期观点，**永不进记分板、不进命中率**。
-- **`predict`（零 LLM / 零网络）**：方向新增量、方法标签提及量、论文被引量
-  按配置增长系数外推；同目标已有 `open` 则跳过（防通胀）。
-- **`stats`**：`--verify` 到期验证（hit / miss / insufficient）；默认命中率**只算 hit/miss**，
-  `insufficient` 单独展示、不进分母；`--calibration` 看 `(tier, 成熟论文当前引用)`；
-  `--impact` 看被引增长与「开创/跟风**候选**」，样本不足时只报数字。
-- **分项 score**：`热度 / 跨源 / 主题` 三分量，`list --score` 展示，**不合成单一总分**。
-- **实跑证据（2026-10-25）**：真实库 2174 篇 → 生成 5 条方向推演（cs.LG 636→700 等），
-  到期 2026-11-24；校准/影响分析均正确输出「样本不足」而非编造结论。
+- **形态已定**：先做 `L5a` **静态 HTML 单文件**（Exporter 第二实现，零新增依赖）；
+  `L5b` 交互式看板在 L5a 验收后单独做，优先单文件 + 原生 JS + 内嵌 JSON，零后端。
+- **内容边界**：L5 **不渲染个人笔记**，只读 public 数据（报告 / 记分板 / 论文元数据）；
+  绝不读取 vault，避免私有内容进入 public 产物。
+- **单文件约束**：CSS 内联、无 CDN、双击可开、首版 ≤ 5 MB；不内联正文（正文永不入库）。
+- **展示约束**：分项分（热度 / 跨源 / 主题）可展示，**不得加权成单一总分**。
+- **必须包含**：今日推演 / 记分板命中率 / 定级校准三类信息。
+- **不要合并完整 Web 栈**：前端构建 / 服务进程 / 托管 / E2E 测试会扩大依赖与 CI 面；
+  只有出现「多用户 / 实时 / 权限」硬需求时才另立阶段评估。
 
-上一阶段：L3b-2（深度分析，tag `l3b2`）。
-下一阶段（**未开始**）：L5（呈现形态，待定）。
+上一阶段：**L4（推演与演化）已完成**（tag `l4`）：
+- 记分板 `data/predictions/scoreboard.jsonl`（public、append-only）；观点 `opinions.jsonl` 永不进统计。
+- 可证伪性由**代码**判定；`insufficient` 不进命中率分母；样本不足不下结论。
+- `predict` / `stats` 零 LLM、零网络；daily.yml 已含 `predict → stats --verify`。
 
-★ L5 开工前必读：
-- L5 是**呈现形态**（静态 HTML / 交互看板），不改变已有数据落点与成本模型。
-- 任何新导出形态必须仍是**自包含、可直接喂给别的 AI 工具**的合成文档。
-- `score` 只有分项、没有总分；展示层不得偷偷加权成一个数字。
+L5 完成后按收尾门禁新建 `docs/handoff/L6-*.md`（当前 L6 未定义）。
 
 当前阶段以任务卡为准（文档维护分级见下方「文档归属」）。
 
