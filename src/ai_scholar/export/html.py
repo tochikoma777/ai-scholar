@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import html
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlparse
@@ -65,13 +66,96 @@ th { color: var(--muted); font-weight: 600; }
 .scores { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; font-size: 13px; }
 .scores span { color: var(--muted); }
 .scores b { color: var(--fg); font-variant-numeric: tabular-nums; }
+.controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px; margin: 14px 0 8px; align-items: end; }
+.controls label { display: flex; flex-direction: column; gap: 4px;
+                  font-size: 12px; color: var(--muted); }
+.controls input, .controls select, .controls button {
+  font: inherit; font-size: 14px; padding: 6px 8px; color: var(--fg);
+  background: var(--card); border: 1px solid var(--line); border-radius: 7px; }
+.controls button { cursor: pointer; color: var(--muted); }
+.controls button:hover { color: var(--accent); border-color: var(--accent); }
+.count { color: var(--muted); font-size: 13px; margin: 4px 0 0; }
+[hidden] { display: none !important; }
 .tag { display: inline-block; font-size: 12px; color: var(--accent);
        border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; margin-left: 6px; }
 .hit { color: var(--accent); } .miss { color: var(--bad); } .insufficient { color: var(--warn); }
 .empty { color: var(--muted); font-style: italic; }
 footer { max-width: 980px; margin: 0 auto; padding: 0 20px 40px; color: var(--muted);
          font-size: 13px; border-top: 1px solid var(--line); padding-top: 14px; }
-@media print { .paper { break-inside: avoid; } }
+@media print { .paper { break-inside: avoid; } .controls, .count, noscript { display: none; } }
+""".strip()
+
+# ★ L5b：筛选 / 排序 / 搜索全部在本地 DOM 上完成 —— 不发请求、不引第三方库。
+#   数据已由服务端渲染成卡片（无 JS 也能读）；这里只做渐进增强。
+_JS = """
+(function () {
+  var list = document.getElementById("paper-list");
+  if (!list) return;
+  var cards = Array.prototype.slice.call(list.querySelectorAll(".paper"));
+  var q = document.getElementById("q");
+  var group = document.getElementById("group");
+  var tier = document.getElementById("tier");
+  var date = document.getElementById("date");
+  var sort = document.getElementById("sort");
+  var count = document.getElementById("count");
+  var empty = document.getElementById("empty");
+  var reset = document.getElementById("reset");
+
+  function matches(card) {
+    var d = card.dataset;
+    var needle = q.value.trim().toLowerCase();
+    if (needle && d.search.indexOf(needle) === -1) return false;
+    if (group.value) {
+      var groups = [];
+      try { groups = JSON.parse(d.groups || "[]"); } catch (e) { groups = []; }
+      if (groups.indexOf(group.value) === -1) return false;
+    }
+    if (tier.value) {
+      if (tier.value === "none") { if (d.tier) return false; }
+      else if (d.tier !== tier.value) return false;
+    }
+    if (date.value && d.date !== date.value) return false;
+    return true;
+  }
+
+  function apply() {
+    var shown = 0;
+    cards.forEach(function (card) {
+      var ok = matches(card);
+      card.hidden = !ok;
+      if (ok) shown += 1;
+    });
+    cards.sort(function (a, b) {
+      if (sort.value === "date") {
+        return (b.dataset.date || "").localeCompare(a.dataset.date || "");
+      }
+      var av = parseFloat(a.dataset[sort.value]);
+      var bv = parseFloat(b.dataset[sort.value]);
+      if (isNaN(av)) av = -Infinity;
+      if (isNaN(bv)) bv = -Infinity;
+      return bv - av;
+    });
+    cards.forEach(function (card) { list.appendChild(card); });
+    count.textContent = "显示 " + shown + " / " + cards.length + " 篇";
+    empty.hidden = shown > 0;
+  }
+
+  q.addEventListener("input", apply);
+  [group, tier, date, sort].forEach(function (el) {
+    el.addEventListener("change", apply);
+  });
+  reset.addEventListener("click", function () {
+    q.value = "";
+    group.value = "";
+    tier.value = "";
+    date.value = "";
+    sort.value = "date";
+    apply();
+    q.focus();
+  });
+  apply();
+})();
 """.strip()
 
 
@@ -348,8 +432,24 @@ class HtmlExporter(Exporter):
         if item.tier:
             meta_bits.append(f"Tier {item.tier}")
         tags = "".join(f'<span class="tag">{_e(g)}</span>' for g in item.groups)
+        # ★ 筛选/排序只读这些属性；搜索文本在服务端小写化，JS 不再拼 HTML
+        search_text = " ".join(
+            [item.title, item.one_line or "", item.why or "", *item.groups]
+        ).lower()
+        groups_json = _e(json.dumps(list(item.groups), ensure_ascii=False))
+        heat = "" if item.heat is None else f"{item.heat:.4f}"
+        attrs = (
+            f'class="paper" data-id="{_e(item.paper_id)}"'
+            f' data-date="{_e(item.first_seen)}"'
+            f' data-tier="{"" if item.tier is None else item.tier}"'
+            f' data-groups="{groups_json}"'
+            f' data-search="{_e(search_text)}"'
+            f' data-heat="{heat}"'
+            f' data-cross="{item.cross_source:.4f}"'
+            f' data-topic="{item.topic:.4f}"'
+        )
         lines = [
-            '<article class="paper">',
+            f"<article {attrs}>",
             f"<h3>{title}{tags}</h3>",
             f'<p class="meta">{" · ".join(meta_bits)}</p>',
         ]
@@ -367,14 +467,68 @@ class HtmlExporter(Exporter):
         ]
         return "\n".join(lines)
 
+    @staticmethod
+    def _options(values: list[str], *, blank: str = "全部") -> str:
+        items = [f'<option value="">{_e(blank)}</option>']
+        items += [f'<option value="{_e(v)}">{_e(v)}</option>' for v in values]
+        return "".join(items)
+
     def _papers(self, data: SiteData) -> str:
-        cards = "\n".join(self._paper_card(item) for item in data.papers)
-        if not cards:
-            cards = '<p class="empty">（库内暂无论文）</p>'
-        return (
+        head = (
             '<section id="papers">\n<h2>论文（分项分）</h2>\n'
             '<p class="meta">热度 / 跨源 / 主题各自独立，本页只在本批内归一化，不可跨批比较。</p>\n'
-            f"{cards}\n</section>"
+        )
+        if not data.papers:
+            return head + '<p class="empty">（库内暂无论文）</p>\n</section>'
+
+        groups = sorted({g for item in data.papers for g in item.groups})
+        dates = sorted({item.first_seen for item in data.papers if item.first_seen}, reverse=True)
+        tiers = sorted({str(item.tier) for item in data.papers if item.tier is not None})
+        has_untiered = any(item.tier is None for item in data.papers)
+        tier_options = self._options(tiers)
+        if has_untiered:
+            tier_options += '<option value="none">未定级</option>'
+
+        manifest = {
+            "version": 1,
+            "total": len(data.papers),
+            "groups": groups,
+            "dates": dates,
+            "tiers": [int(t) for t in tiers],
+        }
+        payload = json.dumps(manifest, ensure_ascii=False).replace("</", "<\\/")
+        controls = (
+            '<div class="controls" role="search">\n'
+            f'<label>搜索<input id="q" type="search" placeholder="标题 / 一句话 / 标签"'
+            ' autocomplete="off"></label>\n'
+            f'<label>方向<select id="group">{self._options(groups)}</select></label>\n'
+            f'<label>Tier<select id="tier">{tier_options}</select></label>\n'
+            f'<label>入库日<select id="date">{self._options(dates)}</select></label>\n'
+            '<label>排序<select id="sort">'
+            '<option value="date">最新</option>'
+            '<option value="heat">热度</option>'
+            '<option value="cross">跨源</option>'
+            '<option value="topic">主题</option>'
+            "</select></label>\n"
+            '<button id="reset" type="button">重置</button>\n'
+            "</div>\n"
+            '<p class="count" id="count" aria-live="polite">'
+            f"显示 {len(data.papers)} / {len(data.papers)} 篇</p>\n"
+            '<noscript><p class="meta">JavaScript 未启用：筛选不可用，'
+            "全部论文仍可阅读。</p></noscript>\n"
+        )
+        cards = "\n".join(self._paper_card(item) for item in data.papers)
+        script = (
+            '<script type="application/json" id="site-index">' + payload + "</script>\n"
+            "<script>\n" + _JS + "\n</script>\n"
+        )
+        return (
+            head
+            + controls
+            + f'<div id="paper-list">\n{cards}\n</div>\n'
+            + '<p class="empty" id="empty" hidden>没有符合条件的论文。</p>\n'
+            + script
+            + "</section>"
         )
 
     @staticmethod
@@ -417,6 +571,7 @@ class HtmlExporter(Exporter):
             "<p>数据来源：每日报告（data/reports）、记分板（data/predictions）、"
             "论文元数据（DB）。本页不读取、不包含 vault 个人笔记与论文正文。</p>\n"
             "<p>分项分各自独立展示，不合并为单一分数；样本不足时只报数字、不下结论。</p>\n"
+            "<p>筛选 / 排序 / 搜索全部由本地原生 JS 完成，不发送任何网络请求。</p>\n"
             "</footer>"
         )
 

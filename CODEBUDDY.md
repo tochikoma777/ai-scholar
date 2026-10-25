@@ -18,24 +18,22 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 ---
 
-## ★ 当前阶段：L5（呈现形态）—— 进行中（L5a 已验收，L5b 未开始）
+## ★ 当前阶段：L6（运营修复与维护）—— 进行中
 
-- **形态已定**：先做 `L5a` **静态 HTML 单文件**（Exporter 第二实现，零新增依赖）；
-  `L5b` 交互式看板在 L5a 验收后单独做，优先单文件 + 原生 JS + 内嵌 JSON，零后端。
-- **内容边界**：L5 **不渲染个人笔记**，只读 public 数据（报告 / 记分板 / 论文元数据）；
-  绝不读取 vault，避免私有内容进入 public 产物。
-- **单文件约束**：CSS 内联、无 CDN、双击可开、首版 ≤ 5 MB；不内联正文（正文永不入库）。
-- **展示约束**：分项分（热度 / 跨源 / 主题）可展示，**不得加权成单一总分**。
-- **必须包含**：今日推演 / 记分板命中率 / 定级校准三类信息。
-- **不要合并完整 Web 栈**：前端构建 / 服务进程 / 托管 / E2E 测试会扩大依赖与 CI 面；
-  只有出现「多用户 / 实时 / 权限」硬需求时才另立阶段评估。
+- **只修不增**：HF daily 400 诊断、成本可见性（`DailyReport.cost_cny`）、
+  公共数据不被本地覆盖。范围与 DoD 见 `docs/handoff/L6-开工.md`。
+- **不自动切换 HF 镜像**：是否在 Actions 显式配 `hf_base_url` 由负责人决定。
+- **不改数据落点**；Actions 仍为 `off`（无 key）⇒ 每日 LLM 成本 ¥0。
+
+上一阶段：**L5（呈现形态）已完成**（tag `l5a` / `l5b`）：
+- L5a 静态 HTML 单文件 + L5b 原生 JS 筛选/排序/搜索；单文件、零后端、不读 vault。
+- 分项分（热度 / 跨源 / 主题）并列展示，**不合成总分**；`site --check` 逐字节幂等。
+- `daily.yml` **不接入** `site`（负责人 2026-10-25 决定）。
 
 上一阶段：**L4（推演与演化）已完成**（tag `l4`）：
 - 记分板 `data/predictions/scoreboard.jsonl`（public、append-only）；观点 `opinions.jsonl` 永不进统计。
 - 可证伪性由**代码**判定；`insufficient` 不进命中率分母；样本不足不下结论。
 - `predict` / `stats` 零 LLM、零网络；daily.yml 已含 `predict → stats --verify`。
-
-L5 完成后按收尾门禁新建 `docs/handoff/L6-*.md`（当前 L6 未定义）。
 
 当前阶段以任务卡为准（文档维护分级见下方「文档归属」）。
 
@@ -117,9 +115,10 @@ cli.py (typer)
 3. `Exporter.write` 原子写（`.tmp` + `os.replace`），避免 Obsidian 读到半截文件。
 4. 收尾写 `00-首页.md` / `90-元数据/生成报告.md` / `90-元数据/links.json`。
 
-★ **L5a 是第二条产物线**：`site` → `build_site_data` → `HtmlExporter.render_site`。
+★ **L5a/L5b 是第二条产物线**：`site` → `build_site_data` → `HtmlExporter.render_site`。
 它只读 public 数据（`data/reports/*.json` + 记分板 + DB 元数据），**不经过 vault**
-（私有笔记不进 public 产物），输出单一自包含 HTML。
+（私有笔记不进 public 产物），输出单一自包含 HTML；L5b 的筛选/排序/搜索由内联原生 JS
+在本地 DOM 上完成，不发任何请求。
 
 ### 模块地图
 
@@ -155,7 +154,7 @@ cli.py (typer)
 | `store/db.py` | 引擎 / 会话 / 建库前 `mkdir` | ★ 空 `data/` 目录也能 `alembic upgrade head` |
 | `export/base.py` | `Exporter` ABC + 原子写 | 不为"将来"加 Registry / 插件机制 |
 | `export/obsidian.py` | 标记块、frontmatter 合并、双轨链接渲染 | 标记块注释里**不能有时间戳** |
-| `export/html.py` | L5a 自包含 HTML 单文件（CSS 内联、无 JS/CDN） | ★ 分项分不合成总分；外链只允许 http(s)；无生成时间 ⇒ 幂等 |
+| `export/html.py` | L5a/L5b 自包含 HTML 单文件（CSS + 原生 JS 内联） | ★ 筛选/排序/搜索全本地；无外部请求；分项分不合成总分；外链只允许 http(s)；无生成时间 ⇒ 幂等 |
 | `utils/http.py` | 限速 / 重试 / 代理 / UA | 只重试 408/425/429/5xx 与超时 |
 | `utils/errors.py` | 异常层级：`ConfigError` / `SourceError` / `UnsafeOutputPath` / `StoreError` / `LLMError` | CLI 退出码映射依据；单源异常在 pipeline 转 `degraded` |
 | `utils/logging.py` | structlog 配置与 `get_logger` | 日志出口唯一，不在模块内各自 print |
@@ -196,6 +195,10 @@ cli.py (typer)
 
 ★ **vault 与代码仓库物理隔离**。本项目的 Actions **只 commit public 仓库**；
 vault 由本地 `export` 写入。任何"让 Actions 写 private vault"的设计都已被否掉，不要提出。
+
+★ **public 真源由 daily bot 提交，本地不要顺手 commit `data/`**（经验固化 G5）：
+本地跑 `report` / `collect` 后用本地 db 覆盖 `data/reports` 会抹掉 bot 的
+`runs` / `degraded` 证据（2026-10-25 已实锤：HF 400 在 public 报告里消失）。
 
 ---
 
@@ -351,7 +354,7 @@ uv run ai-scholar export --check # 只比对不落盘：无变更退出 0，有�
 uv run ai-scholar export --check --all
                                  # 校验库内论文对应的全部现存文献笔记，不只本次选集
 uv run ai-scholar site [--out DIR] [--days N] [--limit N]
-                                 # L5a 静态 HTML 单文件（只读 public 数据；默认 ~/projects/ai-scholar-site）
+                                 # 静态 HTML（L5b：筛选/排序/搜索；只读 public；默认 ~/projects/ai-scholar-site）
 uv run ai-scholar site --check   # 逐字节比对：无变更退出 0，有变更退出 1（幂等验收）
 uv run ai-scholar mark <paper-id> [--unmark]   # 显式收藏（决定是否生成笔记）
 uv run ai-scholar signals [--limit N] [--force] [--dry-run]

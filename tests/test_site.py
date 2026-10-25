@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 from pathlib import Path
 
@@ -20,7 +21,7 @@ from typer.testing import CliRunner
 
 from ai_scholar.config import AppSettings, CalibrationSettings, ExportSettings, Settings
 from ai_scholar.export.base import ExportContext
-from ai_scholar.export.html import MAX_BYTES, HtmlExporter
+from ai_scholar.export.html import MAX_BYTES, HtmlExporter, SiteData, SitePaper
 from ai_scholar.models import WatchlistConfig, WatchlistGroup
 from ai_scholar.pipeline.report import (
     DailyReport,
@@ -223,8 +224,8 @@ def test_site_escapes_text_and_drops_javascript_urls(
     )
     html = run_site(settings=settings, today=TODAY).out_path.read_text(encoding="utf-8")
 
-    assert "<script>" not in html
-    assert "&lt;script&gt;" in html
+    assert '<script>alert("evil")</script>' not in html
+    assert "&lt;script&gt;alert" in html
     assert "javascript:" not in html
     assert "&lt;b&gt;组&lt;/b&gt;" in html
 
@@ -251,9 +252,73 @@ def test_site_is_deterministic_and_check_is_honest(tmp_path: Path) -> None:
 def test_site_is_self_contained(tmp_path: Path) -> None:
     settings = _full_dataset(tmp_path)
     html = run_site(settings=settings, today=TODAY).out_path.read_text(encoding="utf-8")
-    for forbidden in ("<script", "<link", "src=", "@import", "url("):
+    for forbidden in ("<link", "src=", "@import", "url("):
         assert forbidden not in html
     assert "<style>" in html
+    # ★ L5b：允许内联 JS，但不得加载任何外部资源
+    assert html.count("<script>") == 1
+    assert html.count("</script>") == 2  # 一个 JSON 数据块 + 一个脚本块
+    for script in re.findall(r"<script>(.*?)</script>", html, re.S):
+        for token in ("fetch(", "XMLHttpRequest", "http://", "https://", "import("):
+            assert token not in script
+
+
+def test_site_embeds_filter_payload_and_card_attributes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "ai_scholar.pipeline.site.load_watchlist",
+        lambda: WatchlistConfig(groups=[WatchlistGroup(name="Agents", keywords=["agents"])]),
+    )
+    settings = _full_dataset(tmp_path)
+    html = run_site(settings=settings, today=TODAY).out_path.read_text(encoding="utf-8")
+
+    for control in ('id="q"', 'id="group"', 'id="tier"', 'id="date"', 'id="sort"'):
+        assert control in html
+
+    payload = re.search(
+        r'<script type="application/json" id="site-index">(.*?)</script>', html, re.S
+    )
+    assert payload is not None
+    manifest = json.loads(payload.group(1))
+    assert manifest["version"] == 1
+    assert manifest["total"] == 2
+    assert manifest["groups"] == ["Agents"]
+    assert manifest["tiers"] == [1, 2]
+
+    card = re.search(r'<article class="paper" data-id="arXiv:2610\.00001"[^>]*>', html)
+    assert card is not None
+    attrs = card.group(0)
+    assert 'data-tier="1"' in attrs
+    assert 'data-date="2026-10-25"' in attrs
+    assert 'data-groups="[&quot;Agents&quot;]"' in attrs
+    assert "a paper about agents" in attrs.lower()
+    for key in ("data-heat=", "data-cross=", "data-topic="):
+        assert key in attrs
+
+
+def test_site_manifest_neutralizes_script_close() -> None:
+    hostile = "</script><script>alert(1)</script>"
+    page = HtmlExporter().render_site(
+        SiteData(
+            date="2026-10-25",
+            papers=[SitePaper(paper_id="p-1", title="t", groups=(hostile,))],
+        )
+    )
+    assert hostile not in page
+    payload = re.search(
+        r'<script type="application/json" id="site-index">(.*?)</script>', page, re.S
+    )
+    assert payload is not None
+    assert json.loads(payload.group(1))["groups"] == [hostile]
+
+
+def test_site_cards_are_readable_without_js(tmp_path: Path) -> None:
+    settings = _full_dataset(tmp_path)
+    html = run_site(settings=settings, today=TODAY).out_path.read_text(encoding="utf-8")
+    assert 'id="paper-list"' in html
+    assert html.count('<article class="paper"') == 2
+    assert "<noscript>" in html
 
 
 def test_site_never_reads_vault(tmp_path: Path) -> None:
