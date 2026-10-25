@@ -1,0 +1,25 @@
+{
+  "date": "2026-10-26",
+  "schema_version": 1,
+  "total_papers": 2110,
+  "new_today": 0,
+  "watchlist_hits": [],
+  "deep_analyzed": [],
+  "new_graded": [],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "3c6094b7235f",
+      "mode": "off",
+      "source": null,
+      "fetched": 1441,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.0
+}
