@@ -23,7 +23,9 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
   历史地位无数据 → 「待观察」；无 HTML → 透镜标【需正文】），实测 **¥0.054/次**；
   重复运行跳过、零调用。
 - 共享 helper `pipeline/llm_support.py`（预算 / 成本 / prompt / 参考文献）三个管道共用。
-- ★ **L2-C Daily Note**（vault `40-日志/`）**推迟到 L3 之后** —— 依赖 L4 数据。
+- **L2-C Daily Note**：vault `40-日志/YYYY-MM-DD.md`，本地 `export` 生成（不进 Actions）；
+  生成区（今日新增 / 补齐引用 / 深度分析 / 新定级 / ★命中 / 运行状态）在标记块内，
+  「我的笔记摘要 / 待办」在标记块外**永不覆盖**；连续两次导出无 diff。
 
 上一阶段：L3b-1（定级，tag `l3b1`）。
 下一阶段（**未开始**）：L4（推演与演化：趋势 / 主题演化 / 影响分析）。
@@ -31,7 +33,8 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 ★ L4 开工前必读：
 - `score`（排序用客观信号分）仍为 null；L4 定级校准需要 `tier` + 半年后引用。
 - `analyze` 不进 daily.yml；强成本由用户显式触发。
-- L2-C Daily Note 仍待办。
+- **正文抓取**：`arxiv.org/html` 实测命中率高（8/8），但个别论文无 HTML（404，不重试）；
+  `max_fulltext_chars=60000` 会截断长文 —— 增强项待做。
 
 当前阶段以任务卡为准（文档维护分级见下方「文档归属」）。
 
