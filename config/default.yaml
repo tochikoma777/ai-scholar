@@ -66,6 +66,10 @@ export:
   #   只准 `~/` 开头（程序 expanduser），禁止写死家目录绝对路径：
   #   ① 泄露用户名 ② 别人 clone 后路径不存在。
   out_dir: ${AI_SCHOLAR_EXPORT__OUT_DIR:-~/projects/ai-scholar-vault}
+  # ★ L5a 静态 HTML 单文件站点：默认同样落在代码仓库之外（public 产物不堆进代码仓库）
+  site_dir: ${AI_SCHOLAR_EXPORT__SITE_DIR:-~/projects/ai-scholar-site}
+  site_days: 7                     # 趋势区展示最近几天报告（含最新一天详版）
+  site_max_papers: 50              # 单页论文条数上限（体积与信息量的折中）
 
 collect:
   # ★ 单日实测 465 条（§12），200 会把当天截断 —— 取 600 留余量（3 页 × 1 req/3s）

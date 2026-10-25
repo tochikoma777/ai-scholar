@@ -117,11 +117,15 @@ cli.py (typer)
 3. `Exporter.write` 原子写（`.tmp` + `os.replace`），避免 Obsidian 读到半截文件。
 4. 收尾写 `00-首页.md` / `90-元数据/生成报告.md` / `90-元数据/links.json`。
 
+★ **L5a 是第二条产物线**：`site` → `build_site_data` → `HtmlExporter.render_site`。
+它只读 public 数据（`data/reports/*.json` + 记分板 + DB 元数据），**不经过 vault**
+（私有笔记不进 public 产物），输出单一自包含 HTML。
+
 ### 模块地图
 
 | 路径 | 职责 | 关键点 |
 |---|---|---|
-| `cli.py` | 十七个子命令：`init`/`doctor`/`collect`/`export`/`enrich`/`enhance`/`grade`/`analyze`/`predict`/`stats`/`mark`/`signals`/`relate`/`related`/`list`/`budget`/`report` | 退出码：正常恒 0、`ConfigError` 1、参数错误 2 |
+| `cli.py` | 十八个子命令：`init`/`doctor`/`collect`/`export`/`site`/`enrich`/`enhance`/`grade`/`analyze`/`predict`/`stats`/`mark`/`signals`/`relate`/`related`/`list`/`budget`/`report` | 退出码：正常恒 0、`ConfigError` 1、参数错误 2 |
 | `config.py` | YAML 加载、`${ENV}` 插值、watchlist 双文件合并、`Settings` | `load_settings` 带 `lru_cache`；环境变量前缀 `AI_SCHOLAR_`，嵌套分隔 `__` |
 | `models.py` | pydantic 域模型：`WatchlistConfig` / `Availability` / `TimeSemantics` | **与 `store/models.py` 不是一回事** |
 | `budget.py` | `estimate_cost` + `check_budget` | 纯逻辑；调用前过闸门，调用后按实际 token 记账 |
@@ -144,12 +148,14 @@ cli.py (typer)
 | `pipeline/signals.py` | 采样状态机 + signals 写入 + 月度 JSONL | ★ 状态持久化；两套时钟不可混用；JSONL 是跨 DB 重建的幂等真源 |
 | `pipeline/relate.py` | 文献耦合（倒排）+ TF-IDF 相似（增量） | ★ 禁止全库两两比较；对称边只存一条 |
 | `pipeline/report.py` | `DailyReport` + Jinja 渲染 + 原子写 | 只读 DB；当天重跑无生成时间 diff |
+| `pipeline/site.py` | L5a 站点装配：报告 + 记分板 + DB 元数据 | ★ **不读 vault**；缺输入显式降级，不伪造 |
 | `store/hash.py` | 主键归一化 + `content_hash` | hash 只含 title/abstract/authors/venue |
 | `store/first_seen.py` | `first_seen.jsonl` 读写 | append-only，绝不覆盖已有 id |
 | `store/models.py` | 七张 SQLModel 表 | 运行时间戳为 UTC ISO 文本；`first_seen_at`/`observed_at` 按本地日存 `YYYY-MM-DD` |
 | `store/db.py` | 引擎 / 会话 / 建库前 `mkdir` | ★ 空 `data/` 目录也能 `alembic upgrade head` |
 | `export/base.py` | `Exporter` ABC + 原子写 | 不为"将来"加 Registry / 插件机制 |
 | `export/obsidian.py` | 标记块、frontmatter 合并、双轨链接渲染 | 标记块注释里**不能有时间戳** |
+| `export/html.py` | L5a 自包含 HTML 单文件（CSS 内联、无 JS/CDN） | ★ 分项分不合成总分；外链只允许 http(s)；无生成时间 ⇒ 幂等 |
 | `utils/http.py` | 限速 / 重试 / 代理 / UA | 只重试 408/425/429/5xx 与超时 |
 | `utils/errors.py` | 异常层级：`ConfigError` / `SourceError` / `UnsafeOutputPath` / `StoreError` / `LLMError` | CLI 退出码映射依据；单源异常在 pipeline 转 `degraded` |
 | `utils/logging.py` | structlog 配置与 `get_logger` | 日志出口唯一，不在模块内各自 print |
@@ -161,6 +167,9 @@ cli.py (typer)
 - 数据路径全部由 `Settings` 派生：`data_dir()` / `db_path()`；`first_seen.jsonl` 在 `data_dir()` 下。
 - `export.out_dir` 默认 `~/projects/ai-scholar-vault`（`expanduser`）；`--out` 的相对路径按
   仓库根解析，且最终必须落在仓库**之外**，否则抛 `UnsafeOutputPath`（含 `example_vault/`）。
+- `export.site_dir` 默认 `~/projects/ai-scholar-site`，产物固定为 `DIR/index.html`；
+  `--out` 相对路径按仓库根解析（允许显式写进仓库，但默认落在仓库外，避免生成物堆积）。
+  `site_days` / `site_max_papers` 控制趋势天数与单页论文上限。
 - `example_vault/` 是仓库内的**合成演示数据**（frontmatter `example: true`），只用于展示导出物形态，
   **不是真实采集产物，也绝不能作为导出目标**。
 - `load_settings()` 先 `load_dotenv(override=False)` 再插值：不这么做，写进 `.env` 的 key 读不到
@@ -341,6 +350,9 @@ uv run ai-scholar export [--limit N] [--ids a,b] [--since DATE] [--out PATH] [--
 uv run ai-scholar export --check # 只比对不落盘：无变更退出 0，有变更退出 1（幂等验收）
 uv run ai-scholar export --check --all
                                  # 校验库内论文对应的全部现存文献笔记，不只本次选集
+uv run ai-scholar site [--out DIR] [--days N] [--limit N]
+                                 # L5a 静态 HTML 单文件（只读 public 数据；默认 ~/projects/ai-scholar-site）
+uv run ai-scholar site --check   # 逐字节比对：无变更退出 0，有变更退出 1（幂等验收）
 uv run ai-scholar mark <paper-id> [--unmark]   # 显式收藏（决定是否生成笔记）
 uv run ai-scholar signals [--limit N] [--force] [--dry-run]
                                  # 按时序状态机采样（signals 表 + data/signals/YYYY-MM.jsonl）

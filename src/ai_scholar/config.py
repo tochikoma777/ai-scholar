@@ -193,6 +193,11 @@ class ExportSettings(BaseModel):
     # ★ vault 是独立 private 仓库，默认落在代码仓库之外。
     #   只准 `~/` 开头：写死家目录绝对路径会① 泄露用户名 ② 别人 clone 后路径不存在。
     out_dir: str = "~/projects/ai-scholar-vault"
+    # ★ L5a 静态站点：产物同样落在代码仓库之外，避免 public 提交堆积生成物
+    site_dir: str = "~/projects/ai-scholar-site"
+    # 趋势展示天数（报告条数）与单页论文条数上限
+    site_days: int = 7
+    site_max_papers: int = 50
 
 
 class CollectSettings(BaseModel):

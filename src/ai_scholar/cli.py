@@ -1,7 +1,8 @@
 """CLI 入口。
 
-子命令：`init` / `doctor` / `collect` / `export` / `enrich` / `mark` /
-`signals` / `relate` / `related` / `list` / `budget` / `report`。
+子命令：`init` / `doctor` / `collect` / `export` / `site` / `enrich` / `enhance` /
+`grade` / `analyze` / `mark` / `signals` / `relate` / `related` / `list` / `budget` /
+`predict` / `stats` / `report`。
 """
 
 from __future__ import annotations
@@ -401,6 +402,48 @@ def export(
         "说明：正文用标记块保护，`## 我的笔记` 区永不覆盖；"
         "导出时间（秒级）只进 `90-元数据/生成报告.md`。"
     )
+    raise typer.Exit(0)
+
+
+@app.command()
+def site(
+    out: Path | None = typer.Option(
+        None, "--out", help="输出目录（默认 export.site_dir），产物为其中的 index.html"
+    ),
+    days: int | None = typer.Option(
+        None, "--days", help="趋势区展示最近几天报告（默认 export.site_days）"
+    ),
+    limit: int | None = typer.Option(
+        None, "--limit", "-n", help="单页论文条数上限（默认 export.site_max_papers）"
+    ),
+    check: bool = typer.Option(False, "--check", help="只比对不写盘：有变更退出 1，无变更退出 0"),
+) -> None:
+    """生成静态 HTML 单文件站点（L5a）：只读报告 / 记分板 / DB 元数据。
+
+    ★ 不读 vault、不调 LLM、不联网；页面自包含（CSS 内联、无 CDN），双击即可打开。
+    ★ 重跑逐字节一致（页面不含生成时间）；分项分只展示、不合并为单一分数。
+    """
+    from ai_scholar.pipeline.site import run_site
+
+    report = run_site(out=out, days=days, limit=limit, check=check)
+
+    if check:
+        if report.changed:
+            console.print(
+                f"[yellow]将变更[/] {_display_path(report.out_path)}（首次生成或输入已变）"
+            )
+            raise typer.Exit(1)
+        console.print(f"[green]✓[/] 无变更（{report.date}，幂等）")
+        raise typer.Exit(0)
+
+    console.print(f"[green]✓[/] 生成静态站点 → {_display_path(report.out_path)}")
+    console.print(
+        f"  数据日期 {report.date} · 论文 {report.papers} 篇"
+        f" · 报告 {report.reports} 天 · {report.size_bytes / 1024:.1f} KB"
+    )
+    for key, reason in report.degraded.items():
+        console.print(f"[yellow]warning[/] {key}：{reason}")
+    console.print("说明：只读 public 数据（不含个人笔记 / 正文）；分项分不合并为单一分数。")
     raise typer.Exit(0)
 
 

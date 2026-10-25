@@ -9,7 +9,7 @@ AI 文献的 **采集 → 关联 → 推演 → 沉淀**，外加**论文深度�
 
 - 许可证：**MIT**（只管代码，不管数据 —— 数据署名见文末）
 - 姊妹项目：[aipulse](https://github.com/tochikoma777/aipulse)（三档模式 / 三级降级 / 静默失败治理 全盘继承）
-- 当前阶段：**L5 进行中**（L5a 静态 HTML 单文件；L5b 交互看板后续）+ L4 已完成（推演 / 记分板 / 校准 / 影响分析）
+- 当前阶段：**L5 进行中**（L5a 静态 HTML 单文件已实现、待验收；L5b 交互看板后续）+ L4 已完成（推演 / 记分板 / 校准 / 影响分析）
 
 ---
 
@@ -33,6 +33,7 @@ uv run ai-scholar init      # 建目录骨架 + 生成 config/watchlist.local.ya
 uv run ai-scholar doctor    # 环境体检（★ 没配 LLM key 也全绿，自动降级 off，退出码 0）
 uv run ai-scholar collect   # 采集（默认回看 7 天，见下）
 uv run ai-scholar export    # 导出**已收藏**的论文（默认只导 selected；--all 导最新 N 篇）
+uv run ai-scholar site      # 静态 HTML 单文件（只读报告/记分板/DB，默认 ~/projects/ai-scholar-site）
 uv run ai-scholar enrich     # 补查 S2 引用（★ 全程 batch，无 key 也能跑）
 uv run ai-scholar signals    # 时序采样（★ 状态持久化，按到期采样，不每日全量重算）
 uv run ai-scholar relate     # 文献耦合 + TF-IDF 相似（★ 倒排分桶，零 LLM）
