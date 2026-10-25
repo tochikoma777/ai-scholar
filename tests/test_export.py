@@ -708,3 +708,51 @@ def test_deep_analysis_rendered(tmp_path: Path) -> None:
     assert "## TL;DR" in text
     assert "### 总体介绍" in text
     assert "内容" in text
+
+
+# ── L2-C Daily Note（§6.6）──────────────────────────────────────────────
+def test_daily_note_generated(tmp_path: Path) -> None:
+    """Daily Note 落 `40-日志/YYYY-MM-DD.md`：生成区在标记块内，待办在用户区。"""
+    db_path = tmp_path / "data" / "t.db"
+    _seed_db(db_path, [make_paper("arXiv:1", "Paper One"), make_paper("arXiv:2", "Paper Two")])
+    vault = tmp_path / "vault"
+    run_export(settings=_settings(tmp_path), db_path=db_path, out=vault, today=date(2026, 10, 20))
+
+    note = vault / "40-日志" / "2026-10-20.md"
+    assert note.exists()
+    text = note.read_text(encoding="utf-8")
+    assert "今日新增（2 篇）" in text
+    assert BEGIN_MARKER in text and END_MARKER in text
+    assert "## 我的笔记摘要" in text
+    assert "## 待办" in text
+    # ★ 用户区必须在标记块**之外**
+    assert text.index(END_MARKER) < text.index("## 我的笔记摘要")
+
+
+def test_daily_note_user_section_preserved(tmp_path: Path) -> None:
+    """★ 用户写的摘要/待办永不覆盖。"""
+    db_path = tmp_path / "data" / "t.db"
+    _seed_db(db_path, [make_paper("arXiv:1", "Paper One")])
+    vault = tmp_path / "vault"
+    run_export(settings=_settings(tmp_path), db_path=db_path, out=vault, today=date(2026, 10, 20))
+
+    note = vault / "40-日志" / "2026-10-20.md"
+    original = note.read_text(encoding="utf-8")
+    patched = original.replace("## 我的笔记摘要", "## 我的笔记摘要\n今天读了 Paper One", 1)
+    note.write_text(patched, encoding="utf-8")
+
+    run_export(settings=_settings(tmp_path), db_path=db_path, out=vault, today=date(2026, 10, 20))
+    assert "今天读了 Paper One" in note.read_text(encoding="utf-8")
+
+
+def test_daily_note_idempotent(tmp_path: Path) -> None:
+    """连续两次导出，Daily Note 无 diff（文件内不留导出时间）。"""
+    db_path = tmp_path / "data" / "t.db"
+    _seed_db(db_path, [make_paper("arXiv:1", "Paper One")])
+    vault = tmp_path / "vault"
+    run_export(settings=_settings(tmp_path), db_path=db_path, out=vault, today=date(2026, 10, 20))
+    note = vault / "40-日志" / "2026-10-20.md"
+    first = note.read_text(encoding="utf-8")
+
+    run_export(settings=_settings(tmp_path), db_path=db_path, out=vault, today=date(2026, 10, 20))
+    assert note.read_text(encoding="utf-8") == first

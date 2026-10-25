@@ -29,6 +29,9 @@ from ai_scholar.utils.timeutil import DEFAULT_TZ, format_local, today_local
 BEGIN_MARKER = "<!-- BEGIN GENERATED · 以下内容会被重新生成覆盖 -->"
 END_MARKER = "<!-- END GENERATED -->"
 USER_SECTION_TITLE = "## 我的笔记"
+# ★ Daily Note 的用户区：待办勾选框是**用户状态**，必须放在标记块外，永不重生成
+DAILY_USER_TITLE = "## 我的笔记摘要"
+DAILY_USER_DEFAULT = "## 我的笔记摘要\n\n## 待办\n- [ ] "
 
 ILLEGAL_CHARS = re.compile(r'[\\/:*?"<>|]')
 MULTI_DASH = re.compile(r"-+")
@@ -318,6 +321,23 @@ class ObsidianExporter(Exporter):
         return f"{dump_frontmatter(new_fields)}\n{body}"
 
     # ── 首页 / 报告 / links.json ────────────────────────────────────────
+    def render_daily_note(self, existing: str, *, day: str, body_lines: list[str]) -> str:
+        """Daily Note（`40-日志/YYYY-MM-DD.md`，§6.6）。
+
+        ★ 生成区在标记块内；「我的笔记摘要 / 待办」在标记块外 —— 勾选框是用户状态，
+          **永不覆盖、永不重做**。
+        """
+        _old_fields, old_body = parse_frontmatter(existing)
+        _old_generated, old_user = split_generated(old_body)
+        user = old_user.lstrip("\n")
+        if DAILY_USER_TITLE not in user:
+            user = f"{DAILY_USER_DEFAULT}\n"
+        elif not user.endswith("\n"):
+            user += "\n"
+        body = f"{BEGIN_MARKER}\n" + "\n".join(body_lines) + f"\n{END_MARKER}\n\n{user}"
+        fields = {"title": f"AI Scholar · {day}", "date": day, "schema_version": SCHEMA_VERSION}
+        return f"{dump_frontmatter(fields)}\n{body}"
+
     def render_index(
         self,
         papers: list[Paper],

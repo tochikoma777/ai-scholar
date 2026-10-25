@@ -26,6 +26,8 @@ from ai_scholar.config import (
 )
 from ai_scholar.export.base import ExportContext, ExportDoc, LinkRef
 from ai_scholar.export.obsidian import ObsidianExporter, note_name
+from ai_scholar.models import WatchlistConfig
+from ai_scholar.pipeline.report import DailyReport, build_daily_report
 from ai_scholar.store.db import default_db_path
 from ai_scholar.store.models import (
     LINK_TYPE_BIBCOUPLING,
@@ -36,7 +38,7 @@ from ai_scholar.store.models import (
     Run,
 )
 from ai_scholar.utils.errors import UnsafeOutputPath
-from ai_scholar.utils.timeutil import utcnow
+from ai_scholar.utils.timeutil import day_window, today_local, utcnow
 
 
 @dataclass
@@ -234,6 +236,105 @@ def _hf_degraded(session: Session) -> dict[str, str]:
     return {}
 
 
+DAILY_MAX_ITEMS = 20
+
+
+def _daily_note_link(
+    paper: Paper, *, exporter: ObsidianExporter, context: ExportContext, max_len: int
+) -> str:
+    """Daily Note 条目行：有笔记 → `[[双链]]`；无笔记 → 文本 + 外链（不建空笔记）。"""
+    name = None
+    if paper.note_path:
+        name = Path(paper.note_path).stem
+    elif exporter.note_path(paper, context).exists():
+        name = note_name(paper, max_len=max_len)
+    if name:
+        return f"- [[{name}]]"
+    return f"- ★ {paper.title}（无笔记）— {paper.url or '（无外链）'}"
+
+
+def _daily_note_lines(
+    session: Session,
+    *,
+    day: date,
+    daily: DailyReport,
+    watchlist: WatchlistConfig,
+    exporter: ObsidianExporter,
+    context: ExportContext,
+    max_len: int,
+) -> list[str]:
+    """生成区内容（§6.6）：今日新增 / 补齐引用 / 深度分析 / 新定级 / ★命中 / 运行状态。"""
+    day_str = day.isoformat()
+    papers = list(session.exec(select(Paper)).all())
+    by_id = {p.id: p for p in papers}
+
+    def line_for(paper: Paper, *, groups: list[str] | None = None, extra: str = "") -> str:
+        line = _daily_note_link(paper, exporter=exporter, context=context, max_len=max_len)
+        if groups:
+            line += f" ★ {', '.join(groups)}"
+        if extra:
+            line += f"（{extra}）"
+        return line
+
+    lines = [f"# {day_str}", ""]
+
+    new_papers = sorted(
+        [p for p in papers if p.first_seen_at == day_str],
+        key=lambda p: (p.published_at or "", p.hf_score or 0),
+        reverse=True,
+    )
+    lines += [f"## 今日新增（{len(new_papers)} 篇）"]
+    if new_papers:
+        for paper in new_papers[:DAILY_MAX_ITEMS]:
+            hit = match_watchlist(watchlist, paper.title, paper.abstract or "")
+            lines.append(line_for(paper, groups=hit.groups if hit.matched else None))
+        if len(new_papers) > DAILY_MAX_ITEMS:
+            lines.append(f"（还有 {len(new_papers) - DAILY_MAX_ITEMS} 篇）")
+    else:
+        lines.append("（今日无新增）")
+    lines.append("")
+
+    start, _ = day_window(day)
+    start_iso = start.isoformat(timespec="seconds")
+    enriched = [p for p in papers if (p.enrich_last_at or "") >= start_iso]
+    lines += [f"## 今日补齐引用（{len(enriched)} 篇）"]
+    if enriched:
+        for paper in enriched[:DAILY_MAX_ITEMS]:
+            lines.append(line_for(paper))
+    else:
+        lines.append("（无）")
+    lines.append("")
+
+    for heading, hits, with_tier in (
+        ("今日深度分析", daily.deep_analyzed, False),
+        ("今日新定级", daily.new_graded, True),
+        ("★命中 Top10", daily.watchlist_hits, False),
+    ):
+        lines += [f"## {heading}（{len(hits)} 篇）"]
+        if hits:
+            for entry in hits:
+                target = by_id.get(entry.id)
+                if target is None:
+                    lines.append(f"- {entry.title}")
+                    continue
+                extra = f"Tier {target.tier}" if with_tier and target.tier else ""
+                lines.append(line_for(target, groups=entry.groups, extra=extra))
+        else:
+            lines.append("（无）")
+        lines.append("")
+
+    lines += ["## 运行状态"]
+    if daily.degraded:
+        for key, reason in sorted(daily.degraded.items()):
+            lines.append(f"- {key}：{reason}")
+    else:
+        lines.append("（无降级）")
+    lines.append("")
+
+    lines += ["## 今日推演", "- （L4）"]
+    return lines
+
+
 def run_export(
     *,
     limit: int | None = None,
@@ -246,6 +347,7 @@ def run_export(
     check: bool = False,
     exported_at: datetime | None = None,
     all_papers: bool = False,
+    today: date | None = None,
 ) -> ExportReport:
     """跑一次导出（同步：本阶段无网络调用）。
 
@@ -380,6 +482,29 @@ def run_export(
             note_names=index_names,
         )
         docs.append(ExportDoc(path=vault_dir / "00-首页.md", content=index_text))
+
+        # 40-日志/YYYY-MM-DD.md（L2-C Daily Note：本地 export 产物，§6.6）
+        day = today or today_local()
+        daily = build_daily_report(session, today=day, watchlist=watchlist)
+        note_lines = _daily_note_lines(
+            session,
+            day=day,
+            daily=daily,
+            watchlist=watchlist,
+            exporter=exporter,
+            context=ExportContext(vault_dir=vault_dir),
+            max_len=settings.export.filename_max_len,
+        )
+        note_file = vault_dir / "40-日志" / f"{day.isoformat()}.md"
+        existing = note_file.read_text(encoding="utf-8") if note_file.exists() else ""
+        docs.append(
+            ExportDoc(
+                path=note_file,
+                content=exporter.render_daily_note(
+                    existing, day=day.isoformat(), body_lines=note_lines
+                ),
+            )
+        )
 
         # 90-元数据/生成报告.md（★ 导出时间只进这里，秒级；作为运行日志允许 diff）
         report_text = exporter.render_report(
