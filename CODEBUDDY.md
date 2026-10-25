@@ -9,6 +9,12 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 > ★ **每次 clear / init 后第一件事**：读 `docs/经验固化.md`（尤其「输出规范类 O1」：
 >   两张进度表 + 待决策子格式），再读 `docs/handoff/` 下**阶段号最大**的 `L*-开工.md`
 >   （当前 `L4-开工.md`；已完成阶段的文件是归档，不作开工入口）。**未读即开工或输出 = 违规。**
+> ★ **阶段收尾硬门禁（宣布“已完成”前逐项打勾）**：
+>   1) 代码 / 测试 / tag / push 完成；
+>   2) **新建 `docs/handoff/L{下一阶段}-开工.md`**，当前阶段 handoff 标「已归档」并指向新文件；
+>   3) 更新 CODEBUDDY / README / 执行手册 / 维护日志 / 开发日志；
+>   4) `uv run pytest tests/test_docs_consistency.py -q` 必须绿。
+>   ★ 原因：每个大阶段结束都会 **clear + init**，下一阶段 handoff 是**唯一上下文入口**。
 
 ---
 
