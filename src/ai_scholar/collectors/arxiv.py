@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import xml.etree.ElementTree as ET
 from datetime import date
 
@@ -66,12 +67,17 @@ async def fetch_arxiv_ids(
     ids: list[str],
     endpoint: str,
     batch_size: int = 50,
+    *,
+    rate_limit_backoff_s: tuple[float, ...] = (20.0, 40.0),
 ) -> tuple[list[RawPaper], list[str]]:
     """按 arXiv id **批量直采**（`id_list`），返回 `(条目, 未命中的 id)`。
 
     ★ 经典种子清单专用（v1.11）：ID 确定、无搜索噪声、零配额问题。
     ★ **未命中的 id 必须显式返回** —— arXiv 对不存在的 id 是静默跳过，
       不核对会让"清单 33 条"变成"入库 30 条"却无人察觉（静默失败最危险）。
+    ★ **429 必须自己退避重试**（2026-10-26 Actions 实测）：`collect` 刚连发 7 天查询，
+      排在其后的 classics 立刻请求 ⇒ `429 Rate exceeded`，整批 49 条全丢。
+      `HttpClient` 的通用重试间隔对 arXiv 太短，这里按 20s / 40s 显式退避。
     """
     items: list[RawPaper] = []
     for start in range(0, len(ids), batch_size):
@@ -83,6 +89,16 @@ async def fetch_arxiv_ids(
             rate_limit="1/3s",
             timeout=None,
         )
+        waits = list(rate_limit_backoff_s)
+        while response.status_code == 429 and waits:
+            await asyncio.sleep(waits.pop(0))
+            response = await client.get(
+                endpoint,
+                params={"id_list": ",".join(chunk), "max_results": batch_size},
+                source="arxiv",
+                rate_limit="1/3s",
+                timeout=None,
+            )
         if response.status_code != 200:
             raise RuntimeError(
                 f"arXiv HTTP {response.status_code}（id_list={len(chunk)} 项）："

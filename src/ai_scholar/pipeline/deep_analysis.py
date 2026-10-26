@@ -241,6 +241,25 @@ def _select(
     return chosen, skipped
 
 
+def validate_output(content: str) -> tuple[bool, str]:
+    """校验深度分析输出（★ 断言打在**真实结构**上，不打在"模型是否听话"上）。
+
+    背景（2026-10-26 Actions 实测）：原校验是「`paper.id` 必须出现在正文里」——
+    但真实模型**经常不回显** id（本地 3 篇产物里 2 篇没有回显），
+    结果 5 次调用只有 1 次通过，4 次花了钱被判废（¥0.2361 里 80% 是废调用）。
+
+    ⇒ 改为结构校验：六段/TL;DR 骨架 + 最小长度。id 映射由「一次调用只喂一篇」保证，
+      不依赖模型回显（回显只是 prompt 的要求，不是数据完整性的必要条件）。
+    """
+    if not content:
+        return False, "输出为空"
+    if len(content) < MIN_ANALYSIS_CHARS:
+        return False, f"输出过短（<{MIN_ANALYSIS_CHARS} 字符）"
+    if "## 六段" not in content and "TL;DR" not in content:
+        return False, "缺少 TL;DR / 六段骨架"
+    return True, ""
+
+
 def _weekly_calls(session: Session, *, today: date) -> int:
     start = window_starts(today)["weekly"]
     rows = session.exec(select(LLMUsage).where(LLMUsage.purpose == "deep_analysis")).all()
@@ -249,6 +268,10 @@ def _weekly_calls(session: Session, *, today: date) -> int:
         for row in rows
         if row.created_at and row.created_at >= start.isoformat(timespec="seconds")
     )
+
+
+# ★ 输出最小长度：六段 + 三句半的合理下限；低于此视为被截断/敷衍
+MIN_ANALYSIS_CHARS = 400
 
 
 # ── L7-4：产物落 public 真源 `data/analyses/{id}.md`（Option B）─────────
@@ -355,8 +378,8 @@ async def run_deep_analysis(
     report.run_id = uuid.uuid4().hex[:12]
     day = today or today_local()
 
-    if settings.effective_mode() == RunMode.OFF:
-        # ★ off 档零调用：check 也不该报缺失（没有分析可做）
+    if settings.effective_mode() == RunMode.OFF and not check:
+        # ★ off 档零调用（check 例外：它只读 db + 文件，与 LLM 档位无关）
         report.mode = "off"
         return report
 
@@ -496,9 +519,14 @@ async def run_deep_analysis(
                 report.cost_cny += analyze_cost
 
                 content = response.content.strip()
-                if not content or paper.id not in content:
+                ok, reason = validate_output(content)
+                if not ok:
                     paper.deep_status = "failed"
-                    report.degraded["llm"] = "输出为空或 paper_id 未回显（下次重试）"
+                    # ★ E5：错误必须自证（带 paper_id / 长度 / tokens），且**不互相覆盖**
+                    report.degraded[f"llm:{paper.id}"] = (
+                        f"{reason}（{len(content)} 字符 / "
+                        f"tokens_out={response.tokens_out}，下次重试）"
+                    )
                     continue
 
                 paper.deep_analysis_md = content

@@ -89,9 +89,23 @@ def seed(db_path: Path, papers: list[Paper], usage: list[LLMUsage] | None = None
         session.commit()
 
 
+# ★ 形态照抄真实产物：真实模型**经常不回显 paper_id**（Actions 2026-10-26 实测 4/5），
+#   所以假模型默认也**不回显**，只给结构 + 足够长度（校验看结构，不看回显）。
+FAKE_BODY = (
+    "## TL;DR（三句半）\n坐标：演进——把 A 接到 B。\n痛点：现有做法贵。\n"
+    "手术：换掉中间层。\n疗效：指标 +3.2。\n代价：多花 20% 显存。\n\n"
+    "## 六段\n### 总体介绍\n"
+    + "这是一段用来满足最小长度校验的正文。"
+    * 24
+    + "\n### 核心思想\n同上。\n### 技术路线与结构特点\n同上。\n"
+    "### 主要贡献\n同上。\n### 实验与证据\n同上。\n### 历史地位\n待观察。\n"
+)
+
+
 class FakeDeepLLM:
-    def __init__(self, *, echo_id: bool = True):
+    def __init__(self, *, echo_id: bool = False, body: str | None = None):
         self.echo_id = echo_id
+        self.body = body
         self.calls = 0
         self.last_prompt = ""
 
@@ -107,9 +121,9 @@ class FakeDeepLLM:
         self.last_prompt = text
         match = re.search(r"论文 ID：`([^`]+)`", text)
         pid = match.group(1) if match else "unknown"
-        body = "## TL;DR\n坐标：演进｜痛点：…\n## 六段\n### 总体介绍\n…"
+        body = self.body if self.body is not None else FAKE_BODY
         if self.echo_id:
-            body = f"{pid}\n{body}"
+            body = f"paper_id: {pid}\n{body}"
         return LLMResponse(content=body, tokens_in=1000, tokens_out=500, cache_hit=False)
 
 
@@ -209,21 +223,63 @@ async def test_idempotent_and_force(tmp_path: Path) -> None:
 
 
 async def test_failure_marks_failed_without_hash(tmp_path: Path) -> None:
+    """★ 结构不达标的输出：判废、不写指纹（下次重试）、但**成本照样记账**。"""
     db = tmp_path / "d.db"
     seed(db, [make_paper("arXiv:A")])
     report = await run_deep_analysis(
         settings=strong_settings(str(tmp_path)),
         db_path=db,
-        client=FakeDeepLLM(echo_id=False),
+        client=FakeDeepLLM(body="## TL;DR\n被截断了"),
         watchlist=WATCHLIST,
         today=DAY,
     )
     assert report.analyzed == 0
     assert report.llm_calls == 1  # 真实调用即记账
-    assert "llm" in report.degraded
+    assert any(key.startswith("llm:") for key in report.degraded), report.degraded
+    assert "输出过短" in next(v for k, v in report.degraded.items() if k.startswith("llm:"))
     paper = load_papers(db)["arXiv:A"]
     assert paper.deep_status == "failed"
     assert paper.deep_content_hash is None
+
+
+def test_validate_output_accepts_no_id_echo() -> None:
+    """★ 回归：真实模型常不回显 id —— 有结构 + 足够长度就该通过。"""
+    from ai_scholar.pipeline.deep_analysis import validate_output
+
+    ok, reason = validate_output(FAKE_BODY)
+    assert ok, reason
+    assert not validate_output("")[0]
+    assert not validate_output("## TL;DR\n短")[0]
+    assert not validate_output("很长但没结构的正文" * 50)[0]
+
+
+async def test_check_runs_even_in_off_mode(tmp_path: Path) -> None:
+    """★ 回归（2026-10-26 Actions 假绿）：`--check` 不能因 off 档直接返回。
+
+    daily.yml 的 check 步骤没有注入 LLM secret ⇒ effective_mode=OFF ⇒
+    旧实现直接 return，于是"零候选、OK 齐备"——**假绿**。
+    """
+    db = tmp_path / "d.db"
+    paper = make_paper("arXiv:A")
+    paper.deep_analysis_md = "## 六段\n存在分析但没有真源"
+    paper.deep_content_hash = paper.content_hash
+    paper.deep_analyzed_at = DAY.isoformat()
+    paper.deep_status = "done"
+    seed(db, [paper])
+    settings = strong_settings(str(tmp_path))
+    settings.llm.api_key = ""  # 强制 off 档
+
+    report = await run_deep_analysis(
+        settings=settings,
+        db_path=db,
+        client=FakeDeepLLM(),
+        watchlist=WATCHLIST,
+        today=DAY,
+        check=True,
+    )
+    assert report.check is True
+    assert report.requested == 1, "off 档不该让 check 变成空跑"
+    assert report.analyses_missing == ["arXiv:A"]
 
 
 async def test_fulltext_is_used_and_not_persisted(tmp_path: Path, monkeypatch) -> None:

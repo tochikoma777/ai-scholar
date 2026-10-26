@@ -145,3 +145,49 @@ async def test_collect_classics_reports_missing_ids(tmp_path, monkeypatch) -> No
 
     # 3) 真实清单本身也要能被读到（防"测试绿了但仓库清单是空的"）
     assert load_classics().ids(), "仓库 config/classics.yaml 为空"
+
+
+async def test_fetch_arxiv_ids_retries_on_429(monkeypatch) -> None:
+    """★ 回归（2026-10-26 Actions 实测）：`collect` 刚跑完，classics 立刻请求被 429。
+
+    arXiv 的 429 会丢掉**整批**清单 ⇒ 必须自己退避重试，不能只依赖 HttpClient 的短重试。
+    """
+    from ai_scholar import collectors
+
+    sleeps: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    monkeypatch.setattr(collectors.arxiv.asyncio, "sleep", fake_sleep)
+
+    async with respx.mock() as mock:
+        route = mock.get(ARXIV_URL)
+        route.side_effect = [
+            httpx.Response(429, text="Rate exceeded"),
+            httpx.Response(429, text="Rate exceeded"),
+            httpx.Response(200, text=_feed("1706.03762")),
+        ]
+        # ★ max_retries=1：关掉 HttpClient 的通用短重试，专测**我们自己的**长退避
+        async with HttpClient(max_retries=1) as client:
+            items, missing = await fetch_arxiv_ids(client, ["1706.03762"], ARXIV_URL)
+
+    assert len(items) == 1 and missing == []
+    # ★ 只断言"我们自己的退避"出现了（HttpClient 内部也会 sleep，会混进同一个列表）
+    assert 20.0 in sleeps and 40.0 in sleeps, f"缺少 20s/40s 退避，实际 {sleeps}"
+
+
+async def test_fetch_arxiv_ids_gives_up_after_backoff(monkeypatch) -> None:
+    """退避用完仍 429 ⇒ 明确报错（带响应体），不静默返回 0 条。"""
+    from ai_scholar import collectors
+
+    async def no_sleep(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setattr(collectors.arxiv.asyncio, "sleep", no_sleep)
+
+    async with respx.mock() as mock:
+        mock.get(ARXIV_URL).mock(return_value=httpx.Response(429, text="Rate exceeded"))
+        async with HttpClient(max_retries=1) as client:
+            with pytest.raises(RuntimeError, match="429"):
+                await fetch_arxiv_ids(client, ["1706.03762"], ARXIV_URL)
