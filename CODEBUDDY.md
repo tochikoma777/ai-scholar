@@ -134,7 +134,7 @@ migrate → collect → collect --classics → enrich → signals → relate →
 
 ### 两条主线的关键路径
 
-**collect** — `pipeline/collect.py:297 run_collect`
+**collect** — `pipeline/collect.py:310 run_collect`
 
 1. `_days_back(days)` 逐日抓取（arXiv 按 `submittedDate` 精确框定并翻页；HF 按 `date`）。
 2. `canonical_id_for` → `_resolve_via_alias` → `upsert_paper`。三级去重：
@@ -224,8 +224,9 @@ migrate → collect → collect --classics → enrich → signals → relate →
 ## ★ 成本可见性（L8-F，2026-10-26）
 
 - 查账：`ai-scholar cost [--days N] [--json]`（零 LLM）；累计真源 = `data/reports/*.json`。
-- 异常三类消费者：报告 md 顶部 ⚠️ / 报告 json 的 `cost_anomalies` / 站点「成本」板块 /
-  Actions `::warning::`（daily 的 `Cost guard` 步骤）。**全部只标注，退出码仍 0。**
+- 异常**四处**消费者（★ 口径统一：说"三类"是漏数）：报告 md 顶部 ⚠️ / 报告 json 的
+  `cost_anomalies` / 站点「成本」板块 / Actions `::warning::`（daily 的 `Cost guard` 步骤）；
+  另有 `ai-scholar cost` 命令可随时查账。**全部只标注，退出码仍 0。**
 - ★ 改"每天必跑"的 LLM 参数前，先算 `日 × 365`：日差 ¥0.1 = 年差 ≈¥36。
 
 ---
@@ -507,7 +508,7 @@ gh run list --workflow=daily.yml --limit 3        # 最近三次 daily 是否 su
 - 除 `test_live_arxiv_parse` / `test_live_hf_parse_may_skip` 外，网络一律 respx 拦截；
   这两个联网冒烟在连接失败、非 200 或无数据时 skip，但解析断言失败仍会让测试红。
 - 断言要落在**实际收到的值**上（如 `settings.llm.base_url`），不是"加载成功"。
-- 基线（tag `l8a`，2026-10-26）：`uv run pytest -m "not live" -q` = **376 passed**；
+- 基线（tag `l8a` + 2026-10-26 审计修复）：`uv run pytest -m "not live" -q` = **382 passed**；
   全量 378（多 2 个 `@pytest.mark.live` 联网冒烟，无真实响应时 skip）。
   ★ `-q` 叠加 `pyproject` 里的 `addopts = "-q"` 会变成 `-qq`，**pytest 不再打印
   `N passed` 汇总行** —— 要数字就去掉一个 `-q` 或用 `--collect-only` 计数。
@@ -516,7 +517,7 @@ gh run list --workflow=daily.yml --limit 3        # 最近三次 daily 是否 su
 - ★ **离线跑法**：`uv run pytest -m "not live" -q`。联网冒烟（`test_live_arxiv_parse` /
   `test_live_hf_parse_may_skip`）带 `@pytest.mark.live`，拿不到真实响应就 skip。
 - ★ **CODEBUDDY 里的行号引用会被机器校验**：凡是写成 `path.py:NNN 符号` 的（如
-  `pipeline/collect.py:297 run_collect`），`tests/test_docs_consistency.py::test_codebuddy_line_anchors`
+  `pipeline/collect.py:310 run_collect`），`tests/test_docs_consistency.py::test_codebuddy_line_anchors`
   会断言该行附近确有该符号 —— **改完代码记得重跑，漂了就改文档**。
 - `tests/test_docs_consistency.py` 是阶段收尾的机械门禁：若 CODEBUDDY 标记当前阶段「已完成」，
   则 `docs/handoff/` 下必须存在**下一阶段**的 `L*-开工.md`（未归档），且维护日志已登记。
