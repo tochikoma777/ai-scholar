@@ -4,7 +4,14 @@
   "total_papers": 2110,
   "new_today": 0,
   "watchlist_hits": [],
-  "deep_analyzed": [],
+  "deep_analyzed": [
+    {
+      "id": "arXiv:2610.30231",
+      "title": "Edit, Don't Imitate: Minimal-Edit On-Policy Distillation for Multimodal Reasoning",
+      "score": 0.0,
+      "groups": []
+    }
+  ],
   "new_graded": [],
   "predictions_verified": [],
   "predictions_due": [],
@@ -18,8 +25,31 @@
       "fetched": 1441,
       "new": 0,
       "degraded": []
+    },
+    {
+      "run_id": "3d7b652e3daf",
+      "mode": "off",
+      "source": null,
+      "fetched": 249,
+      "new": 0,
+      "degraded": [
+        "ReadTimeout: "
+      ]
+    },
+    {
+      "run_id": "30b5e3f9cd53",
+      "mode": "off",
+      "source": null,
+      "fetched": 0,
+      "new": 0,
+      "degraded": [
+        "RuntimeError: arXiv HTTP 429（id_list=49 项）：Rate exceeded."
+      ]
     }
   ],
-  "degraded": {},
-  "cost_cny": 0.0
+  "degraded": {
+    "arxiv": "ReadTimeout: ",
+    "classics": "RuntimeError: arXiv HTTP 429（id_list=49 项）：Rate exceeded."
+  },
+  "cost_cny": 0.2361
 }
