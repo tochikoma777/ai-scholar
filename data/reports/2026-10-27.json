@@ -1,0 +1,179 @@
+{
+  "date": "2026-10-27",
+  "schema_version": 1,
+  "total_papers": 2555,
+  "new_today": 21,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2610.01352",
+      "title": "MMVistaReason: Toward Open-Data and Post-Training Recipes for Multimodal Reasoning",
+      "score": 2.9,
+      "groups": [
+        "multimodal",
+        "efficient-inference",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.30932",
+      "title": "UserArena: Benchmarking Interactive User Simulation for Long-Horizon Shopping Agents",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.29552",
+      "title": "Generalized CycleGRPO for Fine-Grained Multimodal Understanding and Grounding",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.24481",
+      "title": "DuoLM: Fast and Effective Personalized Recommendation with Language Models",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.27782",
+      "title": "RoboJudge: Multimodal Language Models as Judges for Embodied Video Generation",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.32965",
+      "title": "RynnUnify: Towards Unified Embodied Brain",
+      "score": 1.0,
+      "groups": [
+        "multimodal"
+      ]
+    },
+    {
+      "id": "arXiv:2610.31162",
+      "title": "HiSTEVE 1.0: Harnessing Human-Interface VLA Agents for Open-World Games",
+      "score": 1.0,
+      "groups": [
+        "multimodal"
+      ]
+    },
+    {
+      "id": "arXiv:2610.23234",
+      "title": "MultiAgent-OPD: End-to-End Training of Hierarchical Multi-Agent Systems with On-Policy Distillation",
+      "score": 1.0,
+      "groups": [
+        "efficient-inference"
+      ]
+    },
+    {
+      "id": "arXiv:2610.32909",
+      "title": "HoloBoxing: A Simple Recipe for Humanoid Boxing with 7 Minutes of Single-GPU Training",
+      "score": 0.9,
+      "groups": [
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.31779",
+      "title": "FLORA: An Open Model Suite for Scaling Robotics Data Engines",
+      "score": 0.9,
+      "groups": [
+        "eval-benchmark"
+      ]
+    }
+  ],
+  "deep_analyzed": [],
+  "new_graded": [
+    {
+      "id": "arXiv:1910.02054",
+      "title": "ZeRO: Memory Optimizations Toward Training Trillion Parameter Models",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2310.03714",
+      "title": "DSPy: Compiling Declarative Language Model Calls into Self-Improving Pipelines",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2305.13245",
+      "title": "GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2401.04088",
+      "title": "Mixtral of Experts",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2009.14794",
+      "title": "Rethinking Attention with Performers",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2606.31002",
+      "title": "Beyond Compilation: Evaluating Faithful Natural-Language-to-Lean Statement Formalization",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2610.32864",
+      "title": "PoKER: A Probability of Kill Estimation Rate Model for Air-to-Air Missiles Using Machine Learning on Stochastic Targets",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2511.14102",
+      "title": "Specter: Fast MoE Inference via Quantization-Enabled Multi-Step Speculative Offloading",
+      "score": 0.0,
+      "groups": []
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [
+    {
+      "id": "p-dce1708b8fef",
+      "claim": "方法「quantization」在 2026-11-26 前被 ≥ 8 篇新增论文提及（最近 90 天 6 篇）",
+      "status": "open",
+      "due_at": "2026-11-26",
+      "observed": null,
+      "threshold": 8
+    }
+  ],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "aebf3a245900",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1337,
+      "new": 21,
+      "degraded": []
+    },
+    {
+      "run_id": "ef00529c5aea",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.0997,
+  "cost_anomalies": []
+}
