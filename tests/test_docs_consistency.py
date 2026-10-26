@@ -154,6 +154,41 @@ def test_current_handoff_pointer_is_latest() -> None:
     assert not errors, "；".join(errors)
 
 
+def previous_handoff_errors(handoff_dir: Path) -> list[str]:
+    """除**阶段号最大**的那份，其余 handoff 头部必须含「已归档」。
+
+    ★ 背景（2026-10-26 审计发现）：`L2-开工.md` / `L6-开工.md` 阶段早已完成，
+    但头部既无「已归档」也不指向下一阶段，文件名却仍叫「开工」——
+    按目录浏览的人会把它当成入口。原门禁只校验「CODEBUDDY 指针」与「下一阶段文件」，
+    历史文件没人管。
+    """
+    candidates = sorted(
+        (p for p in handoff_dir.glob("L*-开工.md") if re.fullmatch(r"L\d+-开工\.md", p.name)),
+        key=lambda p: int(re.match(r"L(\d+)", p.name).group(1)),  # type: ignore[union-attr]
+    )
+    if len(candidates) < 2:
+        return []
+    errors: list[str] = []
+    for path in candidates[:-1]:
+        head = "\n".join(path.read_text(encoding="utf-8").splitlines()[:8])
+        if "已归档" not in head:
+            errors.append(f"{path.name} 已完成但头部无「已归档」，会被误当作开工入口")
+    return errors
+
+
+def test_all_previous_handoffs_archived() -> None:
+    assert not previous_handoff_errors(HANDOFF_DIR), "；".join(previous_handoff_errors(HANDOFF_DIR))
+
+
+def test_archived_checker_detects_unmarked(tmp_path: Path) -> None:
+    """★ 反向验证：历史 handoff 没标归档必须报错（否则门禁是假的）。"""
+    (tmp_path / "L2-开工.md").write_text("# L2 交接 · 开工\n\n正文", encoding="utf-8")
+    (tmp_path / "L9-开工.md").write_text("# L9\n正文", encoding="utf-8")
+    assert previous_handoff_errors(tmp_path)
+    (tmp_path / "L2-开工.md").write_text("# L2 交接 · 已归档\n", encoding="utf-8")
+    assert not previous_handoff_errors(tmp_path)
+
+
 def test_pointer_checker_detects_stale_pointer(tmp_path: Path) -> None:
     """★ 反向验证：指向上一个阶段必须报错（否则门禁是假的）。"""
     (tmp_path / "L8-开工.md").write_text("# L8\n> 已归档", encoding="utf-8")
