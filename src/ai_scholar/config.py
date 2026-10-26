@@ -211,6 +211,10 @@ class CollectSettings(BaseModel):
     default_days: int = 7
     # 深度分析通道 A 的当日 Top N（★ 立刻执行，不看 Tier）
     deep_dive_top_n: int = 5
+    # ★ D-1：arXiv 单页（200 条 Atom）读超时。全局 http 是 20s（其他源够用），
+    #   但 arXiv 高峰期 200 条会超过 20s ⇒ 单日整批 ReadTimeout（2026-10-26 实测）；
+    #   且**单日失败不该拖垮整源**（见 `_collect_source` 的逐日隔离）。
+    arxiv_read_timeout_s: int = 60
 
 
 class EnrichSettings(BaseModel):

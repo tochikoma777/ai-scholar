@@ -20,6 +20,7 @@ htmlcov/
 data/*.db
 data/*.db-journal
 data/*.db-wal
+_site/  # ★ L8-C：Pages 构建产物（CI 内生成，不入库）
 data/cache/
 data/logs/
 data/tmp/

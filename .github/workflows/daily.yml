@@ -9,6 +9,9 @@ on:
 
 permissions:
   contents: write # ★ commit/push 真源需要写权限
+  # ★ L8-C：发布静态站点到 GitHub Pages（Actions 构建模式）
+  pages: write
+  id-token: write
 
 jobs:
   daily:
@@ -114,6 +117,16 @@ jobs:
       #   db 被 .gitignore 排除，不 commit。
       #   并发冲突：先 commit 再 fetch + rebase（★ 不能用 reset --soft FETCH_HEAD ——
       #   它会丢"checkout 之后远程新增 commit"的改动，2026-10-24 实跑已踩）。
+      # ★ L8-C：站点发布 —— 必须**在 daily job 内构建**：站点要读 db 元数据，
+      #   db 只在 Actions 缓存里（git 里没有），单独的 pages workflow 拿不到。
+      - name: Build site
+        run: uv run ai-scholar site --out _site
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
@@ -127,3 +140,19 @@ jobs:
           git fetch origin main
           git rebase origin/main
           git push origin HEAD:main
+
+  # ★ L8-C：部署到 GitHub Pages（https://tochikoma777.github.io/ai-scholar/）
+  #   独立 job：deploy-pages 需要 `github-pages` environment 与 OIDC 权限，
+  #   混在 daily 里会让"部署失败"看起来像"采集失败"。
+  deploy-pages:
+    needs: daily
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

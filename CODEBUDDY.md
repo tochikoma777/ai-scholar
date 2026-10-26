@@ -18,15 +18,20 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 ---
 
-## ★ 当前阶段：L7（接线阶段）—— 已完成（8/8 接线，验收通过，tag `l7a`）
+## ★ 当前阶段：L8（运营验证与使用闭环）—— 已完成（A/B/C/D-1/F 全部落地）
 
-> **下一阶段：L8**（运营验证与使用闭环，范围待负责人定案）—— 开工入口
-> `docs/handoff/L8-开工.md`。★ L7 的 handoff 已归档，不要再从它开工。
+> **下一阶段：L9**（运营期：持续观察与按需维护，不新增功能）—— 开工入口
+> `docs/handoff/L9-开工.md`。★ L8 的 handoff 已归档。
+
+
 
 - **只接线不新建**：把已定案但从未接线的链路接上 —— 范围与 DoD 见
   `docs/handoff/L7-开工.md`（8 项：analyze 入自动管道、D 排序、深度分析置 `selected`、
   public 真源 `data/analyses/`、经典种子清单、报告点读、links.json、frontmatter score）。
-- **接线进度（2026-10-25）**：#1–#8 **全部已接线并通过验收**（证据见 `docs/handoff/L8-开工.md` §3）。
+- **L8 完成情况**：A（Actions 开 LLM）· B（真实 vault 物化）· C（Pages 发布）·
+  D-1（collect 逐日隔离 + 60s 读超时）· F（成本可见性三件套）全部完成。
+  稳态成本 **≈¥0.14/天（¥52/年）**；站点 `https://tochikoma777.github.io/ai-scholar/`。
+- **L7 接线证据**：#1–#8 全部验收（见 `docs/handoff/L8-开工.md` §3，已归档）。
   #6 用负责人批准的方案 A：新落点 `data/wanted.jsonl`（public 真源）+ `ai-scholar want`，
   报告每条给可复制命令、站点卡片给「复制想读命令」按钮（纯 JS、零请求）。
 - **已定决策（v1.11，勿推翻）**：D 排序（热度/经典交替+去重）；Tier 1 不是深度分析门槛
@@ -99,6 +104,12 @@ cli.py (typer)
 ★ `predict` / `stats --verify` 零 LLM、零网络；`analyze`（strong）与 `export`（写私有 vault）
 **都不在 daily**：前者成本高、后者只本地跑。
 
+**站点发布**（L8-C）：`daily` job 内 `ai-scholar site --out _site` → `upload-pages-artifact`
+→ 独立 `deploy-pages` job（`github-pages` environment）→
+`https://tochikoma777.github.io/ai-scholar/`。
+★ 为什么必须在 daily 内构建：站点要读 db 元数据，db 只存在于 actions-cache（git 里没有）。
+★ `_site/` 已 gitignore，构建产物不入库。
+
 分层规则（违反就会重新引入已踩过的坑）：
 
 - **arXiv / HF collectors 只产出 `RawPaper`**，不碰 DB、不碰 watchlist。新增采集源 = 一个
@@ -114,7 +125,7 @@ cli.py (typer)
 
 ### 两条主线的关键路径
 
-**collect** — `pipeline/collect.py:277 run_collect`
+**collect** — `pipeline/collect.py:298 run_collect`
 
 1. `_days_back(days)` 逐日抓取（arXiv 按 `submittedDate` 精确框定并翻页；HF 按 `date`）。
 2. `canonical_id_for` → `_resolve_via_alias` → `upsert_paper`。三级去重：
@@ -482,7 +493,7 @@ uv build                         # hatchling：构建 sdist + wheel（默认写 
 - ★ **离线跑法**：`uv run pytest -m "not live" -q`。联网冒烟（`test_live_arxiv_parse` /
   `test_live_hf_parse_may_skip`）带 `@pytest.mark.live`，拿不到真实响应就 skip。
 - ★ **CODEBUDDY 里的行号引用会被机器校验**：凡是写成 `path.py:NNN 符号` 的（如
-  `pipeline/collect.py:277 run_collect`），`tests/test_docs_consistency.py::test_codebuddy_line_anchors`
+  `pipeline/collect.py:298 run_collect`），`tests/test_docs_consistency.py::test_codebuddy_line_anchors`
   会断言该行附近确有该符号 —— **改完代码记得重跑，漂了就改文档**。
 - `tests/test_docs_consistency.py` 是阶段收尾的机械门禁：若 CODEBUDDY 标记当前阶段「已完成」，
   则 `docs/handoff/` 下必须存在**下一阶段**的 `L*-开工.md`（未归档），且维护日志已登记。

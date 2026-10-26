@@ -80,6 +80,8 @@ export:
 collect:
   # ★ 单日实测 465 条（§12），200 会把当天截断 —— 取 600 留余量（3 页 × 1 req/3s）
   arxiv_max_results: 600
+  # ★ D-1：arXiv 单页读超时（全局 http 20s 不够；2026-10-26 实测整日 ReadTimeout）
+  arxiv_read_timeout_s: 60
   hf_days: 1
   deep_dive_top_n: 5               # ★ 通道 A 立刻执行，不看 Tier
 

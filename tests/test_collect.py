@@ -564,3 +564,60 @@ async def test_hf_http_error_becomes_runtime_error() -> None:
     async with HttpClient() as client:
         with pytest.raises(RuntimeError, match="ConnectError"):
             await fetch_hf_day(client, date(2026, 10, 21), HF_URL)
+
+
+# ── D-1：逐日隔离（一天超时不再拖垮整源）──────────────────────────────
+async def test_one_day_timeout_does_not_kill_source(tmp_path: Path) -> None:
+    """★ 回归（2026-10-26 实测）：7 天窗口里 1 天 ReadTimeout ⇒ 整个源 0 条。
+
+    现在改为逐日隔离：失败的天进 `degraded['arxiv_partial']`，其余天照常入库。
+    """
+    from ai_scholar.utils.http import HttpClient
+
+    async with respx.mock() as mock:
+        mock.get(ARXIV_URL).mock(
+            side_effect=[
+                httpx.ReadTimeout("timed out"),
+                httpx.Response(200, text=atom_feed(arxiv_entry(), total=1)),
+            ]
+        )
+        async with HttpClient(max_retries=1) as client:
+            report = await run_collect(
+                days=2,
+                source="arxiv",
+                settings=Settings(),
+                db_path=tmp_path / "c.db",
+                first_seen_path=tmp_path / "fs.jsonl",
+                client=client,
+            )
+
+    assert report.fetched == 1, "失败的那天不该拖垮另一天"
+    assert report.outcomes[0].failed is False, "部分成功不算源失败"
+    partial = report.degraded.get("arxiv_partial", "")
+    assert "ReadTimeout" in partial, report.degraded
+
+
+async def test_all_days_failing_still_marks_source_failed(tmp_path: Path) -> None:
+    """★ 全部天都失败 ⇒ 仍按"源失败"处理（不能假装成功）。"""
+    from ai_scholar.utils.http import HttpClient
+
+    async with respx.mock() as mock:
+        mock.get(ARXIV_URL).mock(side_effect=httpx.ReadTimeout("timed out"))
+        async with HttpClient(max_retries=1) as client:
+            report = await run_collect(
+                days=2,
+                source="arxiv",
+                settings=Settings(),
+                db_path=tmp_path / "c.db",
+                first_seen_path=tmp_path / "fs.jsonl",
+                client=client,
+            )
+    assert report.fetched == 0
+    assert report.outcomes[0].failed is True
+    assert "arxiv" in report.degraded and "ReadTimeout" in report.degraded["arxiv"]
+    assert report.ok is False
+
+
+def test_arxiv_read_timeout_is_configurable() -> None:
+    """超时要可配（20s 不够；硬编码会挡住线上调参）。"""
+    assert Settings().collect.arxiv_read_timeout_s >= 30

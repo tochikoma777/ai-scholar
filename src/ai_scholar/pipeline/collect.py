@@ -239,13 +239,18 @@ async def _collect_source(
     settings: Settings,
     days: list[date],
     max_results: int,
-) -> tuple[list[RawPaper], list[str]]:
-    """抓一个源（跨多天）。失败抛异常，由调用方转 degraded。
+) -> tuple[list[RawPaper], list[str], list[str]]:
+    """抓一个源（跨多天）。**逐日隔离**：某天失败只记 degraded，其余天照常入库。
 
-    第二项是**未命中的 id**（只有 `classics` 源会有）—— arXiv 对不存在的 id 静默跳过，
-    不显式返回就会变成"清单 49 条、入库 46 条"却无人察觉。
+    返回 `(条目, 未命中的 id, 失败说明)`：
+    - 未命中 id 只有 `classics` 源会有（arXiv 对不存在的 id 静默跳过）；
+    - 失败说明形如 `2026-10-24: ReadTimeout: ...`，由调用方写进 `runs.degraded_json`。
+
+    ★ 为什么改成逐日（2026-10-26 实测）：arXiv 单页读超时把**整天**打成异常，
+      7 天窗口里 1 天超时 = 整个源 0 条（数据入口静默归零，比报错更危险）。
     """
     items: list[RawPaper] = []
+    failures: list[str] = []
     if name == "classics":
         # ★ 经典种子清单直采（v1.11）：人工审校的 arXiv id，用 `id_list` 批量拉
         from ai_scholar.config import load_classics
@@ -257,21 +262,37 @@ async def _collect_source(
         if not ids:
             raise RuntimeError("config/classics.yaml 为空 —— 清单缺失时不发请求")
         items, missing = await fetch_arxiv_ids(client, ids, endpoint)
-        return items, [canonical_arxiv_id(i) for i in missing]
+        return items, [canonical_arxiv_id(i) for i in missing], failures
     if name == "arxiv":
         cfg = settings.source("arxiv")
         endpoint = cfg.endpoint if cfg else "https://export.arxiv.org/api/query"
         categories = cfg.categories() if cfg else ["cs.AI", "cs.CL", "cs.LG"]
+        read_timeout = float(settings.collect.arxiv_read_timeout_s) or None
         for day in days:
-            items.extend(await fetch_arxiv_day(client, day, categories, endpoint, max_results))
+            try:
+                items.extend(
+                    await fetch_arxiv_day(
+                        client,
+                        day,
+                        categories,
+                        endpoint,
+                        max_results,
+                        read_timeout_s=read_timeout,
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001 —— 单日失败必须隔离
+                failures.append(f"{day.isoformat()}: {type(exc).__name__}: {exc}"[:200])
     elif name == "hf_daily":
         cfg = settings.source("hf_daily")
         base_url = cfg.hf_url() if cfg else "https://huggingface.co/api/daily_papers"
         # ★ L6-1：HF 榜单滞后发布，请求「今天」必 400 ⇒ 窗口从昨天开始（不含今天）
         hf_days = hf_collect_days(days[0], len(days))
         for day in hf_days:
-            items.extend(await fetch_hf_day(client, day, base_url))
-    return items, []
+            try:
+                items.extend(await fetch_hf_day(client, day, base_url))
+            except Exception as exc:  # noqa: BLE001 —— 同样逐日隔离
+                failures.append(f"{day.isoformat()}: {type(exc).__name__}: {exc}"[:200])
+    return items, [], failures
 
 
 async def run_collect(
@@ -325,7 +346,7 @@ async def run_collect(
             for name in names:
                 outcome = SourceOutcome(name=name)
                 try:
-                    items, missing = await _collect_source(
+                    items, missing, failures = await _collect_source(
                         name, http, settings, day_list, max_results
                     )
                 except Exception as exc:  # noqa: BLE001 —— 单源失败必须隔离
@@ -334,6 +355,14 @@ async def run_collect(
                     report.degraded[name] = outcome.degraded
                     report.outcomes.append(outcome)
                     continue
+                if failures and not items:
+                    # 全部天都失败 ⇒ 仍是"源失败"（沿用原 key，CLI/报告据此标黄）
+                    outcome.failed = True
+                    outcome.degraded = failures[0]
+                    report.degraded[name] = outcome.degraded
+                elif failures:
+                    # ★ 部分天失败：数据照常入库，但失败的天必须显式暴露
+                    report.degraded[f"{name}_partial"] = "；".join(failures[:5])
                 if missing:
                     report.degraded[f"{name}_missing"] = (
                         f"{len(missing)} 个 id 未命中：" + ", ".join(missing[:20])

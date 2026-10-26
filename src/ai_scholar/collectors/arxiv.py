@@ -13,6 +13,8 @@ import asyncio
 import xml.etree.ElementTree as ET
 from datetime import date
 
+import httpx
+
 from ai_scholar.collectors.base import SOURCE_ARXIV, RawPaper
 from ai_scholar.store.hash import canonical_arxiv_id
 from ai_scholar.utils.http import HttpClient
@@ -117,8 +119,19 @@ async def fetch_arxiv_day(
     categories: list[str],
     endpoint: str,
     max_results: int = 600,
+    *,
+    read_timeout_s: float | None = None,
 ) -> list[RawPaper]:
-    """抓某一天（按 submittedDate 框定）的论文，自动翻页。"""
+    """抓某一天（按 submittedDate 框定）的论文，自动翻页。
+
+    `read_timeout_s`：单页读超时覆盖（★ arXiv 200 条/页在高峰期常 >20s；
+    全局 `http.timeout_read_s=20` 对 HF/S2 够用，对 arXiv 不够 —— 见 D-1）。
+    """
+    timeout = (
+        httpx.Timeout(None, connect=client.connect_timeout_s, read=read_timeout_s)
+        if read_timeout_s
+        else None
+    )
     query = submitted_query(categories, day)
     base_params = {
         "search_query": query,
@@ -133,7 +146,7 @@ async def fetch_arxiv_day(
             base_params, start=start, max_results=min(PAGE_SIZE, max_results - len(items))
         )
         response = await client.get(
-            endpoint, params=params, source="arxiv", rate_limit="1/3s", timeout=None
+            endpoint, params=params, source="arxiv", rate_limit="1/3s", timeout=timeout
         )
         if response.status_code != 200:
             raise RuntimeError(f"arXiv HTTP {response.status_code}（day={day}）")
