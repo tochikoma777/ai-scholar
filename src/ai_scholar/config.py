@@ -285,9 +285,13 @@ class EnhanceSettings(BaseModel):
 
 
 class GradeSettings(BaseModel):
-    """L3b-1 定级参数（fast）。★ 触发阈值复用 `signals.maturity_days` / `min_citations`。"""
+    """L3b-1 定级参数（fast）。★ 触发阈值复用 `signals.maturity_days` / `min_citations`。
 
-    default_limit: int = 20
+    `default_limit=8`（2026-10-26 实测调整）：单次约 ¥0.0091，是日成本的最大单项；
+    20 篇/天 = ¥0.18/天 ≈ ¥65/年，降到 8 篇 ≈ ¥0.073/天 ≈ ¥27/年。
+    """
+
+    default_limit: int = 8
 
 
 class LensSettings(BaseModel):

@@ -170,7 +170,10 @@ enhance:
 
 grade:
   # ★ L3b-1 定级：成熟（published_at ≥ signals.maturity_days）或引用达标才定级
-  default_limit: 20
+  # ★ 2026-10-26 实测：grading prompt 带引用/元数据，**单次 ¥0.0091**（比一篇 strong 深度分析还贵），
+  #   20 篇/天 = ¥0.18/天（占日成本 72%）。日成本是**天天乘 365** 的量，故降到 8 篇（≈¥0.073）。
+  #   代价：定级覆盖变慢（积压由延迟定级机制自然消化，不丢条目）。
+  default_limit: 8
 
 deep_analysis:
   # ★ 注意力预算：每周最多 5 篇 strong 分析；超限进队列，不降单篇质量
