@@ -12,6 +12,8 @@ from sqlmodel import Session, SQLModel
 from ai_scholar.config import WatchlistConfig, WatchlistGroup
 from ai_scholar.pipeline.report import (
     DailyReport,
+    PredictionBrief,
+    RunStatus,
     build_daily_report,
     render_markdown,
     write_report,
@@ -69,7 +71,7 @@ def test_build_aggregates_today(tmp_path: Path) -> None:
     assert report.new_today == 2
     assert len(report.watchlist_hits) == 1
     assert report.watchlist_hits[0].id == "arXiv:2610.00001"
-    assert report.deep_analyzed == []  # L3 才填，本阶段恒空
+    assert report.deep_analyzed == []  # fixture 当天无分析产物；填充路径见 test_deep_analysis.py
     assert report.new_graded == []
 
 
@@ -148,6 +150,40 @@ def test_empty_state_renders_placeholder(tmp_path: Path) -> None:
     assert "今日无 watchlist 命中" in md
     assert "暂无（L3 实现后填充）" in md
     assert "今日无运行记录" in md
+
+
+def test_multi_item_sections_render_one_line_each(tmp_path: Path) -> None:
+    """★ 回归（2026-10-26 实锤）：运行状态与「已验证推演」曾整段挤成一行。
+
+    根因：jinja 开了 `trim_blocks`，而这两处循环体**行尾是 `{% endif %}`**，
+    块标签后的换行被吃掉 ⇒ 多条 run / 多条推演首尾相接（公共报告里已可见）。
+    ★ 判据：按「以 `- ` 开头的行数」数，而不是 `in md` 子串 —— 子串断言恒真。
+    """
+    report = DailyReport(
+        date="2026-10-24",
+        runs=[
+            RunStatus(run_id="aaa", mode="off", source="arxiv", fetched=1, new=0),
+            RunStatus(run_id="bbb", mode="fast", fetched=2, new=1, degraded=["HF HTTP 400"]),
+        ],
+        predictions_verified=[
+            PredictionBrief(
+                id="p1",
+                claim="命中一条",
+                status="hit",
+                due_at="2026-11-01",
+                observed=12,
+                threshold=10,
+            ),
+            PredictionBrief(id="p2", claim="未命中一条", status="miss", due_at="2026-11-01"),
+        ],
+    )
+    md = render_markdown(report)
+    runs_block = md.split("## 运行状态", 1)[1]
+    assert len([ln for ln in runs_block.splitlines() if ln.startswith("- ")]) == 2
+    assert "降级：HF HTTP 400" in runs_block
+    pred_lines = md.split("## 今日推演", 1)[1].split("## ★ 想读", 1)[0].splitlines()
+    assert "- ✅ `p1` — 命中一条（观测 12 / 阈值 10）" in pred_lines
+    assert "- ❌ `p2` — 未命中一条" in pred_lines
 
 
 def test_json_roundtrip(tmp_path: Path) -> None:

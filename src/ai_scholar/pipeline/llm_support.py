@@ -32,6 +32,40 @@ def estimate_input_tokens(text: str) -> int:
     return max(1, len(text) // 3)
 
 
+def validate_output(
+    content: str,
+    *,
+    tokens_out: int | None = None,
+    max_tokens: int | None = None,
+    min_chars: int = 0,
+    skeleton: tuple[str, ...] = (),
+    skeleton_name: str = "骨架",
+) -> tuple[bool, str]:
+    """★ 通用输出判废（E8）：空 / 过短 / 缺骨架 / **`tokens_out` 顶格**。
+
+    顶格 = 推理把额度吃光，答案即使"看起来有结构"也是残稿。
+
+    ★ 断言打在**真实结构**上，**不打在「模型是否听话」上**（如"必须回显 paper_id"）——
+    真实模型经常不回显，那条判据会把"截断"误诊成"不听话"（2026-10-26 Actions 实锤）。
+
+    Args:
+        min_chars: 最小字符数（0 = 不检查长度）。
+        skeleton: 至少命中一个的骨架标记（空 = 不检查结构）。
+    """
+    top_grid = tokens_out is not None and max_tokens and tokens_out >= max_tokens - 1
+    if not content.strip():
+        if top_grid:
+            return False, f"推理占满全部额度，答案为空（tokens_out={tokens_out}/{max_tokens}）"
+        return False, "输出为空"
+    if min_chars and len(content) < min_chars:
+        return False, f"输出过短（<{min_chars} 字符）"
+    if skeleton and not any(marker in content for marker in skeleton):
+        return False, f"缺少 {skeleton_name}"
+    if top_grid:
+        return False, f"输出顶格疑似截断（tokens_out={tokens_out}/{max_tokens}）"
+    return True, ""
+
+
 def authors_text(paper: Paper) -> str:
     return ", ".join(json.loads(paper.authors_json or "[]"))
 

@@ -56,7 +56,10 @@ schema_version: {{ report.schema_version }}
 {%- endif %}
 {% if report.predictions_verified -%}
 {% for item in report.predictions_verified %}
-- {{ "✅" if item.status == "hit" else ("❌" if item.status == "miss" else "⚠️") }} `{{ item.id }}` — {{ item.claim }}{% if item.observed is not none %}（观测 {{ item.observed }} / 阈值 {{ item.threshold }}）{% endif %}
+{#- ★ 行尾不能留 `{% endif %}`：jinja 开了 trim_blocks，块标签后的换行会被吃掉，多条会被挤成一行 -#}
+{% set icon = "✅" if item.status == "hit" else ("❌" if item.status == "miss" else "⚠️") %}
+{% set observed_txt = ("（观测 " ~ item.observed ~ " / 阈值 " ~ item.threshold ~ "）") if item.observed is not none else "" %}
+- {{ icon }} `{{ item.id }}` — {{ item.claim }}{{ observed_txt }}
 {% endfor -%}
 {%- elif report.predictions_due -%}
 {% for item in report.predictions_due %}
@@ -85,7 +88,10 @@ schema_version: {{ report.schema_version }}
 
 {% if report.runs -%}
 {% for run in report.runs %}
-- `{{ run.run_id }}`（{{ run.mode }}{% if run.source %} / {{ run.source }}{% endif %}）：fetched {{ run.fetched }} · new {{ run.new }}{% if run.degraded %} · 降级：{{ run.degraded|join("；") }}{% endif %}
+{#- ★ 同上：行尾必须落在变量标签上，否则 trim_blocks 吃掉换行，多条 run 会挤成一行 -#}
+{% set mode_txt = run.mode ~ (" / " ~ run.source if run.source else "") %}
+{% set degraded_txt = (" · 降级：" ~ run.degraded|join("；")) if run.degraded else "" %}
+- `{{ run.run_id }}`（{{ mode_txt }}）：fetched {{ run.fetched }} · new {{ run.new }}{{ degraded_txt }}
 {% endfor -%}
 {%- else -%}
 - 今日无运行记录

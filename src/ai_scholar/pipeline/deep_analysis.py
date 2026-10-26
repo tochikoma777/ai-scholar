@@ -46,6 +46,9 @@ from ai_scholar.pipeline.llm_support import (
     window_starts,
     year_text,
 )
+from ai_scholar.pipeline.llm_support import (
+    validate_output as _validate_output,
+)
 from ai_scholar.store.db import default_db_path
 from ai_scholar.store.models import (
     LINK_TYPE_REFERENCES,
@@ -255,20 +258,17 @@ def validate_output(
 
     ⇒ 改为结构校验：六段/TL;DR 骨架 + 最小长度。id 映射由「一次调用只喂一篇」保证，
       不依赖模型回显（回显只是 prompt 的要求，不是数据完整性的必要条件）。
+
+    ★ 判废规则与 `grade` 共用同一份实现（E8），见 `llm_support.validate_output`。
     """
-    if not content:
-        if tokens_out is not None and max_tokens and tokens_out >= max_tokens - 1:
-            return False, f"推理占满全部额度，答案为空（tokens_out={tokens_out}/{max_tokens}）"
-        return False, "输出为空"
-    if len(content) < MIN_ANALYSIS_CHARS:
-        return False, f"输出过短（<{MIN_ANALYSIS_CHARS} 字符）"
-    if "## 六段" not in content and "TL;DR" not in content:
-        return False, "缺少 TL;DR / 六段骨架"
-    # ★ E6：输出顶格 = 被截断（推理 token 吃掉了答案）。截断的"六段"是残稿，
-    #   判成功会让 vault 里躺半篇 —— 必须判废（不写指纹，下次重试）。
-    if tokens_out is not None and max_tokens and tokens_out >= max_tokens - 1:
-        return False, f"输出顶格疑似截断（tokens_out={tokens_out}/{max_tokens}）"
-    return True, ""
+    return _validate_output(
+        content,
+        tokens_out=tokens_out,
+        max_tokens=max_tokens,
+        min_chars=MIN_ANALYSIS_CHARS,
+        skeleton=("## 六段", "TL;DR"),
+        skeleton_name="TL;DR / 六段骨架",
+    )
 
 
 def _weekly_analyzed(session: Session, *, today: date) -> int:

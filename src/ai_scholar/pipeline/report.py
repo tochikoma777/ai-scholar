@@ -7,8 +7,8 @@
 ★ 三层分离（§6.6）：`DailyReport` 模型 + `templates/report/daily.md.j2` + 渲染。
   调格式只改 .j2；加板块（数据已有）模型加字段 + 模板加块；加新报告类型新增渲染器。
 
-★ 本阶段（L2）只填「概览 / ★命中 Top10 / 运行状态」三块；「深度分析 / 新定级」
-  是 L3 的能力，字段保留但恒空（渲染"暂无"），**不假装有数据**。
+★ L2 时只填「概览 / ★命中 Top10 / 运行状态」三块；**L7 起**「深度分析 / 新定级」
+  按当日产物填充（渲染"暂无"仅表示当天确实没有新产物），**不假装有数据**。
 """
 
 from __future__ import annotations
@@ -89,7 +89,7 @@ class DailyReport(BaseModel):
     new_today: int = 0
     # ★ 命中 Top10（今日新增里 watchlist 命中的，按分数 desc）
     watchlist_hits: list[ReportHit] = Field(default_factory=list)
-    # L3 才填，本阶段恒空
+    # ★ L7 起填充：当日 `deep_analyzed_at` / 当日定级的论文（不再是恒空占位）
     deep_analyzed: list[ReportHit] = Field(default_factory=list)
     new_graded: list[ReportHit] = Field(default_factory=list)
     # L4 推演：只读记分板；观点单独计数，★ 不进统计

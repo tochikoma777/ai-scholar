@@ -415,6 +415,39 @@ def test_report_exposes_degraded_state(tmp_path: Path) -> None:
     assert "HF Daily Papers" in (vault / "90-元数据" / "生成报告.md").read_text(encoding="utf-8")
 
 
+def test_hf_degraded_survives_later_classics_run(tmp_path: Path) -> None:
+    """★ 回归（2026-10-26 审计）：降级证据不能被"后跑的干净 run"盖掉。
+
+    daily 的最后一步采集是 `collect --classics`，它写的是**最新**一条 run 且通常干净；
+    原实现只读「最近一条 run」⇒ 当天 HF 的降级会被整个吞掉，vault 里看起来一切正常。
+    """
+    db_path = tmp_path / "data" / "t.db"
+    _seed_db(db_path, [make_paper()])
+    engine = engine_for(db_path)
+    with Session(engine) as session:
+        session.add(
+            Run(
+                run_id="r-hf",
+                started_at="2026-10-20T00:00:00+00:00",
+                mode="off",
+                source="hf_daily",
+                degraded_json=json.dumps({"hf_daily": "RuntimeError: ConnectTimeout"}),
+            )
+        )
+        session.add(
+            Run(
+                run_id="r-classics",
+                started_at="2026-10-20T00:05:00+00:00",
+                mode="off",
+                source="classics",
+            )
+        )
+        session.commit()
+    vault = tmp_path / "vault"
+    report = run_export(settings=_settings(tmp_path), db_path=db_path, out=vault)
+    assert "HF Daily Papers" in report.degraded, report.degraded
+
+
 def test_content_rev_at_not_bumped_across_days_without_change(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

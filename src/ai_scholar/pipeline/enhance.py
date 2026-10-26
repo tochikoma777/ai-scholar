@@ -206,21 +206,12 @@ async def run_enhance(
                     response = await llm.complete(
                         [{"role": "user", "content": prompt}], json_schema=ENHANCE_SCHEMA
                     )
-                    data = parse_json_content(response.content)
                 except LLMError as exc:
-                    report.degraded["llm"] = f"{type(exc).__name__}: {exc}"
-                    continue
-                if data.get("paper_id") != paper.id:
-                    report.degraded["llm"] = f"paper_id 回显不一致：{data.get('paper_id')!r}"
+                    report.degraded[f"llm:{paper.id}"] = f"{type(exc).__name__}: {exc}"
                     continue
 
-                paper.one_line = data.get("one_line") or None
-                paper.why = data.get("why") or None
-                paper.method_tags_json = json.dumps(
-                    data.get("method_tags") or [], ensure_ascii=False
-                )
-                paper.enhanced_at = day.isoformat()
-                paper.enhance_content_hash = paper.content_hash
+                # ★ 只要真实调用了就记账（**在**解析/校验之前）：解析失败的钱已经花出去了，
+                #   漏记会让 `cost` 与预算闸门失明（`spent_in_windows` 读的就是这张表）。
                 papers_cost = actual_cost(settings, provider, model, response)
                 session.add(
                     LLMUsage(
@@ -233,9 +224,28 @@ async def run_enhance(
                         purpose="enhance",
                     )
                 )
-                report.enhanced += 1
                 report.llm_calls += 1
                 report.cost_cny += papers_cost
+
+                try:
+                    data = parse_json_content(response.content)
+                except LLMError as exc:
+                    report.degraded[f"llm:{paper.id}"] = f"{type(exc).__name__}: {exc}"
+                    continue
+                if data.get("paper_id") != paper.id:
+                    report.degraded[f"llm:{paper.id}"] = (
+                        f"paper_id 回显不一致：{data.get('paper_id')!r}"
+                    )
+                    continue
+
+                paper.one_line = data.get("one_line") or None
+                paper.why = data.get("why") or None
+                paper.method_tags_json = json.dumps(
+                    data.get("method_tags") or [], ensure_ascii=False
+                )
+                paper.enhanced_at = day.isoformat()
+                paper.enhance_content_hash = paper.content_hash
+                report.enhanced += 1
 
             # 关联解读（强相似边）
             for edge in _select_links(
@@ -278,11 +288,11 @@ async def run_enhance(
                     response = await llm.complete(
                         [{"role": "user", "content": prompt}], json_schema=LINK_SCHEMA
                     )
-                    data = parse_json_content(response.content)
                 except LLMError as exc:
                     report.degraded["link"] = f"{type(exc).__name__}: {exc}"
                     continue
-                edge.interpretation = data.get("interpretation") or None
+
+                # ★ 同上：真实调用即记账，放在解析之前
                 link_cost = actual_cost(settings, provider, model, response)
                 session.add(
                     LLMUsage(
@@ -295,9 +305,16 @@ async def run_enhance(
                         purpose="enhance_link",
                     )
                 )
-                report.links_interpreted += 1
                 report.llm_calls += 1
                 report.cost_cny += link_cost
+
+                try:
+                    data = parse_json_content(response.content)
+                except LLMError as exc:
+                    report.degraded["link"] = f"{type(exc).__name__}: {exc}"
+                    continue
+                edge.interpretation = data.get("interpretation") or None
+                report.links_interpreted += 1
 
             if not dry_run:
                 session.commit()

@@ -170,7 +170,7 @@ class PaperLink(SQLModel, table=True):
 
 
 class Signal(SQLModel, table=True):
-    """④ 时序快照。本阶段只建表，不写数据（L1 填充）。"""
+    """④ 时序快照。★ L1-B 起由 `signals` 命令按状态机写入（表 + `data/signals/*.jsonl`）"""
 
     __tablename__ = "signals"
 

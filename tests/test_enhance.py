@@ -229,7 +229,9 @@ async def test_paper_id_mismatch_skips(tmp_path: Path) -> None:
         settings=fast_settings(), db_path=db, client=fake, watchlist=WATCHLIST
     )
     assert report.enhanced == 0
-    assert "llm" in report.degraded
+    # ★ 降级键带 paper_id（E5：多条失败不许互相覆盖）
+    assert any(k.startswith("llm") for k in report.degraded), report.degraded
+    assert report.llm_calls == 1  # ★ 调用已发生 ⇒ 必须记账（否则成本不可见）
 
 
 async def test_link_interpretation_writes_edge(tmp_path: Path) -> None:

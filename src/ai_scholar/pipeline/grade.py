@@ -29,6 +29,7 @@ from ai_scholar.pipeline.llm_support import (
     references_text,
     render_prompt,
     spent_in_windows,
+    validate_output,
     year_text,
 )
 from ai_scholar.store.db import default_db_path
@@ -43,6 +44,8 @@ from ai_scholar.utils.timeutil import age_days_since, today_local
 
 _TIER_RE = re.compile(r"Tier\s*([123])", re.IGNORECASE)
 _CONF_RE = re.compile(r"【置信度】\s*(高|中|低)")
+# ★ E9：连续判废 N 次就中止本轮 —— 失败是信息，继续重试只会把预算烧光
+MAX_CONSECUTIVE_FAILURES = 2
 
 
 @dataclass
@@ -132,6 +135,8 @@ async def run_grade(
     owns_client = client is None
     llm = client or build_client(settings)
     calls = 0
+    # ★ E9：连续判废 / 解析失败 N 次 ⇒ 中止本轮（失败通常是系统性原因，继续只是烧钱）
+    consecutive_failures = 0
 
     try:
         with Session(engine) as session:
@@ -200,16 +205,42 @@ async def run_grade(
                 report.llm_calls += 1
                 report.cost_cny += grade_cost
 
+                # ★ E8：判废 = 空 / 顶格。**不要求回显 paper_id** —— 真实模型经常不回显，
+                #   那条判据会把"被截断"误诊成"不听话"，白白重复付费（deep_analysis 已踩过）。
+                ok, reason = validate_output(
+                    response.content, tokens_out=response.tokens_out, max_tokens=max_tokens
+                )
+                if not ok:
+                    report.degraded[f"llm:{paper.id}"] = (
+                        f"{reason}（{len(response.content)} 字符 / "
+                        f"tokens_out={response.tokens_out}，下次重试）"
+                    )
+                    consecutive_failures += 1
+                    if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+                        report.blocked += len(candidates) - i - 1
+                        report.degraded["llm_abort"] = (
+                            f"连续 {consecutive_failures} 次输出判废，中止本轮"
+                            "（避免继续付费；已花成本见 cost）"
+                        )
+                        break
+                    continue
+                consecutive_failures = 0
+
                 tier, confidence = parse_grade(response.content)
+                if tier is None:
+                    report.degraded[f"llm:{paper.id}"] = "无法从输出解析 Tier（下次重试）"
+                    consecutive_failures += 1
+                    if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+                        report.blocked += len(candidates) - i - 1
+                        report.degraded["llm_abort"] = (
+                            f"连续 {consecutive_failures} 次无法解析 Tier，中止本轮"
+                        )
+                        break
+                    continue
+                consecutive_failures = 0
+
                 paper.grade_text = response.content
                 paper.grade_confidence = confidence
-                if tier is None:
-                    report.degraded["llm"] = "无法从输出解析 Tier（下次重试）"
-                    continue
-                if paper.id not in response.content:
-                    report.degraded["llm"] = "paper_id 未回显（结果丢弃）"
-                    continue
-
                 paper.tier = tier
                 paper.graded_at = day.isoformat()
                 paper.grade_content_hash = paper.content_hash

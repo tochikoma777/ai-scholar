@@ -9,13 +9,14 @@
 - 四层上限（日/周/月/年）+ 单次 run 调用次数，全部可配置；超限**硬停、退出码 0**。
 
 本模块只做纯逻辑，**不读写数据库、不发网络**：
-L3 的 LLM 调用层在发起调用前调用 :func:`estimate_cost` + :func:`check_budget`，
-「已累计」状态由调用方从 `llm_usage` 表查询后传入（阶段 0 无真实调用点，用参数模拟）。
+LLM 调用层（`enhance` / `grade` / `deep_analysis`）在发起调用前调用
+:func:`estimate_cost` + :func:`check_budget`；「已累计」状态由
+:func:`ai_scholar.pipeline.llm_support.spent_in_windows` 从 `llm_usage` 表查询后传入。
 
-★ L3 待办（记账闭环，阶段 0 有意不做，**勿遗漏**）：
-1. `llm_usage` 表补 `cost_cny` + `cache_hit` 字段（alembic migration）。
-2. 每次 LLM 调用完成后写一条 `llm_usage`（tokens / model / 成本 / 缓存命中与否）。
-3. 调用前从 `llm_usage` 按时间窗口查「已花费」→ 组装 :class:`BudgetState` → 过闸门。
+★ 记账闭环**已完成**（原「L3 待办」三条均已落地，勿重复施工）：
+1. `llm_usage` 已有 `cost_cny` + `cache_hit`（alembic 迁移 `f1c8b4d9e2a7`）；
+2. 每次调用后三处调用点都会写 `llm_usage`（**含解析失败的调用** —— 钱已花）；
+3. `spent_in_windows` 按日/周/月/年窗口汇总 + 本次 run 调用次数。
 """
 
 from __future__ import annotations
@@ -41,7 +42,8 @@ class CostEstimate:
 class BudgetState:
     """闸门需要的「已累计」状态。
 
-    L3 从 `llm_usage` 表按时间窗口 / 本次 run 查询后传入；阶段 0 用命令行参数模拟。
+    由 `llm_support.spent_in_windows` 从 `llm_usage` 按时间窗口 / 本次 run 查询后传入；
+    `budget` 命令用命令行参数模拟（离线演练）。
     """
 
     spent_daily: float = 0.0

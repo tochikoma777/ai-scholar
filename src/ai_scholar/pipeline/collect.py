@@ -233,6 +233,17 @@ def _days_back(days: int, today: date) -> list[date]:
     return [today - timedelta(days=i) for i in range(days)]
 
 
+def _failure_text(exc: BaseException, *, context: str) -> str:
+    """★ E5：失败信息必须自证 —— 异常类型 + 消息 + 关键参数。
+
+    Why（2026-10-26 实锤）：`httpx.ReadTimeout` 的 `str(exc)` 是**空串**，
+    报告里只能显示「降级：ReadTimeout: 」，看不出哪天 / 哪个端点 / 多少秒超时，
+    下一个人只能从零猜。⇒ 消息为空要显式标注，并补上请求的关键参数。
+    """
+    detail = " ".join(str(exc).split()) or "（异常未携带消息）"
+    return f"{type(exc).__name__}: {detail}（{context}）"[:200]
+
+
 async def _collect_source(
     name: str,
     client: HttpClient,
@@ -281,7 +292,8 @@ async def _collect_source(
                     )
                 )
             except Exception as exc:  # noqa: BLE001 —— 单日失败必须隔离
-                failures.append(f"{day.isoformat()}: {type(exc).__name__}: {exc}"[:200])
+                context = f"{day.isoformat()} · {endpoint} · read_timeout={read_timeout}s"
+                failures.append(_failure_text(exc, context=context))
     elif name == "hf_daily":
         cfg = settings.source("hf_daily")
         base_url = cfg.hf_url() if cfg else "https://huggingface.co/api/daily_papers"
@@ -291,7 +303,7 @@ async def _collect_source(
             try:
                 items.extend(await fetch_hf_day(client, day, base_url))
             except Exception as exc:  # noqa: BLE001 —— 同样逐日隔离
-                failures.append(f"{day.isoformat()}: {type(exc).__name__}: {exc}"[:200])
+                failures.append(_failure_text(exc, context=f"{day.isoformat()} · {base_url}"))
     return items, [], failures
 
 
@@ -351,7 +363,9 @@ async def run_collect(
                     )
                 except Exception as exc:  # noqa: BLE001 —— 单源失败必须隔离
                     outcome.failed = True
-                    outcome.degraded = f"{type(exc).__name__}: {exc}"
+                    outcome.degraded = _failure_text(
+                        exc, context=f"source={name} · days={day_list[0]}~{day_list[-1]}"
+                    )
                     report.degraded[name] = outcome.degraded
                     report.outcomes.append(outcome)
                     continue

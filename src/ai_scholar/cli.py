@@ -270,7 +270,7 @@ def doctor(
     raise typer.Exit(0)
 
 
-# ── 以下子命令为 L0-A 的**刻意占位** ──────────────────────────────────────
+# ── 采集 / 导出 / 站点 ──────────────────────────────────────────────────────
 @app.command()
 def collect(
     days: int | None = typer.Option(
@@ -1223,7 +1223,8 @@ def report(
 ) -> None:
     """生成当日报告快照：`data/reports/YYYY-MM-DD.md` + `.json`（★ 只读，不写库）。
 
-    ★ 聚合「概览 / ★命中 Top10 / 运行状态」三块；「深度分析 / 新定级」是 L3 能力，恒空。
+    ★ 聚合「概览 / ★命中 Top10 / 深度分析 / 新定级 / 今日推演 / 想读 / 运行状态 / 成本」各块；
+    深度分析与新定级自 L7 起按当日 `deep_analyzed_at` / 定级时间填充（不再是恒空占位）。
     """
     from ai_scholar.pipeline.report import build_daily_report, write_report
     from ai_scholar.utils.timeutil import today_local

@@ -339,20 +339,45 @@ def _watchlist_degraded() -> dict[str, str]:
 
 
 def _hf_degraded(session: Session) -> dict[str, str]:
-    """HF 是否不可达：从**最近一次采集**的 `runs.degraded_json` 读（不重新发请求）。"""
-    run = session.exec(select(Run).order_by(desc(col(Run.started_at)))).first()
-    if run is None:
-        return {"HF Daily Papers": "未知（尚无采集记录）"}
-    if not run.degraded_json:
-        return {}
+    """HF 是否不可达：从**当日所有**采集 run 的 `runs.degraded_json` 读（不重新发请求）。
+
+    ★ 为什么不能只读「最近一次 run」（2026-10-26 审计实锤）：daily 的最后一步采集是
+      `collect --classics`，它写入的是**最新**一条 run（通常干净）⇒ 只取第一条会把
+      当天 HF 的降级证据整个吞掉，vault 与报告看起来"一切正常"（比报错更危险）。
+    """
     import json
 
-    try:
-        degraded = json.loads(run.degraded_json)
-    except json.JSONDecodeError:
-        return {"HF Daily Papers": "degraded_json 解析失败"}
-    if "hf_daily" in degraded:
-        return {"HF Daily Papers": f"不可达（{degraded['hf_daily']}）"}
+    runs = session.exec(select(Run).order_by(desc(col(Run.started_at))).limit(50)).all()
+    if not runs:
+        return {"HF Daily Papers": "未知（尚无采集记录）"}
+
+    def _hf_message(run: Run) -> tuple[bool, str]:
+        """返回 `(解析是否成功, HF 降级原因)`；原因为空串 = 该 run 里 HF 正常。"""
+        if not run.degraded_json:
+            return True, ""
+        try:
+            degraded = json.loads(run.degraded_json)
+        except json.JSONDecodeError:
+            return False, "degraded_json 解析失败"
+        for key, value in degraded.items():
+            if key.startswith("hf_daily"):
+                return True, str(value)
+        return True, ""
+
+    # ① 优先：最近一次**真正采过 HF** 的 run（`collect` 按源各写一行）
+    for run in runs:
+        if run.source == "hf_daily":
+            ok, message = _hf_message(run)
+            if not ok:
+                return {"HF Daily Papers": message}
+            return {"HF Daily Papers": f"不可达（{message}）"} if message else {}
+    # ② 兜底：历史数据的 `source` 可能为空，退化成按 degraded 键扫描
+    for run in runs:
+        ok, message = _hf_message(run)
+        if not ok:
+            return {"HF Daily Papers": message}
+        if message:
+            return {"HF Daily Papers": f"不可达（{message}）"}
     return {}
 
 

@@ -200,7 +200,8 @@ async def test_parse_failure_degrades_without_hash(tmp_path: Path) -> None:
     assert report.graded == 0
     assert report.llm_calls == 1  # ★ 真实调用了就计数
     assert report.cost_cny > 0
-    assert "llm" in report.degraded
+    # ★ 降级键带 paper_id（E5：多条失败不许互相覆盖），故按前缀断言
+    assert any(k.startswith("llm") for k in report.degraded), report.degraded
     paper = load_papers(db)["arXiv:A"]
     assert paper.tier is None
     assert paper.grade_content_hash is None  # 下次重试
@@ -212,6 +213,39 @@ async def test_parse_failure_degrades_without_hash(tmp_path: Path) -> None:
 
 async def _no_tier_complete(messages, *, json_schema=None, json_mode=True):
     return LLMResponse(content="输出没有 Tier 字样", tokens_in=1, tokens_out=1)
+
+
+async def test_no_id_echo_is_still_graded(tmp_path: Path) -> None:
+    """★ E8 回归：模型没回显 `paper_id` 也要正常定级。
+
+    旧判据「`paper_id` 必须出现在输出里」会把"模型不听话"当作失败 ⇒
+    真实模型经常不回显，导致**每天重复付费重定级**（deep_analysis 已踩过同一坑）。
+    """
+    db = tmp_path / "d.db"
+    seed(db, [make_paper("arXiv:A")])
+    fake = FakeGradeLLM(echo_id=False)
+    report = await run_grade(settings=fast_settings(), db_path=db, client=fake, today=DAY)
+    assert report.graded == 1
+    assert not report.degraded, report.degraded
+    assert load_papers(db)["arXiv:A"].tier == 1
+
+
+async def test_consecutive_invalid_output_aborts_run(tmp_path: Path) -> None:
+    """★ E9 回归：连续 2 次输出判废 ⇒ 中止本轮，不把剩余候选一路付费烧完。"""
+    db = tmp_path / "d.db"
+    seed(db, [make_paper(f"arXiv:{i}", published="2025-01-01T00:00:00Z") for i in range(4)])
+    fake = FakeGradeLLM()
+
+    async def _top_grid(messages, *, json_schema=None, json_mode=True):
+        return LLMResponse(content="", tokens_in=10, tokens_out=fake_top_grid_out)
+
+    fake_top_grid_out = 8000  # = max_tokens_fast ⇒ 顶格判废
+    fake.complete = _top_grid  # type: ignore[method-assign]
+    report = await run_grade(settings=fast_settings(), db_path=db, client=fake, today=DAY)
+
+    assert report.llm_calls == 2, report.llm_calls  # ★ 不是 4：第 2 次失败即刹车
+    assert any(k == "llm_abort" for k in report.degraded), report.degraded
+    assert report.blocked >= 1
 
 
 async def test_budget_gate_blocks(tmp_path: Path) -> None:
