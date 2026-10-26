@@ -159,6 +159,12 @@
       "groups": []
     },
     {
+      "id": "arXiv:2308.08155",
+      "title": "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
+      "score": 0.0,
+      "groups": []
+    },
+    {
       "id": "arXiv:1502.03167",
       "title": "Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift",
       "score": 0.0,
@@ -173,6 +179,18 @@
     {
       "id": "arXiv:1512.03385",
       "title": "Deep Residual Learning for Image Recognition",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:1706.03741",
+      "title": "Deep reinforcement learning from human preferences",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2501.12948",
+      "title": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning",
       "score": 0.0,
       "groups": []
     },
@@ -203,6 +221,24 @@
     {
       "id": "arXiv:2211.17192",
       "title": "Fast Inference from Transformers via Speculative Decoding",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2307.08691",
+      "title": "FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2205.14135",
+      "title": "FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2304.03442",
+      "title": "Generative Agents: Interactive Simulacra of Human Behavior",
       "score": 0.0,
       "groups": []
     },
@@ -261,6 +297,12 @@
       "groups": []
     },
     {
+      "id": "arXiv:2303.11366",
+      "title": "Reflexion: Language Agents with Verbal Reinforcement Learning",
+      "score": 0.0,
+      "groups": []
+    },
+    {
       "id": "arXiv:2005.11401",
       "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
       "score": 0.0,
@@ -281,6 +323,12 @@
     {
       "id": "arXiv:2203.02155",
       "title": "Training language models to follow instructions with human feedback",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:1901.02860",
+      "title": "Transformer-XL: Attentive Language Models Beyond a Fixed-Length Context",
       "score": 0.0,
       "groups": []
     },
@@ -389,6 +437,14 @@
       "due_at": "2027-04-24",
       "observed": null,
       "threshold": 108639
+    },
+    {
+      "id": "p-da1e99797eae",
+      "claim": "方法「agent」在 2026-11-25 前被 ≥ 8 篇新增论文提及（最近 90 天 6 篇）",
+      "status": "open",
+      "due_at": "2026-11-25",
+      "observed": null,
+      "threshold": 8
     }
   ],
   "opinions_total": 0,
@@ -484,12 +540,28 @@
       "fetched": 49,
       "new": 0,
       "degraded": []
+    },
+    {
+      "run_id": "c52cbdffba11",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1816,
+      "new": 0,
+      "degraded": []
+    },
+    {
+      "run_id": "d979d3ef46d4",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
     }
   ],
   "degraded": {
     "arxiv": "ReadTimeout: ",
     "classics": "RuntimeError: arXiv HTTP 429（id_list=49 项）：Rate exceeded."
   },
-  "cost_cny": 0.8968,
+  "cost_cny": 0.9709,
   "cost_anomalies": []
 }
