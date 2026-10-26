@@ -162,9 +162,7 @@ def load_usage_by_purpose(
     return by_purpose, sum(int(n) for *_x, n in rows), None
 
 
-def detect_anomalies(
-    summary: CostSummary, *, budget: BudgetSettings, today: date
-) -> list[str]:
+def detect_anomalies(summary: CostSummary, *, budget: BudgetSettings, today: date) -> list[str]:
     """异常判定（规则必须可解释，见任务卡 §3）。
 
     ★ 只**标注**不阻断：阻断是 `check_budget` 的职责，两者别混。
@@ -178,8 +176,7 @@ def detect_anomalies(
         )
     if summary.median_7d and summary.today > summary.median_7d * 3:
         reasons.append(
-            f"今日 ¥{summary.today:.4f} > 近 7 日中位数 ¥{summary.median_7d:.4f} × 3"
-            "（相对突增）"
+            f"今日 ¥{summary.today:.4f} > 近 7 日中位数 ¥{summary.median_7d:.4f} × 3（相对突增）"
         )
     month_cap = round(float(budget.monthly_limit_cny) * 0.8, 4)
     if summary.month > month_cap:

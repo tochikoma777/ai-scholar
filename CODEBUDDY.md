@@ -8,7 +8,9 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 > ★ 全程中文回复（技术术语 / 代码 / 路径除外）。
 > ★ **每次 clear / init 后第一件事**：读 `docs/经验固化.md`（尤其「输出规范类 O1」：
 >   两张进度表 + 待决策子格式），再读 `docs/handoff/` 下**阶段号最大**的 `L*-开工.md`
->   （当前 `L7-开工.md`；已完成阶段的文件是归档，不作开工入口）。**未读即开工或输出 = 违规。**
+>   （当前 `L9-开工.md`；已完成阶段的文件是归档，不作开工入口）。**未读即开工或输出 = 违规。**
+>   ★ 这一行由 `tests/test_docs_consistency.py::test_current_handoff_pointer_is_latest` 机械校验
+>   —— 指向过期 handoff 会让下一个 Agent 在**已归档**的范围里开工（2026-10-26 已两次踩中）。
 > ★ **阶段收尾硬门禁（宣布“已完成”前逐项打勾）**：
 >   1) 代码 / 测试 / tag / push 完成；
 >   2) **新建 `docs/handoff/L{下一阶段}-开工.md`**，当前阶段 handoff 标「已归档」并指向新文件；
@@ -18,7 +20,7 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 ---
 
-## ★ 当前阶段：L8（运营验证与使用闭环）—— 已完成（A/B/C/D-1/F 全部落地）
+## ★ 当前阶段：L8（运营验证与使用闭环）—— 已完成（A/B/C/D-1/F 全部落地，tag `l8a`）
 
 > **下一阶段：L9**（运营期：持续观察与按需维护，不新增功能）—— 开工入口
 > `docs/handoff/L9-开工.md`。★ L8 的 handoff 已归档。

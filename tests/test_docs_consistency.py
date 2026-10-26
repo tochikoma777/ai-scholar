@@ -112,3 +112,51 @@ def test_anchor_checker_detects_drift() -> None:
     good = next(i for i, line in enumerate(lines, 1) if line.startswith("async def run_collect"))
     assert anchor_errors(f"**collect** — `pipeline/collect.py:{good - 5} run_collect`")
     assert not anchor_errors(f"**collect** — `pipeline/collect.py:{good} run_collect`")
+
+
+_CURRENT_HANDOFF = re.compile(r"当前\s*`(L\d+)-开工\.md`")
+
+
+def current_handoff_pointer(text: str, handoff_dir: Path) -> list[str]:
+    """CODEBUDDY 里"当前 `Lx-开工.md`"必须指向**阶段号最大且未归档**的那份。
+
+    ★ 背景（2026-10-26 已两次踩中）：L7 开工后仍写着 L5、L8 完成后仍写着 L7 ——
+      clear+init 后的 Agent 会照着**已归档**的范围开工（G4 交接文档要能盲测）。
+    """
+    match = _CURRENT_HANDOFF.search(text)
+    if match is None:
+        return ["CODEBUDDY.md 没有『当前 `Lx-开工.md`』指针 —— 交接入口缺失"]
+    stage = match.group(1)
+    candidates = sorted(
+        (p for p in handoff_dir.glob("L*-开工.md") if re.fullmatch(r"L\d+-开工\.md", p.name)),
+        key=lambda p: int(re.match(r"L(\d+)", p.name).group(1)),  # type: ignore[union-attr]
+    )
+    if not candidates:
+        return ["docs/handoff/ 下没有任何 L*-开工.md"]
+    latest = candidates[-1].stem.split("-")[0]
+    errors: list[str] = []
+    if stage != latest:
+        errors.append(
+            f"CODEBUDDY 指向 {stage}，但最新阶段是 {latest}（开工入口指错 = 按归档范围开工）"
+        )
+    target = handoff_dir / f"{stage}-开工.md"
+    if not target.exists():
+        errors.append(f"{target.name} 不存在")
+    else:
+        head = "\n".join(target.read_text(encoding="utf-8").splitlines()[:8])
+        if "已归档" in head:
+            errors.append(f"{target.name} 已归档，不能作为开工入口")
+    return errors
+
+
+def test_current_handoff_pointer_is_latest() -> None:
+    errors = current_handoff_pointer(CODEBUDDY.read_text(encoding="utf-8"), HANDOFF_DIR)
+    assert not errors, "；".join(errors)
+
+
+def test_pointer_checker_detects_stale_pointer(tmp_path: Path) -> None:
+    """★ 反向验证：指向上一个阶段必须报错（否则门禁是假的）。"""
+    (tmp_path / "L8-开工.md").write_text("# L8\n> 已归档", encoding="utf-8")
+    (tmp_path / "L9-开工.md").write_text("# L9\n正文", encoding="utf-8")
+    assert current_handoff_pointer("当前 `L8-开工.md`", tmp_path)
+    assert not current_handoff_pointer("当前 `L9-开工.md`", tmp_path)

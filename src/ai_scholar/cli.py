@@ -963,11 +963,7 @@ def cost(
     console.print(table)
 
     if summary.median_7d:
-        delta = (
-            f"{summary.today_delta_pct:+.1f}%"
-            if summary.today_delta_pct is not None
-            else "—"
-        )
+        delta = f"{summary.today_delta_pct:+.1f}%" if summary.today_delta_pct is not None else "—"
         console.print(
             f"近 {days} 日中位数 ¥{summary.median_7d:.4f} · 今日环比 {delta}"
             f" · 覆盖 {summary.report_days} 天报告"

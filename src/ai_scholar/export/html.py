@@ -441,12 +441,8 @@ class HtmlExporter(Exporter):
             items = "；".join(_e(reason) for reason in data.cost_anomalies)
             anomaly = f'\n<p class="badge bad">⚠️ 成本异常：{items}</p>'
         return (
-            head
-            + f'<p class="meta">近 {len(points)} 日每日成本 · 峰值 ¥{peak:.4f} · '
-            f'本月累计 <b>¥{data.cost_month:.4f}</b></p>\n'
-            + svg
-            + anomaly
-            + "\n</section>"
+            head + f'<p class="meta">近 {len(points)} 日每日成本 · 峰值 ¥{peak:.4f} · '
+            f"本月累计 <b>¥{data.cost_month:.4f}</b></p>\n" + svg + anomaly + "\n</section>"
         )
 
     @staticmethod
