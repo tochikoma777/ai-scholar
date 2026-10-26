@@ -9,7 +9,8 @@
 用法：
     uv run python scripts/probe_sources.py                 # 探测最近可获得的完整日
     uv run python scripts/probe_sources.py --date 2026-10-19
-    uv run python scripts/probe_sources.py --arxiv-max 600
+    uv run python scripts/probe_sources.py --arxiv-max 600   # = collect 的生产上限
+    # ★ 参数默认 1200；CI（ci.yml 的 probe job）用 400 只为提速，不代表生产口径
 """
 
 from __future__ import annotations

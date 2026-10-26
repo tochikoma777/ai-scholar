@@ -7,6 +7,13 @@ on:
     - cron: "30 16 * * *"
   workflow_dispatch:
 
+# ★ 同一时间只允许一个 daily 在跑（手动触发 / 重试叠加时会撞车）：
+#   两个 run 同时写 public 真源并 push，后 rebase 的那个会覆盖前一个的产物
+#   （G5 教训：真源被覆盖 = 降级证据消失）。排队执行，不取消进行中的。
+concurrency:
+  group: ai-scholar-daily
+  cancel-in-progress: false
+
 permissions:
   contents: write # ★ commit/push 真源需要写权限
   # ★ L8-C：发布静态站点到 GitHub Pages（Actions 构建模式）
