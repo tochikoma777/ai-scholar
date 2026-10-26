@@ -20,30 +20,23 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 ---
 
-## ★ 当前阶段：L8（运营验证与使用闭环）—— 已完成（A/B/C/D-1/F 全部落地，tag `l8a`）
+## ★ 当前阶段：L9（运营期：观察 + 按需维护）—— 进行中（默认不新增功能，开工入口 `docs/handoff/L9-开工.md`）
 
-> **下一阶段：L9**（运营期：持续观察与按需维护，不新增功能）—— 开工入口
-> `docs/handoff/L9-开工.md`。★ L8 的 handoff 已归档。
-
-
-
-- **只接线不新建**：把已定案但从未接线的链路接上 —— 范围与 DoD 见
-  `docs/handoff/L7-开工.md`（8 项：analyze 入自动管道、D 排序、深度分析置 `selected`、
-  public 真源 `data/analyses/`、经典种子清单、报告点读、links.json、frontmatter score）。
-- **L8 完成情况**：A（Actions 开 LLM）· B（真实 vault 物化）· C（Pages 发布）·
-  D-1（collect 逐日隔离 + 60s 读超时）· F（成本可见性三件套）全部完成。
-  稳态成本 **≈¥0.14/天（¥52/年）**；站点 `https://tochikoma777.github.io/ai-scholar/`。
-- **L7 接线证据**：#1–#8 全部验收（见 `docs/handoff/L8-开工.md` §3，已归档）。
-  #6 用负责人批准的方案 A：新落点 `data/wanted.jsonl`（public 真源）+ `ai-scholar want`，
-  报告每条给可复制命令、站点卡片给「复制想读命令」按钮（纯 JS、零请求）。
-- **已定决策（v1.11，勿推翻）**：D 排序（热度/经典交替+去重）；Tier 1 不是深度分析门槛
-  （通道 B 是并行补读）；经典获取=种子清单 `config/classics.yaml` 为主；
-  深度分析产物用 Option B 写成 public 真源。
-- ★ 前置审计教训（E7）：能力已实现≠已接线 —— 各阶段 DoD 必须回答「产出凭什么被下一阶段拿到」。
+> ★ **L9 默认不新增功能**：先把"每天自动跑"看稳，新需求先出任务卡（候选见 L9 handoff §6，
+> 需负责人定案）。日常巡检 5 分钟一套命令见 handoff §3。
+> ★ 上一阶段 **L8（运营验证与使用闭环）已完成**（tag `l8a`）：A（Actions 开 LLM）·
+> B（真实 vault 物化）· C（Pages 发布）· D-1（collect 逐日隔离 + 60s 读超时）·
+> F（成本可见性三件套）。稳态成本 **≈¥0.14/天（¥52/年）**；
+> 站点 `https://tochikoma777.github.io/ai-scholar/`（daily 内构建 → deploy-pages）。
+> ★ **v1.11 已定决策（勿推翻）**：D 排序（热度/经典交替 + 去重）；Tier 1 不是深度分析门槛
+> （通道 B 是并行补读）；经典获取 = 种子清单 `config/classics.yaml` 为主；
+> 深度分析产物写成 public 真源 `data/analyses/`。
+> ★ **daily 已接入 `site`**（L8-C 推翻 2026-10-25「不接入」的旧决定）：
+> 站点要读 db 元数据，而 db 只存在于 actions-cache ⇒ 必须在 daily job 内构建。
+> ★ 前置审计教训（E7）：能力已实现≠已接线 —— 各阶段 DoD 必须回答「产出凭什么被下一阶段拿到」。
 
 上一阶段：**L6（运营修复）已完成**（tag `l6`）：HF 400 根因修复、成本可见性、端到端实测。
 上一阶段：**L5（呈现形态）已完成**（tag `l5a` / `l5b`）：静态 HTML + 交互看板。
-- `daily.yml` **不接入** `site`（负责人 2026-10-25 决定）。
 
 上一阶段：**L4（推演与演化）已完成**（tag `l4`）：
 - 记分板 `data/predictions/scoreboard.jsonl`（public、append-only）；观点 `opinions.jsonl` 永不进统计。
@@ -94,17 +87,31 @@ cli.py (typer)
 ├─ report ─→ pipeline/report.py ─→ templates/report/ ─→ data/reports/
 ├─ predict ─→ pipeline/predict.py ─→ store/scoreboard.py ─→ data/predictions/*.jsonl
 ├─ stats ─→ pipeline/stats.py（验证 / 校准 / 影响分析，只读 JSONL + db）
+├─ want ─→ store/wanted.py ─→ data/wanted.jsonl（点读队列；`export` 消费后置 `selected=1`）
+├─ cost ─→ pipeline/cost.py（累计真源 = data/reports/*.json；db 只用于分项）
 └─ budget ─→ budget.py（纯成本估算与闸门；无网络、无 DB）
 
 横切层：config.py（YAML + ${ENV} + watchlist 合并） · utils/http.py（唯一网络出口）
 ```
 
-**自动化编排**（`.github/workflows/daily.yml`，每天 UTC 16:30）：
-`alembic upgrade head → collect → enrich → signals → relate → enhance → grade → predict → stats --verify → report`，
-末尾只 commit `data/first_seen.jsonl` / `data/signals/` / `data/reports/` / `data/predictions/`
-四类真源（db 走 actions-cache，按 `run_id` 作 key，**不入库**）。
-★ `predict` / `stats --verify` 零 LLM、零网络；`analyze`（strong）与 `export`（写私有 vault）
-**都不在 daily**：前者成本高、后者只本地跑。
+**自动化编排**（`.github/workflows/daily.yml`，每天 UTC 16:30 / 北京 00:30）：
+
+```
+migrate → collect → collect --classics → enrich → signals → relate → enhance → grade
+→ analyze → analyze --check → predict → stats --verify → report
+→ Cost guard（::warning）→ site --out _site → upload-pages-artifact → commit → deploy-pages
+```
+
+- LLM 环节只有三个：`enhance`(fast, 20) · `grade`(fast, **8**) · `analyze`(strong, 周 5 篇上限)。
+- 末尾只 commit `data/first_seen.jsonl` / `data/signals/` / `data/reports/` /
+  `data/predictions/` / `data/analyses/` 五类真源
+  （db 走 actions-cache，按 `run_id` 作 key，**不入库**）。
+  ★ `data/wanted.jsonl`（L7-6 点读队列）目前**不在 daily 的 commit 列表里**，只落本地。
+- ★ `predict` / `stats --verify` / `cost` 零 LLM、零网络；
+  **`export`（写私有 vault）不在 daily，只本地跑**。
+- ★ **两份 db**：Actions 用 actions-cache 里的 db，本地是 `data/ai_scholar.db`（gitignored）。
+  ⇒ 典型现象：`data/analyses/` 有产物但本地 vault 没有 —— 该论文不在**本地** db，
+  本地补跑 `collect` 再 `export` 即可（不是 bug）。
 
 **站点发布**（L8-C）：`daily` job 内 `ai-scholar site --out _site` → `upload-pages-artifact`
 → 独立 `deploy-pages` job（`github-pages` environment）→
@@ -127,7 +134,7 @@ cli.py (typer)
 
 ### 两条主线的关键路径
 
-**collect** — `pipeline/collect.py:298 run_collect`
+**collect** — `pipeline/collect.py:297 run_collect`
 
 1. `_days_back(days)` 逐日抓取（arXiv 按 `submittedDate` 精确框定并翻页；HF 按 `date`）。
 2. `canonical_id_for` → `_resolve_via_alias` → `upsert_paper`。三级去重：
@@ -156,7 +163,7 @@ cli.py (typer)
 
 | 路径 | 职责 | 关键点 |
 |---|---|---|
-| `cli.py` | 十八个子命令：`init`/`doctor`/`collect`/`export`/`site`/`enrich`/`enhance`/`grade`/`analyze`/`predict`/`stats`/`mark`/`signals`/`relate`/`related`/`list`/`budget`/`report` | 退出码：正常恒 0、`ConfigError` 1、参数错误 2 |
+| `cli.py` | **二十个**子命令：`init`/`doctor`/`collect`（`--classics` 是它的 flag）/`export`/`site`/`enrich`/`enhance`/`analyze`/`grade`/`mark`/`want`/`signals`/`relate`/`related`/`list`/`cost`/`budget`/`predict`/`stats`/`report` | 退出码：正常恒 0、`ConfigError` 1、参数错误 2 |
 | `config.py` | YAML 加载、`${ENV}` 插值、watchlist 双文件合并、`Settings` | `load_settings` 带 `lru_cache`；环境变量前缀 `AI_SCHOLAR_`，嵌套分隔 `__` |
 | `models.py` | pydantic 域模型：`WatchlistConfig` / `Availability` / `TimeSemantics` | **与 `store/models.py` 不是一回事** |
 | `budget.py` | `estimate_cost` + `check_budget` | 纯逻辑；调用前过闸门，调用后按实际 token 记账 |
@@ -404,6 +411,8 @@ uv run ai-scholar site [--out DIR] [--days N] [--limit N]
                                  # 静态 HTML（L5b：筛选/排序/搜索；只读 public；默认 ~/projects/ai-scholar-site）
 uv run ai-scholar site --check   # 逐字节比对：无变更退出 0，有变更退出 1（幂等验收）
 uv run ai-scholar mark <paper-id> [--unmark]   # 显式收藏（决定是否生成笔记）
+uv run ai-scholar want <paper-id>   # 想读（写 data/wanted.jsonl 并置位；export 消费它）
+uv run ai-scholar cost [--days N] [--json]     # 查账（零 LLM）：今天/本月/本年 + 分项 + 异常
 uv run ai-scholar signals [--limit N] [--force] [--dry-run]
                                  # 按时序状态机采样（signals 表 + data/signals/YYYY-MM.jsonl）
 uv run ai-scholar relate [--type bibcoupling|similarity|all] [--limit N] [--dry-run]
@@ -446,6 +455,10 @@ uv run pytest -k "config or watchlist" -q      # 按关键字筛
 uv run ruff check . && uv run ruff format --check .
 uv run mypy src/ai_scholar       # strict，cli.* 与 utils.* 有放宽
 uv build                         # hatchling：构建 sdist + wheel（默认写 dist/）
+
+# 阶段收尾门禁 / 运维巡检
+uv run pytest tests/test_docs_consistency.py -q   # handoff 指针 + 行号锚点（收尾必绿）
+gh run list --workflow=daily.yml --limit 3        # 最近三次 daily 是否 success
 ```
 
 ---
@@ -469,6 +482,10 @@ uv build                         # hatchling：构建 sdist + wheel（默认写 
 | `pipeline/report.py` · `templates/report/` | `pytest -k report`（★ 当天重跑无 diff；只读 DB） |
 | `pipeline/site.py` · `export/html.py` | `pytest -k site` + 实跑 `ai-scholar site --check`（应退出 0；★ 无生成时间 ⇒ 逐字节幂等） |
 | `budget.py` · 预算配置 | `pytest -k budget` + `ai-scholar budget ...` 演练（零网络） |
+| `pipeline/cost.py` · `ai-scholar cost` | `pytest -k cost`（★ 累计真源 = `data/reports/*.json`；db 只用于分项） |
+| `store/wanted.py` · `ai-scholar want` | `pytest -k wanted`（★ append-only / 幂等 / 坏行显式返回） |
+| `config/classics.yaml` · `collect --classics` | `pytest -k classics` + `uv run python scripts/probe_classics.py` |
+| `CODEBUDDY.md` · `docs/handoff/` | `pytest tests/test_docs_consistency.py -q`（★ 指针与行号锚点） |
 | `scripts/probe_sources.py` | 实跑一次 + 检查 `docs/数据源手册.md`；不可达时确认是 skip 不是伪造 |
 | `cli.py` | `pytest -k cli` + `uv run ai-scholar --help` |
 | `store/hash.py`（content_hash） | `pytest -k content_hash`（★ 三条硬约束） |
@@ -490,12 +507,16 @@ uv build                         # hatchling：构建 sdist + wheel（默认写 
 - 除 `test_live_arxiv_parse` / `test_live_hf_parse_may_skip` 外，网络一律 respx 拦截；
   这两个联网冒烟在连接失败、非 200 或无数据时 skip，但解析断言失败仍会让测试红。
 - 断言要落在**实际收到的值**上（如 `settings.llm.base_url`），不是"加载成功"。
-- 基线（tag `l7`）：`uv run pytest -q` = **309 passed / 1 skipped**；数字对不上先查原因再往下做。
+- 基线（tag `l8a`，2026-10-26）：`uv run pytest -m "not live" -q` = **376 passed**；
+  全量 378（多 2 个 `@pytest.mark.live` 联网冒烟，无真实响应时 skip）。
+  ★ `-q` 叠加 `pyproject` 里的 `addopts = "-q"` 会变成 `-qq`，**pytest 不再打印
+  `N passed` 汇总行** —— 要数字就去掉一个 `-q` 或用 `--collect-only` 计数。
+  数字对不上先查原因再往下做。
   单条 / 单文件：`uv run pytest tests/test_export.py::test_xxx -q`、`uv run pytest -k "config or watchlist" -q`。
 - ★ **离线跑法**：`uv run pytest -m "not live" -q`。联网冒烟（`test_live_arxiv_parse` /
   `test_live_hf_parse_may_skip`）带 `@pytest.mark.live`，拿不到真实响应就 skip。
 - ★ **CODEBUDDY 里的行号引用会被机器校验**：凡是写成 `path.py:NNN 符号` 的（如
-  `pipeline/collect.py:298 run_collect`），`tests/test_docs_consistency.py::test_codebuddy_line_anchors`
+  `pipeline/collect.py:297 run_collect`），`tests/test_docs_consistency.py::test_codebuddy_line_anchors`
   会断言该行附近确有该符号 —— **改完代码记得重跑，漂了就改文档**。
 - `tests/test_docs_consistency.py` 是阶段收尾的机械门禁：若 CODEBUDDY 标记当前阶段「已完成」，
   则 `docs/handoff/` 下必须存在**下一阶段**的 `L*-开工.md`（未归档），且维护日志已登记。
