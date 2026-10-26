@@ -16,6 +16,11 @@ jobs:
     timeout-minutes: 60
     env:
       AI_SCHOLAR_ENV: actions
+      # ★ L8-A：LLM 凭据放在 **job 级** —— enhance / grade / analyze 都要用；
+      #   只挂在 analyze 上会让前两步恒为 off 档（2026-10-26 实测：runs.mode=off）。
+      #   未配 secret 时为空 ⇒ effective_mode 自动降级 off，整条链路 0 花费、退出 0。
+      AI_SCHOLAR_LLM__BASE_URL: ${{ secrets.AI_SCHOLAR_LLM__BASE_URL }}
+      AI_SCHOLAR_LLM__API_KEY: ${{ secrets.AI_SCHOLAR_LLM__API_KEY }}
     steps:
       - uses: actions/checkout@v5
 
@@ -71,12 +76,9 @@ jobs:
         run: uv run ai-scholar grade
 
       # ★ L7-1：`analyze` 接入自动管道（§5.5 通道 A"立刻执行"）。
-      #   ★ off 档（未配 LLM secret）⇒ run_deep_analysis 直接返回，0 调用、退出码 0。
-      #   ★ 每周最多 5 篇（注意力预算），每天实跑约 1 篇 ≈ ¥0.12/天。
+      #   ★ 凭据在 job 级（见上），off 档时 run_deep_analysis 直接返回 0 调用、退出 0。
+      #   ★ 每周最多 5 篇（注意力预算），稳定后每天约 1 篇。
       - name: Analyze
-        env:
-          AI_SCHOLAR_LLM__BASE_URL: ${{ secrets.AI_SCHOLAR_LLM__BASE_URL }}
-          AI_SCHOLAR_LLM__API_KEY: ${{ secrets.AI_SCHOLAR_LLM__API_KEY }}
         run: uv run ai-scholar analyze
 
       # ★ L7-4：核对 public 真源 data/analyses/ 齐备（零 LLM / 零网络）。

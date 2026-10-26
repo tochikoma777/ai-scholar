@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
 
-from sqlmodel import Session, SQLModel, create_engine, select
+from sqlmodel import Session, SQLModel, col, create_engine, select
 
 from ai_scholar.budget import check_budget, estimate_cost
 from ai_scholar.collectors.fulltext import fetch_arxiv_html
@@ -260,14 +260,18 @@ def validate_output(content: str) -> tuple[bool, str]:
     return True, ""
 
 
-def _weekly_calls(session: Session, *, today: date) -> int:
+def _weekly_analyzed(session: Session, *, today: date) -> int:
+    """本周**已产出**的深度分析篇数（配额口径 = 篇，不是调用次数）。
+
+    ★ 为什么不用 `llm_usage` 计数（2026-10-26 Actions 实锤）：
+      首次带 secret 的 run 里 5 次调用只有 1 次成功，但配额按**调用**记 ⇒
+      4 次废调用直接吃掉整周额度，之后一周再也分析不了（`blocked=5`）。
+      配额是"注意力预算"，语义是**篇**：成败都要省钱，但不能让失败把额度烧光。
+      （成本侧另有 `budget.daily_limit_cny` 兜底，不会因为失败而无限花钱。）
+    """
     start = window_starts(today)["weekly"]
-    rows = session.exec(select(LLMUsage).where(LLMUsage.purpose == "deep_analysis")).all()
-    return sum(
-        1
-        for row in rows
-        if row.created_at and row.created_at >= start.isoformat(timespec="seconds")
-    )
+    rows = session.exec(select(Paper).where(col(Paper.deep_analyzed_at).is_not(None))).all()
+    return sum(1 for row in rows if (row.deep_analyzed_at or "") >= start.isoformat()[:10])
 
 
 # ★ 输出最小长度：六段 + 三句半的合理下限；低于此视为被截断/敷衍
@@ -415,7 +419,7 @@ async def run_deep_analysis(
                 ]
                 return report
 
-            week_calls = _weekly_calls(session, today=day)
+            week_calls = _weekly_analyzed(session, today=day)
             # ★ 先自愈：db 里已有的分析必须落到 public 真源（否则 --check 永远红）
             report.analyses_written += sync_analyses(session, settings)
             candidates, skipped = _select(

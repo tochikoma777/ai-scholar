@@ -167,20 +167,15 @@ async def test_channel_a_and_b_selection(tmp_path: Path) -> None:
 
 
 async def test_weekly_quota_blocks(tmp_path: Path) -> None:
+    """配额口径 = **本周已产出的篇数**（不是调用次数）。"""
     db = tmp_path / "d.db"
-    rows = [
-        LLMUsage(
-            run_id=f"r{i}",
-            model="deepseek-v4-pro",
-            tokens_in=1,
-            tokens_out=1,
-            cost_cny=0.001,
-            purpose="deep_analysis",
-            created_at="2026-10-23T12:00:00+00:00",
-        )
-        for i in range(5)
-    ]
-    seed(db, [make_paper("arXiv:A")], usage=rows)
+    done = [make_paper(f"arXiv:D{i}") for i in range(5)]
+    for paper in done:  # 本周已分析出的 5 篇
+        paper.deep_analysis_md = "## 六段\n已有"
+        paper.deep_content_hash = paper.content_hash
+        paper.deep_analyzed_at = DAY.isoformat()
+        paper.deep_status = "done"
+    seed(db, [*done, make_paper("arXiv:A")])
     fake = FakeDeepLLM()
     report = await run_deep_analysis(
         settings=strong_settings(str(tmp_path)),
@@ -192,6 +187,37 @@ async def test_weekly_quota_blocks(tmp_path: Path) -> None:
     assert report.blocked == 1
     assert report.llm_calls == 0
     assert "quota" in report.degraded
+
+
+async def test_failed_calls_do_not_burn_weekly_quota(tmp_path: Path) -> None:
+    """★ 回归（2026-10-26 Actions 实锤）：4 次废调用烧掉整周额度 ⇒ 一周不能分析。
+
+    配额 = 注意力预算（篇），失败调用只该花当天的钱（有 daily budget 兜底），
+    不该把**本周**的额度一起吃掉。
+    """
+    db = tmp_path / "d.db"
+    failed_usage = [
+        LLMUsage(
+            run_id=f"r{i}",
+            model="deepseek-v4-pro",
+            tokens_in=1,
+            tokens_out=1,
+            cost_cny=0.001,
+            purpose="deep_analysis",
+            created_at=f"{DAY.isoformat()}T12:00:00+00:00",
+        )
+        for i in range(5)
+    ]
+    seed(db, [make_paper("arXiv:A")], usage=failed_usage)
+    report = await run_deep_analysis(
+        settings=strong_settings(str(tmp_path)),
+        db_path=db,
+        client=FakeDeepLLM(),
+        watchlist=WATCHLIST,
+        today=DAY,
+    )
+    assert report.blocked == 0, "废调用不该占满周配额"
+    assert report.analyzed == 1
 
 
 async def test_idempotent_and_force(tmp_path: Path) -> None:
