@@ -97,13 +97,140 @@
   ],
   "deep_analyzed": [
     {
+      "id": "arXiv:2610.31433",
+      "title": "Drift Says When, Budget Says How Much: Rate-Controlled KV Re-selection for Long-Form Multimodal Generation",
+      "score": 0.0,
+      "groups": []
+    },
+    {
       "id": "arXiv:2610.30231",
       "title": "Edit, Don't Imitate: Minimal-Edit On-Policy Distillation for Multimodal Reasoning",
       "score": 0.0,
       "groups": []
+    },
+    {
+      "id": "arXiv:2610.25404",
+      "title": "MT Forcing: Towards Stable and Consistent Multi-Turn Image Editing with Autoregressive Diffusion",
+      "score": 0.0,
+      "groups": []
     }
   ],
-  "new_graded": [],
+  "new_graded": [
+    {
+      "id": "arXiv:1810.04805",
+      "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:1706.03762",
+      "title": "Attention Is All You Need",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2201.11903",
+      "title": "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2006.11239",
+      "title": "Denoising Diffusion Probabilistic Models",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:1910.10683",
+      "title": "Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2211.17192",
+      "title": "Fast Inference from Transformers via Speculative Decoding",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2112.10752",
+      "title": "High-Resolution Image Synthesis with Latent Diffusion Models",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2005.14165",
+      "title": "Language Models are Few-Shot Learners",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2103.00020",
+      "title": "Learning Transferable Visual Models From Natural Language Supervision",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2307.09288",
+      "title": "Llama 2: Open Foundation and Fine-Tuned Chat Models",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2310.06825",
+      "title": "Mistral 7B",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2210.03629",
+      "title": "ReAct: Synergizing Reasoning and Acting in Language Models",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2001.08361",
+      "title": "Scaling Laws for Neural Language Models",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2004.05150",
+      "title": "Longformer: The Long-Document Transformer",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:1909.08053",
+      "title": "Megatron-LM: Training Multi-Billion Parameter Language Models Using Model Parallelism",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2305.14314",
+      "title": "QLoRA: Efficient Finetuning of Quantized LLMs",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2001.04451",
+      "title": "Reformer: The Efficient Transformer",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2203.11171",
+      "title": "Self-Consistency Improves Chain of Thought Reasoning in Language Models",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2305.16291",
+      "title": "Voyager: An Open-Ended Embodied Agent with Large Language Models",
+      "score": 0.0,
+      "groups": []
+    }
+  ],
   "predictions_verified": [],
   "predictions_due": [],
   "predictions_new": [],
@@ -152,11 +279,27 @@
       "fetched": 49,
       "new": 49,
       "degraded": []
+    },
+    {
+      "run_id": "a9024c50614d",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1816,
+      "new": 0,
+      "degraded": []
+    },
+    {
+      "run_id": "e300a1a540f4",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
     }
   ],
   "degraded": {
     "arxiv": "ReadTimeout: ",
     "classics": "RuntimeError: arXiv HTTP 429（id_list=49 项）：Rate exceeded."
   },
-  "cost_cny": 0.2361
+  "cost_cny": 0.6282
 }
