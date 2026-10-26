@@ -135,8 +135,20 @@
       "groups": []
     },
     {
+      "id": "arXiv:2302.13971",
+      "title": "LLaMA: Open and Efficient Foundation Language Models",
+      "score": 0.0,
+      "groups": []
+    },
+    {
       "id": "arXiv:1707.06347",
       "title": "Proximal Policy Optimization Algorithms",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2010.11929",
+      "title": "An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale",
       "score": 0.0,
       "groups": []
     },
@@ -177,6 +189,12 @@
       "groups": []
     },
     {
+      "id": "arXiv:2305.18290",
+      "title": "Direct Preference Optimization: Your Language Model is Secretly a Reward Model",
+      "score": 0.0,
+      "groups": []
+    },
+    {
       "id": "arXiv:1910.10683",
       "title": "Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer",
       "score": 0.0,
@@ -201,6 +219,12 @@
       "groups": []
     },
     {
+      "id": "arXiv:1607.06450",
+      "title": "Layer Normalization",
+      "score": 0.0,
+      "groups": []
+    },
+    {
       "id": "arXiv:2103.00020",
       "title": "Learning Transferable Visual Models From Natural Language Supervision",
       "score": 0.0,
@@ -209,6 +233,18 @@
     {
       "id": "arXiv:2307.09288",
       "title": "Llama 2: Open Foundation and Fine-Tuned Chat Models",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2106.09685",
+      "title": "LoRA: Low-Rank Adaptation of Large Language Models",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2312.00752",
+      "title": "Mamba: Linear-Time Sequence Modeling with Selective State Spaces",
       "score": 0.0,
       "groups": []
     },
@@ -225,6 +261,12 @@
       "groups": []
     },
     {
+      "id": "arXiv:2005.11401",
+      "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+      "score": 0.0,
+      "groups": []
+    },
+    {
       "id": "arXiv:2001.08361",
       "title": "Scaling Laws for Neural Language Models",
       "score": 0.0,
@@ -233,6 +275,12 @@
     {
       "id": "arXiv:2203.15556",
       "title": "Training Compute-Optimal Large Language Models",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2203.02155",
+      "title": "Training language models to follow instructions with human feedback",
       "score": 0.0,
       "groups": []
     },
@@ -301,6 +349,46 @@
       "due_at": "2026-11-25",
       "observed": null,
       "threshold": 15
+    },
+    {
+      "id": "p-fcb90612e637",
+      "claim": "论文「Deep Residual Learning for Image Recognition」在 2027-04-24 前被引 ≥ 364944 次（当前 243296 次）",
+      "status": "open",
+      "due_at": "2027-04-24",
+      "observed": null,
+      "threshold": 364944
+    },
+    {
+      "id": "p-3b612337e3a1",
+      "claim": "方法「vision-language-action」在 2026-11-25 前被 ≥ 8 篇新增论文提及（最近 90 天 6 篇）",
+      "status": "open",
+      "due_at": "2026-11-25",
+      "observed": null,
+      "threshold": 8
+    },
+    {
+      "id": "p-a5c9b0aa6536",
+      "claim": "论文「Attention Is All You Need」在 2027-04-24 前被引 ≥ 297782 次（当前 198521 次）",
+      "status": "open",
+      "due_at": "2027-04-24",
+      "observed": null,
+      "threshold": 297782
+    },
+    {
+      "id": "p-d2942f300f74",
+      "claim": "论文「BERT: Pre-training of Deep Bidirectional Transf…」在 2027-04-24 前被引 ≥ 185045 次（当前 123363 次）",
+      "status": "open",
+      "due_at": "2027-04-24",
+      "observed": null,
+      "threshold": 185045
+    },
+    {
+      "id": "p-af7efb6f8791",
+      "claim": "论文「An Image is Worth 16x16 Words: Transformers for…」在 2027-04-24 前被引 ≥ 108639 次（当前 72426 次）",
+      "status": "open",
+      "due_at": "2027-04-24",
+      "observed": null,
+      "threshold": 108639
     }
   ],
   "opinions_total": 0,
@@ -380,11 +468,28 @@
       "fetched": 49,
       "new": 0,
       "degraded": []
+    },
+    {
+      "run_id": "e2270325648b",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1816,
+      "new": 0,
+      "degraded": []
+    },
+    {
+      "run_id": "f09184581589",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
     }
   ],
   "degraded": {
     "arxiv": "ReadTimeout: ",
     "classics": "RuntimeError: arXiv HTTP 429（id_list=49 项）：Rate exceeded."
   },
-  "cost_cny": 0.8189
+  "cost_cny": 0.8968,
+  "cost_anomalies": []
 }
