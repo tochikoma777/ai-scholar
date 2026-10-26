@@ -9,7 +9,9 @@ AI 文献的 **采集 → 关联 → 推演 → 沉淀**，外加**论文深度�
 
 - 许可证：**MIT**（只管代码，不管数据 —— 数据署名见文末）
 - 姊妹项目：[aipulse](https://github.com/tochikoma777/aipulse)（三档模式 / 三级降级 / 静默失败治理 全盘继承）
-- 当前阶段：**L7 已完成**（接线：自动深度分析 → 沉淀进 vault）+ L8 待定案（运营验证与使用闭环）；L4/L5/L6 均已完成
+- 当前阶段：**L8 已完成**（运营验证：Actions 开 LLM / 真实 vault 物化 / Pages 发布 / collect 加固 / 成本可见性）；
+  **L9 = 运营期**（持续观察与按需维护）；L0–L7 全部完成
+- 在线看板：**https://tochikoma777.github.io/ai-scholar/**（每日自动发布；只含 public 数据）
 
 ---
 
@@ -157,6 +159,8 @@ groups:
   - [x] **L5b** 交互式看板（单文件 + 原生 JS，零后端）
 - [x] **L6** 运营修复：HF 400 根因 + 成本可见性 + 端到端实测
 - [x] **L7** 接线：自动深度分析 → 置位 → public 真源 → 本地物化进 vault（D 排序 / 经典清单 / 点读 / links / score）
+- [x] **L8** 运营验证：Actions 开启 LLM（稳态 ¥0.14/天）+ 真实 vault 物化 + GitHub Pages 发布
+  + collect 逐日隔离（60s 读超时）+ 成本可见性（`cost` 命令 / 报告异常 / 站点板块 / Actions 告警）
 
 ---
 
