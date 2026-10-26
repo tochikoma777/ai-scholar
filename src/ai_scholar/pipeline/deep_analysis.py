@@ -241,7 +241,12 @@ def _select(
     return chosen, skipped
 
 
-def validate_output(content: str) -> tuple[bool, str]:
+def validate_output(
+    content: str,
+    *,
+    tokens_out: int | None = None,
+    max_tokens: int | None = None,
+) -> tuple[bool, str]:
     """校验深度分析输出（★ 断言打在**真实结构**上，不打在"模型是否听话"上）。
 
     背景（2026-10-26 Actions 实测）：原校验是「`paper.id` 必须出现在正文里」——
@@ -252,11 +257,17 @@ def validate_output(content: str) -> tuple[bool, str]:
       不依赖模型回显（回显只是 prompt 的要求，不是数据完整性的必要条件）。
     """
     if not content:
+        if tokens_out is not None and max_tokens and tokens_out >= max_tokens - 1:
+            return False, f"推理占满全部额度，答案为空（tokens_out={tokens_out}/{max_tokens}）"
         return False, "输出为空"
     if len(content) < MIN_ANALYSIS_CHARS:
         return False, f"输出过短（<{MIN_ANALYSIS_CHARS} 字符）"
     if "## 六段" not in content and "TL;DR" not in content:
         return False, "缺少 TL;DR / 六段骨架"
+    # ★ E6：输出顶格 = 被截断（推理 token 吃掉了答案）。截断的"六段"是残稿，
+    #   判成功会让 vault 里躺半篇 —— 必须判废（不写指纹，下次重试）。
+    if tokens_out is not None and max_tokens and tokens_out >= max_tokens - 1:
+        return False, f"输出顶格疑似截断（tokens_out={tokens_out}/{max_tokens}）"
     return True, ""
 
 
@@ -406,6 +417,9 @@ async def run_deep_analysis(
     http = http_client or client_from_settings(settings)
     calls = 0
     week_calls = 0
+    # ★ 预算保护：连续 N 次判废 ⇒ 中止本轮（付费仍发生，不许把配额/预算一路烧完）
+    consecutive_failures = 0
+    max_consecutive_failures = 2
 
     try:
         with Session(engine) as session:
@@ -523,7 +537,9 @@ async def run_deep_analysis(
                 report.cost_cny += analyze_cost
 
                 content = response.content.strip()
-                ok, reason = validate_output(content)
+                ok, reason = validate_output(
+                    content, tokens_out=response.tokens_out, max_tokens=max_tokens
+                )
                 if not ok:
                     paper.deep_status = "failed"
                     # ★ E5：错误必须自证（带 paper_id / 长度 / tokens），且**不互相覆盖**
@@ -531,7 +547,17 @@ async def run_deep_analysis(
                         f"{reason}（{len(content)} 字符 / "
                         f"tokens_out={response.tokens_out}，下次重试）"
                     )
+                    consecutive_failures += 1
+                    if consecutive_failures >= max_consecutive_failures:
+                        report.blocked = len(candidates) - i - 1
+                        report.degraded["llm_abort"] = (
+                            f"连续 {consecutive_failures} 次输出判废，中止本轮"
+                            "（避免继续付费；已花成本见 cost）"
+                        )
+                        break
                     continue
+
+                consecutive_failures = 0
 
                 paper.deep_analysis_md = content
                 paper.deep_analyzed_at = day.isoformat()

@@ -103,9 +103,10 @@ FAKE_BODY = (
 
 
 class FakeDeepLLM:
-    def __init__(self, *, echo_id: bool = False, body: str | None = None):
+    def __init__(self, *, echo_id: bool = False, body: str | None = None, tokens_out: int = 500):
         self.echo_id = echo_id
         self.body = body
+        self.tokens_out = tokens_out
         self.calls = 0
         self.last_prompt = ""
 
@@ -124,7 +125,9 @@ class FakeDeepLLM:
         body = self.body if self.body is not None else FAKE_BODY
         if self.echo_id:
             body = f"paper_id: {pid}\n{body}"
-        return LLMResponse(content=body, tokens_in=1000, tokens_out=500, cache_hit=False)
+        return LLMResponse(
+            content=body, tokens_in=1000, tokens_out=self.tokens_out, cache_hit=False
+        )
 
 
 def load_papers(db_path: Path) -> dict[str, Paper]:
@@ -581,3 +584,39 @@ async def test_sync_backfills_selected_for_legacy_analyses(tmp_path: Path) -> No
         session.commit()
     assert load_papers(db)["arXiv:OLD"].selected is True
     assert analysis_path(settings, "arXiv:OLD").exists()
+
+
+def test_validate_output_rejects_truncation() -> None:
+    """★ E6 回归：tokens_out 顶格 = 截断，结构再"像"也必须判废。"""
+    from ai_scholar.pipeline.deep_analysis import validate_output
+
+    ok, reason = validate_output(FAKE_BODY, tokens_out=8000, max_tokens=8000)
+    assert not ok and "截断" in reason
+    ok, _ = validate_output(FAKE_BODY, tokens_out=6500, max_tokens=8000)
+    assert ok
+
+
+async def test_consecutive_failures_abort_run(tmp_path: Path) -> None:
+    """★ 预算保护回归：连续 2 次判废就中止，不许把剩余候选全部付费烧掉。
+
+    背景（2026-10-26 首次 Actions）：5 次调用 1 次成功，4 次判废仍继续调用，
+    白花 ¥0.2361 的 80%。失败是**有信息**的：同一模型连挂两次，后面只会更糟。
+    """
+    db = tmp_path / "d.db"
+    seed(
+        db,
+        [make_paper(f"arXiv:P{i}") for i in range(3)],
+    )
+    fake = FakeDeepLLM(tokens_out=16000)  # 每次都"顶格" ⇒ 每次都被判废
+    report = await run_deep_analysis(
+        settings=strong_settings(str(tmp_path)),
+        db_path=db,
+        client=fake,
+        watchlist=WATCHLIST,
+        today=DAY,
+        limit=3,
+    )
+    assert fake.calls == 2, f"连续失败应刹车，实际调用 {fake.calls} 次"
+    assert report.blocked == 1
+    assert "llm_abort" in report.degraded
+    assert report.analyzed == 0

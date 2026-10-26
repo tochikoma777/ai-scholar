@@ -91,7 +91,7 @@ class LLMSettings(BaseModel):
     # strong 档走思维链，比 fast 慢得多，分开设（否则读超时会打断）
     timeout_strong_s: int = 180
     max_tokens_fast: int = 4000
-    max_tokens_strong: int = 8000
+    max_tokens_strong: int = 16000
     max_retries: int = 3
 
     @field_validator("base_url", "api_key", mode="before")
