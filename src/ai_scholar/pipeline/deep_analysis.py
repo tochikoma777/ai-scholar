@@ -309,6 +309,10 @@ def sync_analyses(session: Session, settings: Settings) -> int:
     for paper in session.exec(select(Paper)).all():
         if not paper.deep_analysis_md:
             continue
+        # ★ 与"分析完成即置位"保持一致：L7 之前分析过的论文当时没置位，
+        #   真源补写时顺手补上，否则它们永远导不进 vault（DoD #3 的库内一致性）。
+        if not paper.selected:
+            paper.selected = True
         if write_analysis(settings, paper):
             written += 1
     return written

@@ -474,3 +474,28 @@ async def test_check_reports_missing_and_stale(tmp_path: Path) -> None:
         check=True,
     )
     assert stale.analyses_missing == ["arXiv:A"]
+
+
+async def test_sync_backfills_selected_for_legacy_analyses(tmp_path: Path) -> None:
+    """★ 历史遗留（L7 之前分析过但没置位）⇒ 自愈补写时一并置 `selected=1`。
+
+    不补的话，这些论文永远导不进 vault —— DoD #3 在库内不成立。
+    """
+    from ai_scholar.pipeline.deep_analysis import sync_analyses
+
+    db = tmp_path / "d.db"
+    paper = make_paper("arXiv:OLD", title="legacy analyzed")
+    paper.deep_analysis_md = "## 六段\n旧分析"
+    paper.deep_content_hash = paper.content_hash
+    paper.deep_analyzed_at = DAY.isoformat()
+    paper.deep_status = "done"
+    paper.selected = False  # ★ L7 之前的状态
+    seed(db, [paper])
+    settings = strong_settings(str(tmp_path))
+
+    engine = engine_for(db)
+    with Session(engine) as session:
+        assert sync_analyses(session, settings) == 1
+        session.commit()
+    assert load_papers(db)["arXiv:OLD"].selected is True
+    assert analysis_path(settings, "arXiv:OLD").exists()

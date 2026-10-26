@@ -18,12 +18,15 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 ---
 
-## ★ 当前阶段：L7（接线阶段）—— 进行中（不新增方案）
+## ★ 当前阶段：L7（接线阶段）—— 已完成（8/8 接线，验收通过；tag 待打）
+
+> **下一阶段：L8**（运营验证与使用闭环，范围待负责人定案）—— 开工入口
+> `docs/handoff/L8-开工.md`。★ L7 的 handoff 已归档，不要再从它开工。
 
 - **只接线不新建**：把已定案但从未接线的链路接上 —— 范围与 DoD 见
   `docs/handoff/L7-开工.md`（8 项：analyze 入自动管道、D 排序、深度分析置 `selected`、
   public 真源 `data/analyses/`、经典种子清单、报告点读、links.json、frontmatter score）。
-- **接线进度（2026-10-25）**：#1–#8 **全部已接线**（含单测与本地实跑）。
+- **接线进度（2026-10-25）**：#1–#8 **全部已接线并通过验收**（证据见 `docs/handoff/L8-开工.md` §3）。
   #6 用负责人批准的方案 A：新落点 `data/wanted.jsonl`（public 真源）+ `ai-scholar want`，
   报告每条给可复制命令、站点卡片给「复制想读命令」按钮（纯 JS、零请求）。
 - **已定决策（v1.11，勿推翻）**：D 排序（热度/经典交替+去重）；Tier 1 不是深度分析门槛
