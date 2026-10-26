@@ -1,9 +1,100 @@
 {
   "date": "2026-10-26",
   "schema_version": 1,
-  "total_papers": 2110,
-  "new_today": 0,
-  "watchlist_hits": [],
+  "total_papers": 2534,
+  "new_today": 424,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2610.32770",
+      "title": "On-Policy Self-Training: Data-Free Self-Improvement in Large Language Models",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ]
+    },
+    {
+      "id": "arXiv:2610.32971",
+      "title": "RobustRLlib: A Unified Library and Benchmark for Robust Reinforcement Learning Algorithms",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.32943",
+      "title": "Knowledge Distillation across Item and Code Spaces for Parallel Generative Recommendation",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.32933",
+      "title": "Yalda-Embedding: Open Development of a Competitive Persian Retrieval Model",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.32888",
+      "title": "When Human Corrections Travel: Safety in Federated VLA Adaptation",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.32674",
+      "title": "EMG Tokenization Preserves Movement Information at a Fraction of the Bitrate",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.32483",
+      "title": "When Agents Fail: Model or Harness--Who's to Blame?",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.32481",
+      "title": "CASE: Confusion-Aware Skill Evolution for Frozen Multimodal Emotion Models",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.32474",
+      "title": "Beyond Post-Hoc Rewards: Privileged Reasoning Exploration for Multimodal Embeddings",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.32332",
+      "title": "4DMemory: Benchmarking Long-Horizon Spatiotemporal Memory with Harness-Augmented Agents",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ]
+    }
+  ],
   "deep_analyzed": [
     {
       "id": "arXiv:2610.30231",
@@ -45,6 +136,22 @@
       "degraded": [
         "RuntimeError: arXiv HTTP 429（id_list=49 项）：Rate exceeded."
       ]
+    },
+    {
+      "run_id": "0f0ce85cf343",
+      "mode": "off",
+      "source": null,
+      "fetched": 1816,
+      "new": 375,
+      "degraded": []
+    },
+    {
+      "run_id": "1093f8027556",
+      "mode": "off",
+      "source": null,
+      "fetched": 49,
+      "new": 49,
+      "degraded": []
     }
   ],
   "degraded": {
