@@ -167,6 +167,7 @@ cli.py (typer)
 | `pipeline/prescreen.py` | 零成本预筛（规则负面排除） | ★ 只决定是否跟踪；`r` 是淘汰集留存率 |
 | `pipeline/signals.py` | 采样状态机 + signals 写入 + 月度 JSONL | ★ 状态持久化；两套时钟不可混用；JSONL 是跨 DB 重建的幂等真源 |
 | `pipeline/relate.py` | 文献耦合（倒排）+ TF-IDF 相似（增量） | ★ 禁止全库两两比较；对称边只存一条 |
+| `pipeline/cost.py` | L8-F 成本汇总 | ★ 累计真源 = `data/reports/*.json`；db 只用于**分项**（缓存）；异常只标注不阻断 |
 | `pipeline/report.py` | `DailyReport` + Jinja 渲染 + 原子写 | 只读 DB；当天重跑无生成时间 diff |
 | `pipeline/site.py` | L5a 站点装配：报告 + 记分板 + DB 元数据 | ★ **不读 vault**；缺输入显式降级，不伪造 |
 | `store/hash.py` | 主键归一化 + `content_hash` | hash 只含 title/abstract/authors/venue |
@@ -260,6 +261,7 @@ vault 由本地 `export` 写入。任何"让 Actions 写 private vault"的设计
 | 单价、闸门、实测花费 | `docs/成本预算.md` |
 | 可迁移的原则 / 指南 | `docs/经验固化.md`（G/C/E/D/O 编号） |
 | 当前阶段怎么开工 | `docs/handoff/L*-开工.md`（阶段号最大的那份） |
+| 当前任务卡 / 具体交付口径 | `docs/任务卡/*.md` |
 | 按时间发生的事实 / 文档版本账 | `docs/开发日志.md` · `docs/文档维护日志.md` |
 
 ---

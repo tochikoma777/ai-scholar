@@ -929,6 +929,75 @@ def list_papers(
 
 
 @app.command()
+def cost(
+    days: int = typer.Option(7, "--days", "-d", help="环比 / 中位数窗口（天）"),
+    as_json: bool = typer.Option(False, "--json", help="机器可读输出（字段名稳定）"),
+) -> None:
+    """成本汇总（★ 零 LLM、零网络）：日 / 周 / 月 / 年累计 + 分项 + 异常标注。
+
+    ★ 真源是 `data/reports/*.json` 的 `cost_cny`（public、可审计）；
+      db 的 `llm_usage` 只用于**分项**，且是缓存（可能不完整）。
+    ★ 异常只标注不阻断（退出码 0）—— 阻断由预算闸门 `check_budget` 负责。
+    """
+    import json
+
+    from ai_scholar.pipeline.cost import USAGE_LABELS, build_summary, to_json
+    from ai_scholar.utils.timeutil import today_local
+
+    settings = load_settings()
+    day = today_local()
+    summary = build_summary(settings=settings, today=day, window_days=days)
+    if as_json:
+        console.print_json(json.dumps(to_json(summary, today=day), ensure_ascii=False))
+        raise typer.Exit(0)
+
+    table = Table(title=f"cost · {day.isoformat()}", title_justify="left")
+    table.add_column("窗口")
+    table.add_column("金额（元）", justify="right")
+    table.add_row("今日", f"{summary.today:.4f}")
+    table.add_row(f"近 {days} 日", f"{summary.week:.4f}")
+    table.add_row("本月", f"{summary.month:.4f}")
+    table.add_row("本年", f"{summary.year:.4f}")
+    table.add_row("累计（全部报告）", f"{summary.total:.4f}")
+    console.print(table)
+
+    if summary.median_7d:
+        delta = (
+            f"{summary.today_delta_pct:+.1f}%"
+            if summary.today_delta_pct is not None
+            else "—"
+        )
+        console.print(
+            f"近 {days} 日中位数 ¥{summary.median_7d:.4f} · 今日环比 {delta}"
+            f" · 覆盖 {summary.report_days} 天报告"
+        )
+    elif summary.median_7d == 0:
+        console.print(
+            f"近 {days} 日中位数 ¥0.0000（历史无花费）——环比不可用"
+            f" · 覆盖 {summary.report_days} 天报告"
+        )
+    else:
+        console.print(f"近 {days} 日无历史样本（覆盖 {summary.report_days} 天报告）——同比不可用")
+
+    if summary.by_purpose:
+        console.print("")
+        console.print("[bold]本月分项[/]（来源：db.llm_usage，缓存可能不完整）")
+        for purpose, amount in sorted(summary.by_purpose.items(), key=lambda kv: -kv[1]):
+            label = USAGE_LABELS.get(purpose, purpose)
+            console.print(f"  {label}：¥{amount:.4f}")
+    else:
+        console.print("本月分项：无数据（db 缓存缺失属正常，累计仍以 reports 为准）")
+
+    if summary.anomalies:
+        console.print("")
+        for reason in summary.anomalies:
+            console.print(f"[yellow]⚠️ 成本异常[/]：{reason}")
+    for note in summary.notes:
+        console.print(f"[dim]提示：{note}[/]")
+    raise typer.Exit(0)
+
+
+@app.command()
 def budget(
     input_tokens: int = typer.Option(..., "--input-tokens", help="输入 token 估算"),
     max_tokens: int = typer.Option(..., "--max-tokens", help="输出 token 上限（max_tokens）"),
