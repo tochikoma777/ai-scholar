@@ -18,7 +18,7 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 ---
 
-## ★ 当前阶段：L7（接线阶段）—— 已完成（8/8 接线，验收通过；tag 待打）
+## ★ 当前阶段：L7（接线阶段）—— 已完成（8/8 接线，验收通过，tag `l7a`）
 
 > **下一阶段：L8**（运营验证与使用闭环，范围待负责人定案）—— 开工入口
 > `docs/handoff/L8-开工.md`。★ L7 的 handoff 已归档，不要再从它开工。
