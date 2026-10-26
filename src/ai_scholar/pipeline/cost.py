@@ -190,6 +190,32 @@ def detect_anomalies(
     return reasons
 
 
+def live_anomalies(
+    *,
+    data_dir: Path,
+    today: date,
+    today_cost: float,
+    budget: BudgetSettings,
+    window_days: int = 7,
+) -> list[str]:
+    """报告生成时的**实时**异常判定（今日成本由调用方给，历史读 reports）。
+
+    ★ 为什么不直接用 `build_summary`：报告此刻还没写盘，今日的成本只存在于 db，
+      不能等 `reports/今天.json` 出现；同时要避免"今天的旧报告 + 今日实时值"重复计数。
+    """
+    costs, _bad = load_report_costs(data_dir)
+    month_start = today.replace(day=1)
+    month = round(
+        sum(v for d, v in costs.items() if month_start <= d < today) + float(today_cost), 4
+    )
+    probe = CostSummary(
+        today=round(float(today_cost), 4),
+        month=month,
+        median_7d=_median_excluding(costs, day=today, days=window_days),
+    )
+    return detect_anomalies(probe, budget=budget, today=today)
+
+
 def build_summary(
     *,
     settings: Settings,

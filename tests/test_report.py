@@ -298,3 +298,53 @@ def test_report_renders_predictions_without_merging_opinions(tmp_path: Path) -> 
     assert "观测 12 / 阈值 10" in md
     assert "🆕" in md
     assert "观点 1 条" in md
+
+
+# ── L8-F：成本异常只标注不阻断 ──────────────────────────────────────────
+def _report_with_cost(tmp_path: Path, cost: float, *, daily_limit: float) -> DailyReport:
+    from ai_scholar.budget import BudgetSettings
+
+    engine = _engine(tmp_path)
+    start, _end = day_window(TODAY)
+    with Session(engine) as session:
+        session.add(
+            LLMUsage(
+                run_id="r-cost",
+                model="deepseek-v4-pro",
+                tokens_in=100,
+                tokens_out=100,
+                purpose="deep_analysis",
+                created_at=start.isoformat(timespec="seconds"),
+                cost_cny=cost,
+                cache_hit=0,
+            )
+        )
+        session.commit()
+        return build_daily_report(
+            session,
+            today=TODAY,
+            watchlist=_watchlist(),
+            data_dir=tmp_path / "data",
+            budget=BudgetSettings(daily_limit_cny=daily_limit, monthly_limit_cny=1000.0),
+        )
+
+
+def test_cost_anomaly_is_flagged_in_report(tmp_path: Path) -> None:
+    """★ 超日限额一半 ⇒ 报告字段 + md 顶部都要有警示（但仍能正常生成）。"""
+    report = _report_with_cost(tmp_path, cost=0.8, daily_limit=1.0)
+    assert report.cost_anomalies, "应命中『今日 > 日限额一半』"
+    md = render_markdown(report)
+    assert "成本异常" in md
+    assert "日限额一半" in md
+
+
+def test_cost_anomaly_absent_when_normal(tmp_path: Path) -> None:
+    report = _report_with_cost(tmp_path, cost=0.05, daily_limit=10.0)
+    assert report.cost_anomalies == []
+    assert "成本异常" not in render_markdown(report)
+
+
+def test_cost_anomaly_not_in_degraded(tmp_path: Path) -> None:
+    """★ 成本异常与"源故障降级"是两回事，别混在一个字段里。"""
+    report = _report_with_cost(tmp_path, cost=0.8, daily_limit=1.0)
+    assert "cost" not in report.degraded

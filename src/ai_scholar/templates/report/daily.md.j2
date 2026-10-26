@@ -5,6 +5,13 @@ schema_version: {{ report.schema_version }}
 
 # {{ report.date }}
 
+{% if report.cost_anomalies -%}
+> ⚠️ **成本异常**（只标注，不阻断）：
+{% for reason in report.cost_anomalies -%}
+> - {{ reason }}
+{% endfor %}
+{%- endif %}
+
 ## 概览
 
 - 库内论文：{{ report.total_papers }} 篇

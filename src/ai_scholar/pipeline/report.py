@@ -23,7 +23,7 @@ from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel, Field
 from sqlmodel import Session, col, func, select
 
-from ai_scholar.config import match_watchlist
+from ai_scholar.config import BudgetSettings, match_watchlist
 from ai_scholar.models import WatchlistConfig
 from ai_scholar.store.models import LLMUsage, Paper, Run
 from ai_scholar.store.scoreboard import (
@@ -102,6 +102,8 @@ class DailyReport(BaseModel):
     degraded: dict[str, str] = Field(default_factory=dict)
     # L3 记账后填（成本预算 §6：报告尾部附成本说明）
     cost_cny: float | None = None
+    # ★ L8-F：成本异常（只标注不阻断）。空列表 = 正常
+    cost_anomalies: list[str] = Field(default_factory=list)
 
 
 @dataclass
@@ -167,6 +169,7 @@ def build_daily_report(
     top_n: int = WATCHLIST_TOP_N,
     data_dir: Path | None = None,
     timezone: str = DEFAULT_TZ,
+    budget: BudgetSettings | None = None,
 ) -> DailyReport:
     """聚合库内现状，生成当日报告快照（★ 只读，不写库）。"""
     day = today.isoformat()
@@ -237,9 +240,23 @@ def build_daily_report(
     ]
 
     verified, due, new, opinions = _prediction_briefs(data_dir, today=today)
+    cost = _daily_cost(session, today=today, timezone=timezone)
+    # ★ L8-F：成本异常只标注不阻断（阻断是 check_budget 的职责）
+    anomalies: list[str] = []
+    if data_dir is not None:
+        from ai_scholar.config import load_settings
+        from ai_scholar.pipeline.cost import live_anomalies
+
+        anomalies = live_anomalies(
+            data_dir=data_dir,
+            today=today,
+            today_cost=cost,
+            budget=budget or load_settings().budget,
+        )
     return DailyReport(
         date=day,
-        cost_cny=_daily_cost(session, today=today, timezone=timezone),
+        cost_cny=cost,
+        cost_anomalies=anomalies,
         total_papers=total,
         new_today=len(new_papers),
         watchlist_hits=hits,

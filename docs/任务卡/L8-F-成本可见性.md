@@ -1,7 +1,6 @@
 # 任务卡 · L8-F 成本可见性（`cost` 命令 + 异常判定）
 
-> 状态：**F-1～F-3 已完成**（2026-10-26）；F-4 文档同步中
-> 后续（另开任务卡）：报告内 cost guard、站点 7 日趋势、Actions `::warning::`
+> 状态：**全部完成**（2026-10-26）—— F-1～F-4 + guard / 站点趋势 / Actions 告警
 > 归属阶段：L8（运营验证与使用闭环）
 > 依据：`docs/成本预算.md` §9（实测回填）· `docs/经验固化.md` E9（口径要能对上产出）
 
@@ -22,7 +21,13 @@
 | F-3 | 真源口径写死在代码里 | 累计以 `data/reports/*.json` 的 `cost_cny` 为**真源**（public、可审计）；db `llm_usage` 只用于**分项**，并显式标注"缓存、可能不完整" |
 | F-4 | 文档同步 | `CODEBUDDY.md` 命令区 + 文档索引；`docs/成本预算.md` 增"怎么查"；维护日志登记 |
 
-**本期不做**（留给后续任务卡）：报告内 cost guard、站点趋势图、Actions `::warning::` 推送。
+**后续三件（同日已并入本期）**：
+
+| # | 做什么 | DoD |
+|---|---|---|
+| F-5 | 报告内 **cost guard** | `DailyReport.cost_anomalies` 非空 ⇒ md 顶部 ⚠️ 段；**不进 `degraded`**（与源故障分家） |
+| F-6 | 站点**成本趋势** | 内联 SVG 柱状（近 N 日）+ 本月累计 + 异常 badge；零外部请求、逐字节幂等 |
+| F-7 | Actions `::warning::` | daily 增 `Cost guard` 步骤：打印今日/本月/本年 + 对每条异常打 `::warning`；**退出码 0** |
 
 ## 3. 异常判定规则（必须可解释，不许拍脑袋）
 
@@ -52,6 +57,17 @@
   中位数排除今日 / 三条异常规则各自触发 / 缺 db 降级 / CLI `--json`。
 - 实测：`ai-scholar cost` ⇒ 今日 ¥0.8189、覆盖 2 天报告、分项 deep_analysis 0.3647 /
   enhance_link 0.1130 / enhance 0.0537 / grading 0.0296，并提示 `2026-10-24.json: cost_cny 为 null`。
+
+## 4.6 后续三件实现结果（2026-10-26）
+
+- `pipeline/cost.py: live_anomalies()`：报告时刻的实时判定（今日成本来自 db、历史来自 reports，
+  **不重复计今天的旧报告**）。
+- `report.py`：新增 `cost_anomalies` 字段；md 模板顶部 ⚠️ 段；与 `degraded` 严格分开。
+- `site.py` / `html.py`：`cost_series` / `cost_month` / `cost_anomalies` + 内联 SVG 柱状板块；
+  实测站点输出 `本月累计 ¥0.8189`、SVG 存在、无外部请求、重跑逐字节一致。
+- `daily.yml`：`Cost guard` 步骤（`cost --json | python` 打 `::warning::`），不阻断。
+- 测试：report 3 条（异常出现/正常不出现/不进 degraded）、site 3 条（趋势/异常/幂等）、
+  cost 1 条（不重复计数）；全量 **371 passed**。
 
 ## 5. 验收命令
 

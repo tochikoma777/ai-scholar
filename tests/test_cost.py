@@ -212,3 +212,22 @@ def test_cli_cost_json(tmp_path: Path, monkeypatch) -> None:
     assert set(payload) >= {"today", "week", "month", "year", "total", "anomaly", "by_purpose"}
     assert payload["total"] == 0.1
     assert "缓存" in payload["by_purpose_source"]
+
+
+# ── ⑥ 报告实时 guard（今日成本来自 db，不重复计今天的旧报告）─────────────
+def test_live_anomalies_uses_today_cost_without_double_count(tmp_path: Path) -> None:
+    from ai_scholar.pipeline.cost import live_anomalies
+
+    reports = tmp_path / "reports"
+    _write_report(reports, "2026-10-24", 0.10)
+    _write_report(reports, "2026-10-25", 0.10)
+    # ★ 今天已有一份旧报告（重跑场景）：不能被重复计入 month
+    _write_report(reports, "2026-10-26", 5.00)
+
+    budget = BudgetSettings(daily_limit_cny=1.0, monthly_limit_cny=1000.0)
+    reasons = live_anomalies(data_dir=tmp_path, today=TODAY, today_cost=0.9, budget=budget)
+    assert any("日限额一半" in r for r in reasons)
+    assert any("中位数" in r for r in reasons)
+
+    normal = live_anomalies(data_dir=tmp_path, today=TODAY, today_cost=0.05, budget=budget)
+    assert normal == [], normal

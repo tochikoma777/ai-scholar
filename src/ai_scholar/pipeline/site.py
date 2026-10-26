@@ -23,6 +23,7 @@ from ai_scholar.config import Settings, load_settings, load_watchlist, project_r
 from ai_scholar.export.html import (
     HtmlExporter,
     SiteCalibrationRow,
+    SiteCostPoint,
     SiteData,
     SitePaper,
     SitePrediction,
@@ -191,6 +192,14 @@ def build_site_data(
 
     new, verified, due = _prediction_items(latest)
     papers, db_total = _site_papers(settings, limit=limit)
+    # ★ L8-F：成本趋势（旧→新）+ 本月累计 + 异常（异常字段来自报告 JSON）
+    cost_series = [
+        SiteCostPoint(date=report.date, cost=float(report.cost_cny or 0.0))
+        for report in reversed(reports)
+    ]
+    cost_month = round(
+        sum(point.cost for point in cost_series if point.date[:7] == day.isoformat()[:7]), 4
+    )
     return SiteData(
         # ★ 无报告时用固定文案而不是 `today()`：否则同一份输入过一天就产生 diff
         date=latest.date if latest else "（无报告）",
@@ -198,6 +207,9 @@ def build_site_data(
         new_today=latest.new_today if latest else 0,
         hits_today=len(latest.watchlist_hits) if latest else 0,
         cost_cny=latest.cost_cny if latest and latest.cost_cny is not None else 0.0,
+        cost_series=cost_series,
+        cost_month=cost_month,
+        cost_anomalies=list(latest.cost_anomalies) if latest else [],
         open=summary.open,
         hit=summary.hit,
         miss=summary.miss,

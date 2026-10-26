@@ -167,7 +167,7 @@ cli.py (typer)
 | `pipeline/prescreen.py` | 零成本预筛（规则负面排除） | ★ 只决定是否跟踪；`r` 是淘汰集留存率 |
 | `pipeline/signals.py` | 采样状态机 + signals 写入 + 月度 JSONL | ★ 状态持久化；两套时钟不可混用；JSONL 是跨 DB 重建的幂等真源 |
 | `pipeline/relate.py` | 文献耦合（倒排）+ TF-IDF 相似（增量） | ★ 禁止全库两两比较；对称边只存一条 |
-| `pipeline/cost.py` | L8-F 成本汇总 | ★ 累计真源 = `data/reports/*.json`；db 只用于**分项**（缓存）；异常只标注不阻断 |
+| `pipeline/cost.py` | L8-F 成本汇总 | ★ 累计真源 = `data/reports/*.json`；db 只用于**分项**（缓存）；异常只标注不阻断；`live_anomalies()` 供报告实时判定 |
 | `pipeline/report.py` | `DailyReport` + Jinja 渲染 + 原子写 | 只读 DB；当天重跑无生成时间 diff |
 | `pipeline/site.py` | L5a 站点装配：报告 + 记分板 + DB 元数据 | ★ **不读 vault**；缺输入显式降级，不伪造 |
 | `store/hash.py` | 主键归一化 + `content_hash` | hash 只含 title/abstract/authors/venue |
@@ -198,6 +198,15 @@ cli.py (typer)
 - watchlist 合并：`watchlist.local.yaml` 的**同名组整组覆盖** `watchlist.yaml`，不做逐字段合并。
 - LLM 凭据只走环境变量：`AI_SCHOLAR_LLM__BASE_URL` / `AI_SCHOLAR_LLM__API_KEY`（前缀 + `__` 嵌套）。
   未配 key ⇒ 自动降级 `off`，**不得报错退出**。
+
+---
+
+## ★ 成本可见性（L8-F，2026-10-26）
+
+- 查账：`ai-scholar cost [--days N] [--json]`（零 LLM）；累计真源 = `data/reports/*.json`。
+- 异常三类消费者：报告 md 顶部 ⚠️ / 报告 json 的 `cost_anomalies` / 站点「成本」板块 /
+  Actions `::warning::`（daily 的 `Cost guard` 步骤）。**全部只标注，退出码仍 0。**
+- ★ 改"每天必跑"的 LLM 参数前，先算 `日 × 365`：日差 ¥0.1 = 年差 ≈¥36。
 
 ---
 

@@ -96,6 +96,20 @@ jobs:
       - name: Report
         run: uv run ai-scholar report
 
+      # ★ L8-F：成本 guard —— 只**标注**不阻断（退出码仍 0）。
+      #   GitHub 会把 `::warning::` 显示在 run 上，并在 Actions 页面标黄；
+      #   判定规则与 `ai-scholar cost` 完全一致（同一份代码，不重复实现）。
+      - name: Cost guard
+        run: |
+          uv run ai-scholar cost --json > /tmp/cost.json
+          python - <<'PY'
+          import json, pathlib
+          data = json.loads(pathlib.Path("/tmp/cost.json").read_text(encoding="utf-8"))
+          print(f"今日 ¥{data['today']:.4f} · 本月 ¥{data['month']:.4f} · 本年 ¥{data['year']:.4f}")
+          for reason in data["anomalies"]:
+              print(f"::warning title=成本异常::{reason}")
+          PY
+
       # ★ 持久化真源（§8.3 定案 C′）：first_seen / signals / 报告 commit 回 public；
       #   db 被 .gitignore 排除，不 commit。
       #   并发冲突：先 commit 再 fetch + rebase（★ 不能用 reset --soft FETCH_HEAD ——

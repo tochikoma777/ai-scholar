@@ -948,7 +948,8 @@ def cost(
     day = today_local()
     summary = build_summary(settings=settings, today=day, window_days=days)
     if as_json:
-        console.print_json(json.dumps(to_json(summary, today=day), ensure_ascii=False))
+        # ★ 纯 JSON（不加 rich 装饰/ANSI）：CI 里要被 `python -c` 直接解析
+        typer.echo(json.dumps(to_json(summary, today=day), ensure_ascii=False))
         raise typer.Exit(0)
 
     table = Table(title=f"cost · {day.isoformat()}", title_justify="left")

@@ -55,6 +55,24 @@ def _settings(tmp_path: Path, *, min_sample_per_tier: int = 1) -> Settings:
     )
 
 
+def _seed_reports(
+    tmp_path: Path,
+    days: list[tuple[date, float]],
+    *,
+    anomalies: list[str] | None = None,
+) -> None:
+    """写若干天的报告 JSON（站点只读报告，异常字段由 report 侧算好再落盘）。"""
+    for day, cost in days:
+        write_report(
+            DailyReport(
+                date=day.isoformat(),
+                cost_cny=cost,
+                cost_anomalies=list(anomalies or []),
+            ),
+            tmp_path / "data" / "reports",
+        )
+
+
 def make_paper(
     pid: str,
     *,
@@ -415,3 +433,53 @@ def test_single_paper_render_is_a_complete_document() -> None:
     page = HtmlExporter().render(make_paper("arXiv:2610.00001"), ExportContext())
     assert page.startswith("<!doctype html>")
     assert "A Paper About Agents" in page
+
+
+# ── L8-F：成本板块（趋势 + 本月累计 + 异常）─────────────────────────────
+def test_site_has_cost_section_with_trend(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    eng = engine_for(settings.db_path())
+    SQLModel.metadata.create_all(eng)
+    _seed_reports(tmp_path, [(date(2026, 10, 24), 0.12), (date(2026, 10, 25), 0.30)])
+
+    with Session(eng) as session:
+        session.add(make_paper("arXiv:1"))
+        session.commit()
+
+    out = tmp_path / "site"
+    run_site(out=out, settings=settings, today=TODAY)
+    html = (out / "index.html").read_text(encoding="utf-8")
+
+    assert '<section id="cost">' in html
+    assert "<svg" in html and "每日 LLM 成本" in html
+    assert "本月累计" in html and "0.42" in html  # 0.12 + 0.30
+    assert "2026-10-24" in html and "2026-10-25" in html
+
+
+def test_site_shows_cost_anomaly(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    eng = engine_for(settings.db_path())
+    SQLModel.metadata.create_all(eng)
+    _seed_reports(
+        tmp_path,
+        [(date(2026, 10, 25), 0.9)],
+        anomalies=["今日 ¥0.9000 > 日限额一半 ¥1.00"],
+    )
+
+    out = tmp_path / "site"
+    run_site(out=out, settings=settings, today=TODAY)
+    html = (out / "index.html").read_text(encoding="utf-8")
+    assert "成本异常" in html
+
+
+def test_site_cost_section_is_idempotent(tmp_path: Path) -> None:
+    """★ 同一份 reports ⇒ 同一段 HTML（无时间戳、无随机序）。"""
+    settings = _settings(tmp_path)
+    eng = engine_for(settings.db_path())
+    SQLModel.metadata.create_all(eng)
+    _seed_reports(tmp_path, [(date(2026, 10, 24), 0.1), (date(2026, 10, 25), 0.2)])
+    out = tmp_path / "site"
+    run_site(out=out, settings=settings, today=TODAY)
+    first = (out / "index.html").read_bytes()
+    run_site(out=out, settings=settings, today=TODAY)
+    assert (out / "index.html").read_bytes() == first

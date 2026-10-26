@@ -73,6 +73,8 @@ th { color: var(--muted); font-weight: 600; }
         cursor: pointer; }
 .want:hover { border-color: var(--accent); }
 .want-row code { font-size: 12px; color: var(--muted); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+.badge.bad { color: var(--bad); border: 1px solid var(--bad); }
 .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 10px; margin: 14px 0 8px; align-items: end; }
 .controls label { display: flex; flex-direction: column; gap: 4px;
@@ -230,6 +232,14 @@ class SiteTrendRow:
     verified: int
 
 
+@dataclass(frozen=True)
+class SiteCostPoint:
+    """成本趋势的一个点（日期 + 当日实际花费）。"""
+
+    date: str
+    cost: float
+
+
 @dataclass
 class SiteData:
     """一整页所需的数据（由 `pipeline/site.py` 组装，导出器只负责渲染）。"""
@@ -240,6 +250,10 @@ class SiteData:
     hits_today: int = 0
     # ★ L6-2：当日实际 LLM 成本（off 档为 0.0，不是 None）
     cost_cny: float = 0.0
+    # ★ L8-F：成本趋势（旧→新）、本月累计、异常标注（来自报告 JSON 的 cost_anomalies）
+    cost_series: list[SiteCostPoint] = field(default_factory=list)
+    cost_month: float = 0.0
+    cost_anomalies: list[str] = field(default_factory=list)
     open: int = 0
     hit: int = 0
     miss: int = 0
@@ -325,6 +339,7 @@ class HtmlExporter(Exporter):
                 "<main>",
                 self._overview(data),
                 self._predictions(data),
+                self._cost(data),
                 self._scoreboard(data),
                 self._calibration(data),
                 self._papers(data),
@@ -380,6 +395,58 @@ class HtmlExporter(Exporter):
         return (
             '<section id="today">\n<h2>今日概览</h2>\n<div class="grid">\n'
             f"{cards}\n</div>\n</section>"
+        )
+
+    @staticmethod
+    def _cost(data: SiteData) -> str:
+        """成本板块：近 N 日柱状（内联 SVG）+ 本月累计 + 异常标注。
+
+        ★ 零外部请求、无生成时间：同一份 reports ⇒ 同一段 HTML（幂等）。
+        ★ 没数据时显示"无数据"，不画一张空图冒充趋势。
+        """
+        head = '<section id="cost">\n<h2>成本</h2>\n'
+        if not data.cost_series:
+            return head + '<p class="meta">无报告数据（先跑 `ai-scholar report`）。</p>\n</section>'
+
+        points = data.cost_series
+        peak = max((p.cost for p in points), default=0.0)
+        scale = peak if peak > 0 else 1.0
+        width, height, pad = 640, 120, 8
+        slot = (width - pad * 2) / max(len(points), 1)
+        bar_w = max(slot - 6, 4)
+        bars: list[str] = []
+        for index, point in enumerate(points):
+            bar_h = 0.0 if scale == 0 else (point.cost / scale) * (height - 34)
+            x = pad + index * slot + (slot - bar_w) / 2
+            y = height - 18 - bar_h
+            bars.append(
+                f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_w:.1f}" '
+                f'height="{max(bar_h, 1.0):.1f}" rx="2" fill="var(--accent)" '
+                f'opacity="{0.45 + 0.55 * (point.cost / scale if scale else 0):.2f}">'
+                f"<title>{_e(point.date)} ¥{point.cost:.4f}</title></rect>"
+            )
+        first, last = points[0].date, points[-1].date
+        labels = (
+            f'<text x="{pad}" y="{height - 4}" font-size="10" fill="var(--muted)">'
+            f"{_e(first)}</text>"
+            f'<text x="{width - pad}" y="{height - 4}" font-size="10" fill="var(--muted)" '
+            f'text-anchor="end">{_e(last)}</text>'
+        )
+        svg = (
+            f'<svg viewBox="0 0 {width} {height}" width="100%" height="{height}" '
+            f'role="img" aria-label="每日 LLM 成本">{"".join(bars)}{labels}</svg>'
+        )
+        anomaly = ""
+        if data.cost_anomalies:
+            items = "；".join(_e(reason) for reason in data.cost_anomalies)
+            anomaly = f'\n<p class="badge bad">⚠️ 成本异常：{items}</p>'
+        return (
+            head
+            + f'<p class="meta">近 {len(points)} 日每日成本 · 峰值 ¥{peak:.4f} · '
+            f'本月累计 <b>¥{data.cost_month:.4f}</b></p>\n'
+            + svg
+            + anomaly
+            + "\n</section>"
         )
 
     @staticmethod
