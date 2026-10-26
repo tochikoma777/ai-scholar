@@ -19,6 +19,8 @@ HANDOFF_DIR = REPO / "docs" / "handoff"
 
 _CURRENT = re.compile(r"^##\s*★?\s*当前阶段：(.+?)——\s*(.+)$", re.MULTILINE)
 _NEXT = re.compile(r"下一阶段.*?：\s*\*{0,2}(L\d+)\*{0,2}", re.MULTILINE)
+# ★ `path.py:NNN symbol` —— CODEBUDDY 里的行号引用必须有机器校验（2026-10-25 已漂 2 行）
+_ANCHOR = re.compile(r"`([A-Za-z0-9_./]+\.py):(\d+)\s+([A-Za-z_][A-Za-z0-9_]*)`")
 
 
 def next_stage() -> str | None:
@@ -42,6 +44,40 @@ def handoff_errors(handoff_dir: Path, stage: str) -> list[str]:
     return []
 
 
+def anchor_errors(text: str) -> list[str]:
+    """CODEBUDDY 里 `path.py:NNN symbol` 形式的行号引用是否仍然对得上。
+
+    ★ 为什么需要：文档写「关键路径在某某行」，改代码后行号会漂 —— 2026-10-25 实测漂了 2 行
+    （`collect.py:259` 实际是 261）。人工核对不可靠，交给机器。
+    """
+    refs = _ANCHOR.findall(text)
+    if not refs:
+        return ["CODEBUDDY.md 里没有任何 `path.py:行号 符号` 引用 —— 锚定器可能已失效"]
+    errors: list[str] = []
+    for path_str, lineno, symbol in refs:
+        rel = Path(path_str)
+        if path_str.startswith(("src/", "tests/")):
+            target = REPO / rel
+        else:
+            target = REPO / "src" / "ai_scholar" / rel
+        if not target.exists():
+            errors.append(f"{path_str}:{lineno} 文件不存在")
+            continue
+        lines = target.read_text(encoding="utf-8").splitlines()
+        n = int(lineno)
+        if n < 1 or n > len(lines):
+            errors.append(f"{path_str}:{lineno} 超出文件行数（{len(lines)} 行）")
+            continue
+        # 容差：装饰器会让 `def` 落在行号之后几行
+        window = lines[n - 1 : n + 4]
+        pattern = re.compile(
+            rf"^\s*(?:async\s+)?def\s+{re.escape(symbol)}\b|^\s*{re.escape(symbol)}\s*[:=]"
+        )
+        if not any(pattern.search(line) for line in window):
+            errors.append(f"{path_str}:{lineno} 附近找不到 `{symbol}`（行号已漂移）")
+    return errors
+
+
 def test_next_stage_handoff_exists() -> None:
     stage = next_stage()
     if stage is None:
@@ -58,6 +94,21 @@ def test_ledger_mentions_next_handoff() -> None:
     assert f"{stage}-开工.md" in ledger, f"文档维护日志未登记 {stage}-开工.md"
 
 
+def test_codebuddy_line_anchors() -> None:
+    """CODEBUDDY 里的行号引用必须仍然指到它说的那个函数。"""
+    errors = anchor_errors(CODEBUDDY.read_text(encoding="utf-8"))
+    assert not errors, "；".join(errors)
+
+
 def test_checker_detects_missing_handoff(tmp_path: Path) -> None:
     """★ 反向验证：缺文件必须能报错（否则门禁是假的）。"""
     assert handoff_errors(tmp_path, "L9")
+
+
+def test_anchor_checker_detects_drift() -> None:
+    """★ 反向验证：行号漂了必须报错、对的必须放行（否则锚定器是假的）。"""
+    target = REPO / "src" / "ai_scholar" / "pipeline" / "collect.py"
+    lines = target.read_text(encoding="utf-8").splitlines()
+    good = next(i for i, line in enumerate(lines, 1) if line.startswith("async def run_collect"))
+    assert anchor_errors(f"**collect** — `pipeline/collect.py:{good - 5} run_collect`")
+    assert not anchor_errors(f"**collect** — `pipeline/collect.py:{good} run_collect`")

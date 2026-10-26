@@ -86,6 +86,9 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "-q"
 filterwarnings = ["ignore::DeprecationWarning"]
+# ★ `live` = 需要**真实网络**的冒烟（其余一律 respx 拦截）。
+#   离线跑全量：uv run pytest -m "not live"
+markers = ["live: 需要真实网络的冒烟测试（拿不到真实响应就 skip，绝不伪造）"]
 
 [tool.coverage.run]
 source = ["src/ai_scholar"]

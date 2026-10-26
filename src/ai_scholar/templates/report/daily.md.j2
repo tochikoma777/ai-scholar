@@ -61,6 +61,19 @@ schema_version: {{ report.schema_version }}
 {%- endif %}
 - 观点 {{ report.opinions_total }} 条（★ 不可证伪，不进统计）
 
+## ★ 想读（点读入口）
+
+> 看中哪篇就复制它那行命令到本地跑 —— 写进 public 真源 `data/wanted.jsonl`，
+> 下次 `export` 自动把它导出成 vault 笔记（幂等，重复标记无副作用）。
+
+{% if report.watchlist_hits -%}
+{% for hit in report.watchlist_hits[:5] %}
+- `{{ hit.want_cmd }}` — {{ hit.title }}
+{% endfor -%}
+{%- else -%}
+- 今日无候选（想看历史条目：`uv run ai-scholar list`）
+{%- endif %}
+
 ## 运行状态
 
 {% if report.runs -%}

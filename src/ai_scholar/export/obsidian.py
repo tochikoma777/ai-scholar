@@ -18,10 +18,11 @@ import json
 import re
 from datetime import date, datetime
 from pathlib import Path
+from typing import Any
 
 import yaml
 
-from ai_scholar.export.base import ExportContext, ExportDoc, Exporter, LinkRef
+from ai_scholar.export.base import ExportContext, ExportDoc, Exporter, LinkEdge, LinkRef
 from ai_scholar.store.models import LINK_TYPE_BIBCOUPLING, LINK_TYPE_SIMILARITY, Paper
 from ai_scholar.utils.timeutil import DEFAULT_TZ, format_local, today_local
 
@@ -38,6 +39,8 @@ MULTI_DASH = re.compile(r"-+")
 DEFAULT_MAX_LEN = 80
 DEFAULT_LINKS_MAX = 10  # 「关联文献」每类最多显示条数
 SCHEMA_VERSION = 1
+# ★ `links.json` 独立版本：L7-7 把空壳换成有向边（src/dst），结构变了 ⇒ 2
+LINKS_SCHEMA_VERSION = 2
 
 # frontmatter 中**由用户维护**的字段（生成时永不覆盖）
 USER_KEYS = frozenset({"status"})
@@ -89,6 +92,18 @@ def dump_frontmatter(fields: dict[str, object]) -> str:
         elif isinstance(value, list):
             items = ", ".join(json.dumps(str(v), ensure_ascii=False) for v in value)
             lines.append(f"{key}: [{items}]")
+        elif isinstance(value, dict):
+            # ★ 分项分（`score`）必须**分列多行**，绝不合成一个数字（红线 11）
+            lines.append(f"{key}:")
+            for sub_key, sub_value in value.items():
+                if sub_value is None:
+                    lines.append(f"  {sub_key}: null")
+                elif isinstance(sub_value, bool):
+                    lines.append(f"  {sub_key}: {'true' if sub_value else 'false'}")
+                elif isinstance(sub_value, (int, float)):
+                    lines.append(f"  {sub_key}: {sub_value}")
+                else:
+                    lines.append(f"  {sub_key}: {json.dumps(str(sub_value), ensure_ascii=False)}")
         elif isinstance(value, (int, float)) or key in date_keys and value:
             lines.append(f"{key}: {value}")
         else:
@@ -178,6 +193,17 @@ def render_link_section(
     return lines
 
 
+def _score_fields(score: Any | None) -> dict[str, float | None] | None:
+    """把 `ScoreBreakdown` 转成分项字典（缺失分量显式 `null`，**不补 0**）。"""
+    if score is None:
+        return None
+    return {
+        "heat": getattr(score, "heat", None),
+        "cross_source": getattr(score, "cross_source", None),
+        "topic": getattr(score, "topic", None),
+    }
+
+
 class ObsidianExporter(Exporter):
     """把 db 里的论文物化成 Obsidian 笔记。"""
 
@@ -264,7 +290,8 @@ class ObsidianExporter(Exporter):
             "first_seen": (paper.first_seen_at or "")[:10] or None,
             "source": sources,
             "primary_source": paper.primary_source,
-            "score": None,  # ★ 排序用客观信号分，属 L4（本阶段留 null）
+            # ★ L7-8：客观信号分 **分项落**（热度 / 跨源 / 主题），★ 永不合成总分（红线 11）
+            "score": _score_fields(context.score),
             "tier": paper.tier,  # ★ L3b-1 定级：1/2/3；未定级 null
             "tags": tags,
             "status": "待读",  # ★ 用户区字段，生成时不覆盖（读-合并-写回保住）
@@ -406,27 +433,32 @@ class ObsidianExporter(Exporter):
             f"{dump_frontmatter(fields)}\n{BEGIN_MARKER}\n" + "\n".join(lines) + f"{END_MARKER}\n"
         )
 
-    def render_links_json(self, links: list[LinkRef]) -> str:
-        """`90-元数据/links.json` 的内容（本阶段为空结构，L1 填数据）。"""
+    def render_links_json(self, edges: list[LinkEdge]) -> str:
+        """`90-元数据/links.json`（★ L7-7：填**真实关联**，不再是空壳）。
+
+        ★ 幂等：排序必须确定（src → dst → type），否则每次导出顺序不同 ⇒ 假 diff。
+        ★ 不读 vault、不含私有内容。
+        """
+        ordered = sorted(edges, key=lambda e: (e.src_id, e.dst_id, e.link_type))
         payload = {
-            "schema_version": SCHEMA_VERSION,
+            "schema_version": LINKS_SCHEMA_VERSION,
+            "count": len(ordered),
             "links": [
                 {
-                    "src_id": r.paper_id,
-                    "link_type": r.link_type,
-                    "title": r.title,
-                    "url": r.url,
-                    "weight": r.weight,
-                    "evidence": r.evidence,
+                    "src_id": e.src_id,
+                    "dst_id": e.dst_id,
+                    "link_type": e.link_type,
+                    "weight": e.weight,
+                    "evidence": e.evidence,
                 }
-                for r in links
+                for e in ordered
             ],
         }
         return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
 
-    def write_links_json(self, context: ExportContext, links: list[LinkRef]) -> Path:
+    def write_links_json(self, context: ExportContext, edges: list[LinkEdge]) -> Path:
         doc = ExportDoc(
             path=Path(context.vault_dir) / "90-元数据" / "links.json",
-            content=self.render_links_json(links),
+            content=self.render_links_json(edges),
         )
         return self.write(doc)

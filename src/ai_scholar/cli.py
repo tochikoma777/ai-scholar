@@ -19,7 +19,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 from sqlalchemy import create_engine
-from sqlmodel import Session, col, select
+from sqlmodel import Session, SQLModel, col, select
 
 from ai_scholar import __version__
 from ai_scholar.config import (
@@ -278,11 +278,16 @@ def collect(
     ),
     source: str | None = typer.Option(None, "--source", "-s", help="只采一个源：arxiv | hf_daily"),
     dry_run: bool = typer.Option(False, "--dry-run", help="只统计，不写库 / 不写 JSONL"),
+    classics: bool = typer.Option(
+        False, "--classics", help="★ 只采经典种子清单（config/classics.yaml，arXiv id_list 直采）"
+    ),
 ) -> None:
     """采集：arXiv + HF Daily Papers → 三级去重 → 入库 + `first_seen.jsonl`。
 
     ★ 单源失败只 warning（写进 `runs.degraded_json`），**退出码仍为 0**。
     ★ 默认回看窗口取 `sources.arxiv.lookback_days`（索引滞后 3–7 天，只采当天会漏采）。
+    ★ `--classics`：按 `config/classics.yaml` 的经典清单直采（经典文献不在回看窗口里，
+      必须有独立获取路径）；清单改动后用 `scripts/probe_classics.py` 实测复核。
     """
     from ai_scholar.pipeline.collect import run_collect
 
@@ -292,7 +297,9 @@ def collect(
 
     settings = load_settings()
     effective_days = days if days is not None else settings.lookback_days()
-    report = asyncio.run(run_collect(days=effective_days, source=source, dry_run=dry_run))
+    report = asyncio.run(
+        run_collect(days=effective_days, source=source, dry_run=dry_run, classics=classics)
+    )
 
     table = Table(
         title=f"collect · run {report.run_id}" + ("（dry-run）" if dry_run else ""),
@@ -529,16 +536,35 @@ def analyze(
     ),
     force: bool = typer.Option(False, "--force", help="忽略 deep_content_hash，重做全部"),
     dry_run: bool = typer.Option(False, "--dry-run", help="只统计，不写库 / 不调 LLM"),
+    check: bool = typer.Option(
+        False,
+        "--check",
+        help="★ 只核对 public 真源 data/analyses/ 是否齐备（零 LLM；缺/过期 ⇒ 退出码 1）",
+    ),
 ) -> None:
     """深度分析（strong）：三句半 + 六段 + 背景透镜。
 
     ★ 通道 A（意图触发，不看 Tier）+ B（Tier1 补读）；周配额 5 篇。
+    ★ D 排序：通道 A 的「当日 Top N」= 热度 / 经典**交替**（§5.5 v1.11）。
+    ★ 完成后置 `selected=1`（export 默认只导 selected）+ 产物写 public 真源
+      `data/analyses/{id}.md`（db 只是可丢弃缓存）。
     ★ 正文临时抓取、抓完即弃；off 档零调用；失败只 warning，退出码仍 0。
     """
     from ai_scholar.pipeline.deep_analysis import run_deep_analysis
 
     id_list = [s.strip() for s in ids.split(",") if s.strip()] if ids else None
-    report = asyncio.run(run_deep_analysis(ids=id_list, limit=limit, force=force, dry_run=dry_run))
+    report = asyncio.run(
+        run_deep_analysis(ids=id_list, limit=limit, force=force, dry_run=dry_run, check=check)
+    )
+
+    if check:
+        if report.analyses_missing:
+            console.print(f"[red]缺失/过期 {len(report.analyses_missing)} 篇[/]：")
+            for pid in report.analyses_missing[:20]:
+                console.print(f"  - {pid}")
+            raise typer.Exit(1)
+        console.print(f"[green]OK[/] data/analyses/ 齐备（本次候选 {report.requested} 篇）")
+        raise typer.Exit(0)
 
     table = Table(title=f"analyze · run {report.run_id}（{report.mode}）", title_justify="left")
     table.add_column("项")
@@ -548,6 +574,7 @@ def analyze(
     table.add_row("预算/配额拦截", str(report.blocked))
     table.add_row("已分析跳过", str(report.skipped))
     table.add_row("全文命中", str(report.fulltext_hits))
+    table.add_row("产物写入", f"{report.analyses_written}（data/analyses/）")
     table.add_row("LLM 调用", str(report.llm_calls))
     table.add_row("成本（元）", f"{report.cost_cny:.4f}")
     console.print(table)
@@ -609,6 +636,43 @@ def mark(
         title = paper.title[:60]
         session.commit()
     console.print(f"[green]✓[/] {'取消收藏' if unmark else '已收藏'}：{paper_id} — {title}")
+    raise typer.Exit(0)
+
+
+@app.command()
+def want(
+    paper_id: str,
+    source: str = typer.Option("cli", "--source", help="来源标记：report | site | cli（可审计）"),
+) -> None:
+    """★ L7-6 点读入口：把一篇标记「想读」⇒ 写 public 真源 + 置 `selected=1`。
+
+    ★ 存在的理由：静态站点没有后端，public 仓库也不能回写 db ——
+      只能把意愿写进 `data/wanted.jsonl`（append-only 真源），由 `export` 消费。
+    ★ 幂等：重复标记同一篇不会重复写行；论文不在库内时只入队（不报错，采集后再生效）。
+    """
+    from ai_scholar.store.models import Paper
+    from ai_scholar.store.wanted import WantedEntry, append_wanted, wanted_path
+    from ai_scholar.utils.timeutil import today_local
+
+    settings = load_settings()
+    today = today_local()
+    entry = WantedEntry(paper_id=paper_id, created_at=today.isoformat(), source=source)
+    path = wanted_path(settings.data_dir())
+    added = append_wanted(path, entry)
+
+    engine = create_engine(f"sqlite:///{settings.db_path()}", echo=False)
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        paper = session.get(Paper, paper_id)
+        if paper is None:
+            console.print(f"[yellow]已入队[/]（库内暂无此条目，采集后生效）：{paper_id} → {path}")
+            raise typer.Exit(0)
+        paper.selected = True
+        title = paper.title[:60]
+        session.commit()
+
+    state = "已写入" if added else "已在队列（幂等跳过）"
+    console.print(f"[green]✓[/] 想读：{paper_id} — {title}（{state}）")
     raise typer.Exit(0)
 
 

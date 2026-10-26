@@ -25,6 +25,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ai_scholar.models import (
     Availability,
+    ClassicsConfig,
     TimeSemantics,
     WatchlistConfig,
     WatchlistGroup,
@@ -310,6 +311,11 @@ class DeepAnalysisSettings(BaseModel):
     max_fulltext_chars: int = 100000
     # ★ 正文下限：短于此视为元数据/占位页（如 ar5iv 只给 ~5k 的 abs 页），丢弃不用
     min_fulltext_chars: int = 2000
+    # ★ D 排序（v1.11 定案：热度 / 经典**交替** + 已读去重）
+    #   热度侧 = `hf_score` 非空且 first_seen 在最近 N 天内的新增（缺失不当作 0）
+    trending_lookback_days: int = 1
+    #   经典侧来源之一：库内**引用榜** Top N（被本库论文引用最多的工作，零成本）
+    citation_leaders: int = 10
     lens: LensSettings = Field(default_factory=LensSettings)
 
 
@@ -504,6 +510,22 @@ def load_watchlist(config_dir: Path | None = None) -> WatchlistConfig:
         else base.default_threshold,
         groups=_merge_groups(base.groups, override.groups),
     )
+
+
+def classics_path(config_dir: Path | None = None) -> Path:
+    return (config_dir or default_config_dir()) / "classics.yaml"
+
+
+def load_classics(config_dir: Path | None = None) -> ClassicsConfig:
+    """加载经典种子清单 `config/classics.yaml`。
+
+    ★ 清单缺失不是错误（返回空配置）：它是可选项，但**存在就必须被消费**
+    —— `collect --classics` 与深度分析经典侧都读它（经验固化 E1：不留死配置）。
+    """
+    data = load_yaml(classics_path(config_dir))
+    if not data:
+        return ClassicsConfig()
+    return ClassicsConfig(**data)
 
 
 def match_watchlist(

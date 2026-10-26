@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 
 from ai_scholar.export.base import ExportContext, ExportDoc, Exporter
 from ai_scholar.store.models import Paper
+from ai_scholar.store.wanted import want_command
 from ai_scholar.utils.errors import ConfigError
 
 # ★ 首版体积上限（负责人定 ≤ 5 MB）：只内联摘要级文本，不内联论文正文/abstract
@@ -66,6 +67,12 @@ th { color: var(--muted); font-weight: 600; }
 .scores { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; font-size: 13px; }
 .scores span { color: var(--muted); }
 .scores b { color: var(--fg); font-variant-numeric: tabular-nums; }
+.want-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.want { font: inherit; font-size: 12px; padding: 3px 10px; border-radius: 999px;
+        border: 1px solid var(--line); background: var(--card); color: var(--accent);
+        cursor: pointer; }
+.want:hover { border-color: var(--accent); }
+.want-row code { font-size: 12px; color: var(--muted); }
 .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 10px; margin: 14px 0 8px; align-items: end; }
 .controls label { display: flex; flex-direction: column; gap: 4px;
@@ -155,6 +162,28 @@ _JS = """
     q.focus();
   });
   apply();
+})();
+
+// ★ L7-6「点读入口」：复制「标记想读」命令到剪贴板（纯本地，零请求）。
+//   无 JS 时按钮旁的 <code> 里就是同一条命令，手动复制即可。
+(function () {
+  document.addEventListener("click", function (ev) {
+    var btn = ev.target && ev.target.closest ? ev.target.closest(".want") : null;
+    if (!btn) return;
+    var cmd = btn.getAttribute("data-cmd") || "";
+    var done = function (ok) {
+      var old = btn.getAttribute("data-label") || btn.textContent;
+      btn.setAttribute("data-label", old);
+      btn.textContent = ok ? "已复制 ✓" : "请手动复制";
+      setTimeout(function () { btn.textContent = old; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(cmd).then(function () { done(true); },
+                                             function () { done(false); });
+    } else {
+      done(false);
+    }
+  });
 })();
 """.strip()
 
@@ -465,6 +494,14 @@ class HtmlExporter(Exporter):
             f"<span>热度 <b>{_e(_fmt(item.heat))}</b></span>"
             f"<span>跨源 <b>{item.cross_source:.2f}</b></span>"
             f"<span>主题 <b>{item.topic:.2f}</b></span>"
+            "</div>",
+        ]
+        # ★ L7-6：想读入口 —— 命令写在 data-cmd 与 <code> 里（无 JS 也能手动复制）
+        cmd = want_command(item.paper_id)
+        lines += [
+            '<div class="want-row">'
+            f'<button type="button" class="want" data-cmd="{_e(cmd)}">复制想读命令</button>'
+            f"<code>{_e(cmd)}</code>"
             "</div>",
             "</article>",
         ]

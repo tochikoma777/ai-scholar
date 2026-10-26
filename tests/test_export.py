@@ -756,3 +756,117 @@ def test_daily_note_idempotent(tmp_path: Path) -> None:
 
     run_export(settings=_settings(tmp_path), db_path=db_path, out=vault, today=date(2026, 10, 20))
     assert note.read_text(encoding="utf-8") == first
+
+
+# ── L7-7 / L7-8：links.json 真关联 + frontmatter 分项分 ─────────────────
+def _seed_with_links(db_path: Path) -> None:
+    """三篇论文 + 引用边（1→2）+ 相似边（1↔2）。"""
+    from ai_scholar.store.models import LINK_TYPE_REFERENCES, PaperLink
+
+    _seed_db(
+        db_path,
+        [
+            make_paper("arXiv:1", "Paper One"),
+            make_paper("arXiv:2", "Paper Two"),
+            make_paper("arXiv:3", "Paper Three"),
+        ],
+    )
+    engine = engine_for(db_path)
+    with Session(engine) as session:
+        session.add(
+            PaperLink(
+                src_id="arXiv:1",
+                dst_id="arXiv:2",
+                link_type=LINK_TYPE_REFERENCES,
+                evidence="s2_references",
+            )
+        )
+        session.add(
+            PaperLink(
+                src_id="arXiv:1",
+                dst_id="arXiv:2",
+                link_type=LINK_TYPE_SIMILARITY,
+                weight=0.42,
+                evidence="相似 0.42",
+            )
+        )
+        session.commit()
+
+
+def test_links_json_has_real_edges(tmp_path: Path) -> None:
+    """★ L7-7：links.json 不再是空壳 —— 有向边 + 方向正确。"""
+    db_path = tmp_path / "data" / "t.db"
+    _seed_with_links(db_path)
+    settings = _settings(tmp_path)
+    vault = tmp_path / "vault"
+
+    run_export(settings=settings, db_path=db_path, out=vault)
+    payload = json.loads((vault / "90-元数据" / "links.json").read_text(encoding="utf-8"))
+
+    assert payload["count"] >= 1, "links.json 仍是空壳"
+    edges = {(e["src_id"], e["dst_id"], e["link_type"]) for e in payload["links"]}
+    assert ("arXiv:1", "arXiv:2", "references") in edges, "出边方向应为 src→dst"
+    assert ("arXiv:1", "arXiv:2", "similarity") in edges
+    # ★ 对称边只发一次（库里只存一条，别重复渲染成两条）
+    assert sum(1 for e in payload["links"] if e["link_type"] == "similarity") == 1
+
+
+def test_links_json_is_deterministic(tmp_path: Path) -> None:
+    """★ 排序必须确定，否则每次导出顺序不同 ⇒ 假 diff ⇒ 幂等验收红。"""
+    db_path = tmp_path / "data" / "t.db"
+    _seed_with_links(db_path)
+    settings = _settings(tmp_path)
+    vault = tmp_path / "vault"
+    run_export(settings=settings, db_path=db_path, out=vault)
+    first = (vault / "90-元数据" / "links.json").read_bytes()
+    run_export(settings=settings, db_path=db_path, out=vault)
+    assert (vault / "90-元数据" / "links.json").read_bytes() == first
+
+
+def test_frontmatter_score_is_itemized(tmp_path: Path) -> None:
+    """★ L7-8：frontmatter 的 score 落**分项分**（热度 / 跨源 / 主题），不是 null、也不是总分。"""
+    db_path = tmp_path / "data" / "t.db"
+    _seed_db(db_path, [make_paper("arXiv:1", "Paper One")])
+    settings = _settings(tmp_path)
+    vault = tmp_path / "vault"
+
+    run_export(settings=settings, db_path=db_path, out=vault)
+    note = next((vault / "10-文献").rglob("*.md"))
+    fields, _body = parse_frontmatter(note.read_text(encoding="utf-8"))
+    score = fields.get("score")
+
+    assert isinstance(score, dict), f"score 应为分项字典，实际 {score!r}"
+    assert set(score) == {"heat", "cross_source", "topic"}
+    assert "total" not in score, "★ 红线 11：禁止合成总分"
+    assert score["cross_source"] is not None and score["topic"] is not None
+
+
+def test_analyses_backfilled_from_public_source(tmp_path: Path) -> None:
+    """★ L7-4 下半段：`git pull` 拿到 data/analyses/ ⇒ export 回填 db ⇒ 物化进 vault。"""
+    from ai_scholar.pipeline.deep_analysis import analysis_path
+
+    db_path = tmp_path / "data" / "t.db"
+    _seed_db(db_path, [make_paper("arXiv:1", "Paper One")])
+    settings = _settings(tmp_path)
+
+    path = analysis_path(settings, "arXiv:1")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "---\nid: arXiv:1\nanalyzed_at: 2026-10-24\ncontent_hash: deadbeef\n---\n"
+        "## 六段\n来自 public 真源的深度分析\n",
+        encoding="utf-8",
+    )
+
+    vault = tmp_path / "vault"
+    report = run_export(settings=settings, db_path=db_path, out=vault)
+    assert report.analyses_backfilled == 1
+
+    engine = engine_for(db_path)
+    with Session(engine) as session:
+        paper = session.get(Paper, "arXiv:1")
+        assert paper is not None
+        assert "来自 public 真源" in (paper.deep_analysis_md or "")
+        assert paper.deep_analyzed_at == "2026-10-24"
+
+    note = next((vault / "10-文献").rglob("*.md"))
+    assert "来自 public 真源" in note.read_text(encoding="utf-8")

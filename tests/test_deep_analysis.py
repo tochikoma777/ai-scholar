@@ -12,7 +12,7 @@ from ai_scholar.budget import BudgetSettings
 from ai_scholar.config import LLMSettings, Settings
 from ai_scholar.llm import LLMResponse
 from ai_scholar.models import WatchlistConfig, WatchlistGroup
-from ai_scholar.pipeline.deep_analysis import run_deep_analysis
+from ai_scholar.pipeline.deep_analysis import analysis_path, run_deep_analysis
 from ai_scholar.pipeline.report import build_daily_report
 from ai_scholar.store.db import engine_for
 from ai_scholar.store.models import LLMUsage, Paper
@@ -24,7 +24,7 @@ WATCHLIST = WatchlistConfig(
 )
 
 
-def strong_settings(**budget_overrides: object) -> Settings:
+def strong_settings(data_dir: str | None = None, **budget_overrides: object) -> Settings:
     prices = {
         "deepseek": {
             "deepseek-v4-pro": {
@@ -40,9 +40,13 @@ def strong_settings(**budget_overrides: object) -> Settings:
         }
     }
     budget = BudgetSettings(prices=prices, **budget_overrides)
-    return Settings(
+    settings = Settings(
         llm=LLMSettings(api_key="k", base_url="https://api.deepseek.com"), budget=budget
     )
+    # ★ 测试必须把 data_dir 指到 tmp_path：否则深度分析产物会写进**仓库**的 data/analyses/
+    if data_dir is not None:
+        settings.app.data_dir = data_dir
+    return settings
 
 
 def make_paper(
@@ -134,7 +138,7 @@ async def test_channel_a_and_b_selection(tmp_path: Path) -> None:
     )
     fake = FakeDeepLLM()
     report = await run_deep_analysis(
-        settings=strong_settings(),
+        settings=strong_settings(str(tmp_path)),
         db_path=db,
         client=fake,
         watchlist=WATCHLIST,
@@ -165,7 +169,7 @@ async def test_weekly_quota_blocks(tmp_path: Path) -> None:
     seed(db, [make_paper("arXiv:A")], usage=rows)
     fake = FakeDeepLLM()
     report = await run_deep_analysis(
-        settings=strong_settings(),
+        settings=strong_settings(str(tmp_path)),
         db_path=db,
         client=fake,
         watchlist=WATCHLIST,
@@ -179,7 +183,7 @@ async def test_weekly_quota_blocks(tmp_path: Path) -> None:
 async def test_idempotent_and_force(tmp_path: Path) -> None:
     db = tmp_path / "d.db"
     seed(db, [make_paper("arXiv:A")])
-    settings = strong_settings()
+    settings = strong_settings(str(tmp_path))
     await run_deep_analysis(
         settings=settings, db_path=db, client=FakeDeepLLM(), watchlist=WATCHLIST, today=DAY
     )
@@ -208,7 +212,7 @@ async def test_failure_marks_failed_without_hash(tmp_path: Path) -> None:
     db = tmp_path / "d.db"
     seed(db, [make_paper("arXiv:A")])
     report = await run_deep_analysis(
-        settings=strong_settings(),
+        settings=strong_settings(str(tmp_path)),
         db_path=db,
         client=FakeDeepLLM(echo_id=False),
         watchlist=WATCHLIST,
@@ -232,7 +236,7 @@ async def test_fulltext_is_used_and_not_persisted(tmp_path: Path, monkeypatch) -
     monkeypatch.setattr("ai_scholar.pipeline.deep_analysis.fetch_arxiv_html", fake_fetch)
     fake = FakeDeepLLM()
     report = await run_deep_analysis(
-        settings=strong_settings(),
+        settings=strong_settings(str(tmp_path)),
         db_path=db,
         client=fake,
         watchlist=WATCHLIST,
@@ -249,7 +253,7 @@ async def test_report_deep_analyzed_filled(tmp_path: Path) -> None:
     db = tmp_path / "d.db"
     seed(db, [make_paper("arXiv:A", title="Analyzed Paper")])
     await run_deep_analysis(
-        settings=strong_settings(),
+        settings=strong_settings(str(tmp_path)),
         db_path=db,
         client=FakeDeepLLM(),
         watchlist=WATCHLIST,
@@ -259,3 +263,214 @@ async def test_report_deep_analyzed_filled(tmp_path: Path) -> None:
     with Session(engine) as session:
         report = build_daily_report(session, today=DAY, watchlist=WATCHLIST)
     assert any(hit.id == "arXiv:A" for hit in report.deep_analyzed)
+
+
+# ── L7-2：D 方案排序（热度 / 经典交替）───────────────────────────────────
+def test_alternate_heat_and_classic() -> None:
+    """奇数轮热度侧、偶数轮经典侧（交替）。"""
+    from ai_scholar.pipeline.deep_analysis import _alternate
+
+    heat = [make_paper(f"H{i}") for i in range(3)]
+    classic = [make_paper(f"C{i}") for i in range(3)]
+    picked = _alternate(heat, classic, limit=4)
+    assert [p.id for p in picked] == ["H0", "C0", "H1", "C1"]
+
+
+def test_alternate_degrades_to_one_side() -> None:
+    """★ 经典池为空 ⇒ 自动退化为热度侧（设计原文的预期行为）。"""
+    from ai_scholar.pipeline.deep_analysis import _alternate
+
+    heat = [make_paper("H0"), make_paper("H1")]
+    assert [p.id for p in _alternate(heat, [], limit=5)] == ["H0", "H1"]
+    classic = [make_paper("C0")]
+    assert [p.id for p in _alternate([], classic, limit=2)] == ["C0"]
+
+
+def test_heat_side_requires_hf_score() -> None:
+    """热度侧 = hf_score 非空；★ 缺失**不当作 0**（直接不入侧）。"""
+    from ai_scholar.pipeline.deep_analysis import _heat_side
+
+    hot = make_paper("HOT", abstract="unrelated")
+    hot.hf_score = 42
+    cold = make_paper("COLD", abstract="unrelated")
+    cold.hf_score = None
+    rows = _heat_side([hot, cold], day=DAY, lookback_days=1)
+    assert [p.id for p in rows] == ["HOT"]
+
+
+def test_classic_side_three_sources() -> None:
+    """经典侧三来源：成熟（≥180 天）/ 被引≥3 / 种子清单。"""
+    from ai_scholar.pipeline.deep_analysis import _classic_side
+
+    mature = make_paper("MATURE", abstract="unrelated")
+    mature.published_at = "2020-01-01T00:00:00Z"
+    cited = make_paper("CITED", abstract="unrelated")
+    cited.citation_count = 10
+    seeded = make_paper("SEED", arxiv_id="1706.03762", abstract="unrelated")
+    fresh = make_paper("FRESH", abstract="unrelated")
+    fresh.citation_count = 0
+
+    rows = _classic_side(
+        [mature, cited, seeded, fresh],
+        day=DAY,
+        maturity_days=180,
+        min_citations=3,
+        classic_ids={"1706.03762"},
+        leaders=set(),
+    )
+    assert {p.id for p in rows} == {"MATURE", "CITED", "SEED"}
+
+
+async def test_top_n_alternates_when_watchlist_short(tmp_path: Path) -> None:
+    """watchlist 只命中 1 篇时，「当日 Top N」用 D 交替补足（热度 → 经典）。"""
+    db = tmp_path / "d.db"
+    watched = make_paper("arXiv:W", title="retrieval paper")
+    hot = make_paper("arXiv:HOT")
+    hot.hf_score = 99
+    classic = make_paper("arXiv:OLD")
+    classic.published_at = "2019-01-01T00:00:00Z"
+    classic.citation_count = 50
+    seed(db, [watched, hot, classic])
+
+    fake = FakeDeepLLM()
+    report = await run_deep_analysis(
+        settings=strong_settings(str(tmp_path)),
+        db_path=db,
+        client=fake,
+        watchlist=WATCHLIST,
+        today=DAY,
+        limit=3,
+    )
+    order = [p.id for p in load_papers(db).values() if p.deep_status == "done"]
+    assert order == ["arXiv:W", "arXiv:HOT", "arXiv:OLD"], f"实际顺序 {order}"
+    assert report.analyzed == 3
+
+
+async def test_selected_papers_do_not_consume_quota(tmp_path: Path) -> None:
+    """★ 已收藏的论文不占自动配额（`selected=1` ⇒ 用户已点名）。"""
+    db = tmp_path / "d.db"
+    hot = make_paper("arXiv:HOT")
+    hot.hf_score = 99
+    marked = make_paper("arXiv:MARKED")
+    marked.hf_score = 98
+    marked.selected = True  # 用户已收藏
+    seed(db, [hot, marked])
+
+    fake = FakeDeepLLM()
+    report = await run_deep_analysis(
+        settings=strong_settings(str(tmp_path)),
+        db_path=db,
+        client=fake,
+        watchlist=WATCHLIST,
+        today=DAY,
+        limit=2,
+    )
+    assert report.requested == 1, "已收藏的不该进入自动选篇"
+    assert load_papers(db)["arXiv:HOT"].deep_status == "done"
+    assert load_papers(db)["arXiv:MARKED"].deep_analysis_md is None
+
+
+# ── L7-3：深度分析完成 ⇒ selected=1 ────────────────────────────────────
+async def test_analysis_sets_selected(tmp_path: Path) -> None:
+    """★ 置位途径 ①：不置位 ⇒ `export`（默认只导 selected）永远导不出它。"""
+    db = tmp_path / "d.db"
+    seed(db, [make_paper("arXiv:A", title="retrieval paper")])
+    await run_deep_analysis(
+        settings=strong_settings(str(tmp_path)),
+        db_path=db,
+        client=FakeDeepLLM(),
+        watchlist=WATCHLIST,
+        today=DAY,
+    )
+    assert load_papers(db)["arXiv:A"].selected is True
+
+
+# ── L7-4：产物落 public 真源 data/analyses/{id}.md ──────────────────────
+async def test_analysis_written_to_public_source(tmp_path: Path) -> None:
+    db = tmp_path / "d.db"
+    seed(db, [make_paper("arXiv:A", title="retrieval paper")])
+    settings = strong_settings(str(tmp_path))
+    report = await run_deep_analysis(
+        settings=settings, db_path=db, client=FakeDeepLLM(), watchlist=WATCHLIST, today=DAY
+    )
+    assert report.analyses_written == 1
+
+    path = analysis_path(settings, "arXiv:A")
+    assert path.exists() and path.parent.name == "analyses"
+    text = path.read_text(encoding="utf-8")
+    assert "arXiv:A" in text and "## 六段" in text
+    # ★ 幂等：重跑（force）同内容 ⇒ 不再写盘，且字节不变
+    before = path.read_bytes()
+    report2 = await run_deep_analysis(
+        settings=settings,
+        db_path=db,
+        client=FakeDeepLLM(),
+        watchlist=WATCHLIST,
+        today=DAY,
+        force=True,
+    )
+    assert report2.analyses_written == 0, "同内容不该重复写盘"
+    assert path.read_bytes() == before
+
+
+async def test_check_reports_missing_and_stale(tmp_path: Path) -> None:
+    """★ `--check`：零 LLM / 零网络，缺失与过期都能报出来。"""
+    db = tmp_path / "d.db"
+    paper = make_paper("arXiv:A", title="retrieval paper")
+    paper.deep_analysis_md = "## 六段\n内容"
+    paper.deep_content_hash = paper.content_hash
+    paper.deep_analyzed_at = DAY.isoformat()
+    paper.deep_status = "done"
+    seed(db, [paper])
+    settings = strong_settings(str(tmp_path))
+
+    # ① db 里有分析、public 真源没有 ⇒ 缺失
+    missing = await run_deep_analysis(
+        settings=settings,
+        db_path=db,
+        client=FakeDeepLLM(),
+        watchlist=WATCHLIST,
+        today=DAY,
+        check=True,
+    )
+    assert missing.analyses_missing == ["arXiv:A"]
+    assert missing.llm_calls == 0, "check 必须零调用"
+    assert not (tmp_path / "analyses").exists(), "check 不该写任何文件"
+
+    # ② 真的产出 ⇒ 齐备（force：让已分析过的这篇重新落一次盘）
+    report = await run_deep_analysis(
+        settings=settings,
+        db_path=db,
+        client=FakeDeepLLM(),
+        watchlist=WATCHLIST,
+        today=DAY,
+        force=True,
+    )
+    # ★ ≥1：先由 sync_analyses 自愈补写，force 重分析若内容不同会再写一次
+    assert report.analyses_written >= 1
+    ok = await run_deep_analysis(
+        settings=settings,
+        db_path=db,
+        client=FakeDeepLLM(),
+        watchlist=WATCHLIST,
+        today=DAY,
+        check=True,
+    )
+    assert ok.analyses_missing == [], "已产出且 hash 匹配 ⇒ 齐备"
+
+    # ③ 内容变了（content_hash 变）⇒ 产物过期
+    engine = engine_for(db)
+    with Session(engine) as session:
+        row = session.get(Paper, "arXiv:A")
+        assert row is not None
+        row.content_hash = "changed"
+        session.commit()
+    stale = await run_deep_analysis(
+        settings=settings,
+        db_path=db,
+        client=FakeDeepLLM(),
+        watchlist=WATCHLIST,
+        today=DAY,
+        check=True,
+    )
+    assert stale.analyses_missing == ["arXiv:A"]

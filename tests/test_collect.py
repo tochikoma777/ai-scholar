@@ -403,6 +403,7 @@ async def test_degraded_is_persisted_in_runs(tmp_path: Path) -> None:
 
 
 # ── ⑦ 真实解析（拿不到就 skip，绝不伪造）───────────────────────────────
+@pytest.mark.live
 async def test_live_arxiv_parse() -> None:
     """用**真实响应**验证 arXiv 字段解析（拿不到就 skip，不编样例）。"""
     from ai_scholar.utils.http import HttpClient
@@ -434,6 +435,7 @@ async def test_live_arxiv_parse() -> None:
     assert items[0].arxiv_id  # 解析出真实 arXiv id
 
 
+@pytest.mark.live
 async def test_live_hf_parse_may_skip() -> None:
     """HF 真实解析：官方不可达时 skip（本环境已知不可达，配 `hf_base_url` 可解）。"""
     from datetime import date

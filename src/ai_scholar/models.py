@@ -53,6 +53,53 @@ class WatchlistConfig(BaseModel):
         return None
 
 
+class ClassicSeed(BaseModel):
+    """★ 经典种子清单里的一条（`config/classics.yaml`）。
+
+    `note` 是**人工写的预期标题**，不是数据：它的作用是核对 —— id 写错会拉到别的论文，
+    `scripts/probe_classics.py` 用真实 API 把实际标题打出来逐条比对。
+    """
+
+    id: str
+    note: str = ""
+    title: str = ""
+
+
+class ClassicsGroup(BaseModel):
+    name: str
+    papers: list[ClassicSeed] = Field(default_factory=list)
+
+
+class ClassicsConfig(BaseModel):
+    """经典种子清单（v1.11 定案：**人工审校入口**，不用算法猜"什么是经典"）。
+
+    消费方：① `collect --classics`（arXiv `id_list` 直采）
+    ② 深度分析 D 排序的经典侧（`pipeline/deep_analysis.py`）。
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    version: int = 1
+    groups: list[ClassicsGroup] = Field(default_factory=list)
+
+    def ids(self) -> list[str]:
+        """全部 arXiv id（去重、保持清单顺序）。"""
+        out: list[str] = []
+        for group in self.groups:
+            for paper in group.papers:
+                if paper.id not in out:
+                    out.append(paper.id)
+        return out
+
+    def group_of(self, arxiv_id: str) -> str | None:
+        """某 id 属于哪个分组（不在清单 ⇒ None）。"""
+        for group in self.groups:
+            for paper in group.papers:
+                if paper.id == arxiv_id:
+                    return group.name
+        return None
+
+
 class WatchlistHit(BaseModel):
     """一次匹配的结果。
 

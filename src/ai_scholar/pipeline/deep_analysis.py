@@ -14,16 +14,26 @@
 
 from __future__ import annotations
 
+import os
 import uuid
+from collections import Counter
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from ai_scholar.budget import check_budget, estimate_cost
 from ai_scholar.collectors.fulltext import fetch_arxiv_html
-from ai_scholar.config import RunMode, Settings, load_settings, load_watchlist, match_watchlist
+from ai_scholar.config import (
+    RunMode,
+    Settings,
+    load_classics,
+    load_settings,
+    load_watchlist,
+    match_watchlist,
+)
+from ai_scholar.export.obsidian import dump_frontmatter, parse_frontmatter
 from ai_scholar.llm import LLMClient, NullLLM, build_client
 from ai_scholar.models import WatchlistConfig
 from ai_scholar.pipeline.llm_support import (
@@ -38,10 +48,12 @@ from ai_scholar.pipeline.llm_support import (
 )
 from ai_scholar.store.db import default_db_path
 from ai_scholar.store.models import (
+    LINK_TYPE_REFERENCES,
     SIGNAL_REJECTED,
     SIGNAL_SAMPLE,
     LLMUsage,
     Paper,
+    PaperLink,
 )
 from ai_scholar.utils.errors import LLMError
 from ai_scholar.utils.http import HttpClient, client_from_settings
@@ -61,6 +73,11 @@ class DeepAnalysisReport:
     llm_calls: int = 0
     cost_cny: float = 0.0
     fulltext_hits: int = 0
+    # ★ L7-4：产物落 public 真源 `data/analyses/{id}.md`（Option B）
+    analyses_written: int = 0
+    # ★ `--check`：缺失 / 过期的产物（退出码 1 的依据）
+    analyses_missing: list[str] = field(default_factory=list)
+    check: bool = False
     degraded: dict[str, str] = field(default_factory=dict)
     dry_run: bool = False
 
@@ -77,6 +94,83 @@ def _watched(paper: Paper, watchlist: WatchlistConfig) -> bool:
     return match_watchlist(watchlist, paper.title, paper.abstract or "").matched
 
 
+def _citation_leaders(session: Session, top_n: int) -> set[str]:
+    """库内**引用榜**：被本库论文引用次数最多的 `Top N`（零成本、数据驱动）。
+
+    ★ 这是 D 方案经典侧的第三个来源（§5.5「经典论文获取」②）：偏向近年高频工作，
+      与种子清单互补 —— 清单是人工审校的公认经典，引用榜是数据发现的实际影响力。
+      注意：引用榜里**没有**的被引论文（S2 出边指向库外 id）不参与，避免拉进库外条目。
+    """
+    if top_n <= 0:
+        return set()
+    rows = session.exec(select(PaperLink).where(PaperLink.link_type == LINK_TYPE_REFERENCES)).all()
+    counts = Counter(row.dst_id for row in rows)
+    # ★ 只认**库内**的被引论文：出边常指向库外 id（S2 给的是全图引用）
+    known = {pid for pid in session.exec(select(Paper.id)).all() if pid}
+    ranked = sorted(
+        ((pid, n) for pid, n in counts.items() if pid in known),
+        key=lambda t: (-t[1], t[0]),
+    )
+    return {pid for pid, _n in ranked[:top_n]}
+
+
+def _heat_side(candidates: list[Paper], *, day: date, lookback_days: int) -> list[Paper]:
+    """热度侧：`hf_score` 非空的近期新增，按热度降序（缺失**不当作 0**，直接不入侧）。"""
+    cutoff = (day - timedelta(days=lookback_days)).isoformat()
+    rows = [p for p in candidates if p.hf_score is not None and (p.first_seen_at or "") >= cutoff]
+    rows.sort(key=lambda p: ((p.hf_score or 0), p.first_seen_at or ""), reverse=True)
+    return rows
+
+
+def _classic_side(
+    candidates: list[Paper],
+    *,
+    day: date,
+    maturity_days: int,
+    min_citations: int,
+    classic_ids: set[str],
+    leaders: set[str],
+) -> list[Paper]:
+    """经典侧：成熟（≥180 天）**或** 被引达标（≥3）**或** 种子清单 / 库内引用榜。
+
+    按被引降序；成熟但被引未知的老论文按出版日兜底（★ 不合成总分，只排序）。
+    """
+
+    def is_classic(paper: Paper) -> bool:
+        if paper.arxiv_id and paper.arxiv_id in classic_ids:
+            return True
+        if paper.id in leaders:
+            return True
+        if (paper.citation_count or 0) >= min_citations:
+            return True
+        age = age_days_since(paper.published_at, day)
+        return age is not None and age >= maturity_days
+
+    rows = [p for p in candidates if is_classic(p)]
+    rows.sort(key=lambda p: ((p.citation_count or 0), p.published_at or ""), reverse=True)
+    return rows
+
+
+def _alternate(heat: list[Paper], classic: list[Paper], limit: int) -> list[Paper]:
+    """**交替取两侧最高分**：第 1/3/5… 篇取热度侧，第 2/4/6… 篇取经典侧。
+
+    ★ 一侧取尽则退化为另一侧（"初期经典池为空 ⇒ 自动退化为热度侧"就是这个分支），
+      两侧都空 ⇒ 返回空（交于通道 B 兜底）。
+    """
+    chosen: list[Paper] = []
+    seen: set[str] = set()
+    for i in range(limit):
+        first, second = (heat, classic) if i % 2 == 0 else (classic, heat)
+        pick = next((p for p in first if p.id not in seen), None) or next(
+            (p for p in second if p.id not in seen), None
+        )
+        if pick is None:
+            break
+        seen.add(pick.id)
+        chosen.append(pick)
+    return chosen
+
+
 def _select(
     session: Session,
     *,
@@ -85,7 +179,14 @@ def _select(
     limit: int,
     a_cap: int,
     force: bool,
+    today: date,
+    settings: Settings,
 ) -> tuple[list[Paper], int]:
+    """选篇：显式 `--ids` > 通道 A（D 方案交替）> 通道 B（Tier 1 补读）。
+
+    ★ D 方案去重：**已读**（`deep_analysis_md` 非空且 hash 未变）与**已收藏**
+      （`selected=1`，用户已点名要读）都不占用每周 5 篇的注意力预算。
+    """
     papers = list(session.exec(select(Paper)).all())
     by_id = {p.id: p for p in papers}
 
@@ -102,15 +203,36 @@ def _select(
         and (_watched(p, watchlist) or p.tier == 1)
     ]
     skipped = sum(1 for p in pool if not _needs_analysis(p, force=force))
-    candidates = [p for p in pool if _needs_analysis(p, force=force)]
+    # ★ 已收藏（`selected=1`）不占自动配额；但 `--force` 是用户显式要求重做 ⇒ 优先
+    candidates = [p for p in pool if _needs_analysis(p, force=force) and (force or not p.selected)]
 
-    # 通道 A：watchlist 命中（按命中分降序），最多 a_cap 篇
-    a_hits = [(p, match_watchlist(watchlist, p.title, p.abstract or "").score) for p in candidates]
-    a_hits = [item for item in a_hits if _watched(item[0], watchlist)]
-    a_hits.sort(key=lambda t: (t[1], t[0].first_seen_at or ""), reverse=True)
-    chosen = [p for p, _ in a_hits[:a_cap]]
+    # ── 通道 A（意图驱动，立刻执行，不看 Tier）────────────────────────────
+    #   ① watchlist 命中：按命中分降序，最多 a_cap 篇（用户点名的兴趣优先）
+    watched = [(p, match_watchlist(watchlist, p.title, p.abstract or "").score) for p in candidates]
+    watched = [item for item in watched if _watched(item[0], watchlist)]
+    watched.sort(key=lambda t: (t[1], t[0].first_seen_at or ""), reverse=True)
+    chosen = [p for p, _ in watched[:a_cap]]
 
-    # 通道 B：Tier 1 补读，填满 limit
+    #   ② 当日 Top N（**D 方案**：热度 / 经典交替）：补"兴趣外的重要工作"
+    #      —— 只按 watchlist 排会漏掉它们（方案 B 的缺陷）
+    if len(chosen) < a_cap:
+        rest = [p for p in candidates if p.id not in {c.id for c in chosen}]
+        heat = _heat_side(
+            rest,
+            day=today,
+            lookback_days=settings.deep_analysis.trending_lookback_days,
+        )
+        classic = _classic_side(
+            rest,
+            day=today,
+            maturity_days=settings.signals.maturity_days,
+            min_citations=settings.signals.min_citations,
+            classic_ids=set(load_classics().ids()),
+            leaders=_citation_leaders(session, settings.deep_analysis.citation_leaders),
+        )
+        chosen += _alternate(heat, classic, a_cap - len(chosen))
+
+    # ── 通道 B：Tier 1 补读（填满 limit）─────────────────────────────────
     if len(chosen) < limit:
         chosen_ids = {p.id for p in chosen}
         backlog = [p for p in candidates if p.tier == 1 and p.id not in chosen_ids]
@@ -129,12 +251,89 @@ def _weekly_calls(session: Session, *, today: date) -> int:
     )
 
 
+# ── L7-4：产物落 public 真源 `data/analyses/{id}.md`（Option B）─────────
+ANALYSES_SCHEMA_VERSION = 1
+
+
+def analyses_dir(settings: Settings) -> Path:
+    """★ 深度分析产物的**真源目录**（public 仓库，`git` 管）。
+
+    db 是可丢弃缓存：Actions 的 db 走 actions-cache，本地 db 是另一份 ——
+    只有把产物写成 public 文件，"本地 `git pull` 后 `export` 物化进 vault"才成立。
+    """
+    return settings.data_dir() / "analyses"
+
+
+def analysis_path(settings: Settings, paper_id: str) -> Path:
+    safe = paper_id.replace(":", "-").replace("/", "-")
+    return analyses_dir(settings) / f"{safe}.md"
+
+
+def render_analysis_md(paper: Paper) -> str:
+    """分析产物的完整文本：frontmatter（可审计）+ 正文。
+
+    ★ 幂等：字段只取**内容级**信息（分析日期取 `deep_analyzed_at`，不是"今天"），
+      同内容 ⇒ 同字节 ⇒ `--check` 可断言。**绝不读 vault**（public 产物不含私有内容）。
+    """
+    fields: dict[str, object] = {
+        "id": paper.id,
+        "title": paper.title,
+        "arxiv_id": paper.arxiv_id,
+        "analyzed_at": paper.deep_analyzed_at,
+        "content_hash": paper.deep_content_hash,
+        "schema_version": ANALYSES_SCHEMA_VERSION,
+    }
+    return f"{dump_frontmatter(fields)}\n{(paper.deep_analysis_md or '').strip()}\n"
+
+
+def write_analysis(settings: Settings, paper: Paper) -> bool:
+    """原子写 `data/analyses/{id}.md`；返回是否**真的写了**（内容相同 ⇒ 不写）。"""
+    path = analysis_path(settings, paper.id)
+    content = render_analysis_md(paper)
+    if path.exists() and path.read_text(encoding="utf-8") == content:
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(content, encoding="utf-8")
+    os.replace(tmp, path)
+    return True
+
+
+def sync_analyses(session: Session, settings: Settings) -> int:
+    """把 db 里**已有**的分析补写成 public 真源（自愈）。
+
+    ★ L7 之前跑过的分析只在 db 里 —— 真源会缺一大片，`analyze --check` 一上来就红。
+      这里按"db 有 ⇒ 真源必须有"补写，产物缺失就不再是静默失败。
+    """
+    written = 0
+    for paper in session.exec(select(Paper)).all():
+        if not paper.deep_analysis_md:
+            continue
+        if write_analysis(settings, paper):
+            written += 1
+    return written
+
+
+def analysis_is_current(settings: Settings, paper: Paper) -> bool:
+    """`--check` 用：产物是否存在且未过期（frontmatter 的 `content_hash` 对得上）。
+
+    ★ 用 `parse_frontmatter` 解析，**不做字符串包含匹配** —— 引号 / 转义会让
+      `f"content_hash: {hash}" in text` 这类断言恒假（本项目已三次踩中，红线 18）。
+    """
+    path = analysis_path(settings, paper.id)
+    if not path.exists() or not paper.deep_analysis_md:
+        return False
+    fields, _body = parse_frontmatter(path.read_text(encoding="utf-8"))
+    return fields.get("content_hash") == paper.content_hash
+
+
 async def run_deep_analysis(
     *,
     ids: list[str] | None = None,
     limit: int | None = None,
     force: bool = False,
     dry_run: bool = False,
+    check: bool = False,
     today: date | None = None,
     settings: Settings | None = None,
     db_path: Path | None = None,
@@ -142,13 +341,18 @@ async def run_deep_analysis(
     http_client: HttpClient | None = None,
     watchlist: WatchlistConfig | None = None,
 ) -> DeepAnalysisReport:
-    """跑一次深度分析。★ off 档直接返回；失败只 degraded，不影响退出码。"""
+    """跑一次深度分析。★ off 档直接返回；失败只 degraded，不影响退出码。
+
+    ★ `check=True`：**零 LLM、零网络** —— 只核对 `data/analyses/` 里的产物是否齐备
+      （缺失 / `content_hash` 过期进 `report.analyses_missing`），供幂等断言。
+    """
     settings = settings or load_settings()
-    report = DeepAnalysisReport(dry_run=dry_run)
+    report = DeepAnalysisReport(dry_run=dry_run, check=check)
     report.run_id = uuid.uuid4().hex[:12]
     day = today or today_local()
 
     if settings.effective_mode() == RunMode.OFF:
+        # ★ off 档零调用：check 也不该报缺失（没有分析可做）
         report.mode = "off"
         return report
 
@@ -174,7 +378,19 @@ async def run_deep_analysis(
 
     try:
         with Session(engine) as session:
+            if check:
+                # ★ 零 LLM / 零网络：核对"分析过的论文"是否都有 public 产物
+                #   （候选里还没分析的不算缺失 —— 那是"待做"，不是"产物丢了"）
+                rows = [p for p in session.exec(select(Paper)).all() if p.deep_analysis_md]
+                report.requested = len(rows)
+                report.analyses_missing = [
+                    p.id for p in rows if not analysis_is_current(settings, p)
+                ]
+                return report
+
             week_calls = _weekly_calls(session, today=day)
+            # ★ 先自愈：db 里已有的分析必须落到 public 真源（否则 --check 永远红）
+            report.analyses_written += sync_analyses(session, settings)
             candidates, skipped = _select(
                 session,
                 ids=ids,
@@ -182,6 +398,8 @@ async def run_deep_analysis(
                 limit=effective_limit,
                 a_cap=a_cap,
                 force=force,
+                today=day,
+                settings=settings,
             )
             report.requested = len(candidates)
             report.skipped = skipped
@@ -283,7 +501,13 @@ async def run_deep_analysis(
                 paper.deep_analyzed_at = day.isoformat()
                 paper.deep_content_hash = paper.content_hash
                 paper.deep_status = "done"
+                # ★ L7-3 置位途径 ①：深度分析完成 ⇒ selected=1
+                #   （`export` 默认只导 selected —— 不置位，vault 里永远不会有这篇笔记）
+                paper.selected = True
                 report.analyzed += 1
+                # ★ L7-4：产物落 public 真源（db 是可丢弃缓存，真源才能跨机恢复）
+                if write_analysis(settings, paper):
+                    report.analyses_written += 1
 
             if not dry_run:
                 session.commit()

@@ -22,7 +22,7 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlmodel import Session, SQLModel, col, select
 
-from ai_scholar.collectors.arxiv import fetch_arxiv_day
+from ai_scholar.collectors.arxiv import fetch_arxiv_day, fetch_arxiv_ids
 from ai_scholar.collectors.base import SOURCE_HF, RawPaper
 from ai_scholar.collectors.hf import fetch_hf_day, hf_collect_days
 from ai_scholar.config import Settings, load_settings
@@ -239,9 +239,25 @@ async def _collect_source(
     settings: Settings,
     days: list[date],
     max_results: int,
-) -> tuple[list[RawPaper], str | None]:
-    """抓一个源（跨多天）。失败抛异常，由调用方转 degraded。"""
+) -> tuple[list[RawPaper], list[str]]:
+    """抓一个源（跨多天）。失败抛异常，由调用方转 degraded。
+
+    第二项是**未命中的 id**（只有 `classics` 源会有）—— arXiv 对不存在的 id 静默跳过，
+    不显式返回就会变成"清单 49 条、入库 46 条"却无人察觉。
+    """
     items: list[RawPaper] = []
+    if name == "classics":
+        # ★ 经典种子清单直采（v1.11）：人工审校的 arXiv id，用 `id_list` 批量拉
+        from ai_scholar.config import load_classics
+        from ai_scholar.store.hash import canonical_arxiv_id
+
+        cfg = settings.source("arxiv")
+        endpoint = cfg.endpoint if cfg else "https://export.arxiv.org/api/query"
+        ids = load_classics().ids()
+        if not ids:
+            raise RuntimeError("config/classics.yaml 为空 —— 清单缺失时不发请求")
+        items, missing = await fetch_arxiv_ids(client, ids, endpoint)
+        return items, [canonical_arxiv_id(i) for i in missing]
     if name == "arxiv":
         cfg = settings.source("arxiv")
         endpoint = cfg.endpoint if cfg else "https://export.arxiv.org/api/query"
@@ -255,7 +271,7 @@ async def _collect_source(
         hf_days = hf_collect_days(days[0], len(days))
         for day in hf_days:
             items.extend(await fetch_hf_day(client, day, base_url))
-    return items, None
+    return items, []
 
 
 async def run_collect(
@@ -268,10 +284,12 @@ async def run_collect(
     first_seen_path: Path | None = None,
     today: date | None = None,
     client: HttpClient | None = None,
+    classics: bool = False,
 ) -> CollectReport:
     """跑一次采集。
 
     ★ 本阶段**没有任何 LLM 调用** —— `llm_usage` 必然 0 行。
+    ★ `classics=True`：只采 `config/classics.yaml` 的经典种子清单（arXiv `id_list` 直采）。
     """
     settings = settings or load_settings()
     report = CollectReport(dry_run=dry_run)
@@ -296,7 +314,7 @@ async def run_collect(
     day_list = _days_back(days, day0)
     today_str = day0.isoformat()
 
-    names = [source] if source else ["arxiv", "hf_daily"]
+    names = ["classics"] if classics else ([source] if source else ["arxiv", "hf_daily"])
     max_results = settings.collect.arxiv_max_results
 
     owns_client = client is None
@@ -307,13 +325,19 @@ async def run_collect(
             for name in names:
                 outcome = SourceOutcome(name=name)
                 try:
-                    items, _ = await _collect_source(name, http, settings, day_list, max_results)
+                    items, missing = await _collect_source(
+                        name, http, settings, day_list, max_results
+                    )
                 except Exception as exc:  # noqa: BLE001 —— 单源失败必须隔离
                     outcome.failed = True
                     outcome.degraded = f"{type(exc).__name__}: {exc}"
                     report.degraded[name] = outcome.degraded
                     report.outcomes.append(outcome)
                     continue
+                if missing:
+                    report.degraded[f"{name}_missing"] = (
+                        f"{len(missing)} 个 id 未命中：" + ", ".join(missing[:20])
+                    )
 
                 outcome.fetched = len(items)
                 for raw in items:

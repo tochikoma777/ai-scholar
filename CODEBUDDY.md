@@ -8,7 +8,7 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 > ★ 全程中文回复（技术术语 / 代码 / 路径除外）。
 > ★ **每次 clear / init 后第一件事**：读 `docs/经验固化.md`（尤其「输出规范类 O1」：
 >   两张进度表 + 待决策子格式），再读 `docs/handoff/` 下**阶段号最大**的 `L*-开工.md`
->   （当前 `L5-开工.md`；已完成阶段的文件是归档，不作开工入口）。**未读即开工或输出 = 违规。**
+>   （当前 `L7-开工.md`；已完成阶段的文件是归档，不作开工入口）。**未读即开工或输出 = 违规。**
 > ★ **阶段收尾硬门禁（宣布“已完成”前逐项打勾）**：
 >   1) 代码 / 测试 / tag / push 完成；
 >   2) **新建 `docs/handoff/L{下一阶段}-开工.md`**，当前阶段 handoff 标「已归档」并指向新文件；
@@ -23,6 +23,9 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 - **只接线不新建**：把已定案但从未接线的链路接上 —— 范围与 DoD 见
   `docs/handoff/L7-开工.md`（8 项：analyze 入自动管道、D 排序、深度分析置 `selected`、
   public 真源 `data/analyses/`、经典种子清单、报告点读、links.json、frontmatter score）。
+- **接线进度（2026-10-25）**：#1–#8 **全部已接线**（含单测与本地实跑）。
+  #6 用负责人批准的方案 A：新落点 `data/wanted.jsonl`（public 真源）+ `ai-scholar want`，
+  报告每条给可复制命令、站点卡片给「复制想读命令」按钮（纯 JS、零请求）。
 - **已定决策（v1.11，勿推翻）**：D 排序（热度/经典交替+去重）；Tier 1 不是深度分析门槛
   （通道 B 是并行补读）；经典获取=种子清单 `config/classics.yaml` 为主；
   深度分析产物用 Option B 写成 public 真源。
@@ -56,6 +59,13 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 | 运行模式 | 三档 `off` / `fast` / `strong`；**未配 key 自动降级 off 且不报错** |
 | 本地路径 | `~/projects/ai-scholar`（WSL2 原生 ext4，**不要放 `/mnt/c/`**） |
 
+★ README 已声明、但**代码里看不出来**的三条边界（别在方案里踩）：
+
+- **中文文献源不覆盖**（不采中文社区源、不引入中文分词依赖）—— 只做英文源，别提议"顺手加个中文源"。
+- **Semantic Scholar 数据公开展示必须署名**：MIT 只管代码不管数据，README 末尾的
+  "Data provided by Semantic Scholar (Allen Institute for AI)" 一段**独立于 LICENSE，不能删**。
+- **vault 用 git 就不要再叠加 Obsidian Sync / iCloud** —— 两套同步会互相覆盖。
+
 ---
 
 ## 架构总览（★ 跨文件才看得懂的部分）
@@ -66,7 +76,11 @@ cli.py (typer)
 │                                      └→ store/hash.py · first_seen.py · models.py
 ├─ enrich / signals ─→ pipeline/enrich.py · signals.py ─→ collectors/s2.py（batch）
 ├─ relate ─→ pipeline/relate.py ─→ paper_links（文献耦合 / TF-IDF 相似）
-├─ export ─→ pipeline/export.py ─→ export/obsidian.py（db → Markdown）
+├─ export ─→ pipeline/export.py ─→ export/obsidian.py（db → Markdown，写私有 vault）
+├─ site ─→ pipeline/site.py ─→ export/html.py（只读 public 数据 → 单文件 HTML）
+├─ analyze ─→ pipeline/deep_analysis.py ─→ data/analyses/{id}.md（★ L7 #4 已接线：
+│              产物是 public 真源；`export` 反向回填 db，再物化进 vault）
+├─ classics ─→ collectors/arxiv.py `id_list` 直采（config/classics.yaml，L7 #5）
 ├─ report ─→ pipeline/report.py ─→ templates/report/ ─→ data/reports/
 ├─ predict ─→ pipeline/predict.py ─→ store/scoreboard.py ─→ data/predictions/*.jsonl
 ├─ stats ─→ pipeline/stats.py（验证 / 校准 / 影响分析，只读 JSONL + db）
@@ -97,7 +111,7 @@ cli.py (typer)
 
 ### 两条主线的关键路径
 
-**collect** — `pipeline/collect.py:259 run_collect`
+**collect** — `pipeline/collect.py:277 run_collect`
 
 1. `_days_back(days)` 逐日抓取（arXiv 按 `submittedDate` 精确框定并翻页；HF 按 `date`）。
 2. `canonical_id_for` → `_resolve_via_alias` → `upsert_paper`。三级去重：
@@ -139,11 +153,12 @@ cli.py (typer)
 | `pipeline/enrich.py` | 引用补齐：S2 → 出边 + 队列状态机 | ★ 方向语义固定为 src 引用 dst；入库前先写方向单测 |
 | `pipeline/enhance.py` | LLM 增强 + 强相似边关联解读 | watchlist Top N；预算闸门；幂等 `enhance_content_hash` |
 | `pipeline/grade.py` | 定级：Tier 1/2/3 + 原始证据 | 延迟定级；幂等 `grade_content_hash`；解析失败不写指纹 |
-| `pipeline/deep_analysis.py` | 深度分析（strong）+ 通道 A/B | 周配额 5；正文临时抓取；幂等 `deep_content_hash` |
+| `pipeline/deep_analysis.py` | 深度分析（strong）+ 通道 A/B | 周配额 5；正文临时抓取；幂等 `deep_content_hash`；**D 排序**（热度/经典交替）；完成即置 `selected=1`；产物落 `data/analyses/`（`--check` 核对；`sync_analyses` 自愈补写） |
 | `pipeline/predict.py` | L4 推演生成（★ 零 LLM） | 3 类判据；同目标 open 则跳过；观点另存 |
 | `pipeline/stats.py` | 到期验证 / 记分板 / 校准 / 影响分析 | ★ `insufficient` 不进命中率分母；样本不足不下结论 |
 | `pipeline/score.py` | 热度 / 跨源 / 主题三分量 | ★ 无 `total` 字段，不做加权求和（红线 11） |
 | `store/scoreboard.py` | 记分板 JSONL + 可证伪门禁 | append-only 快照；代码判定可证伪性 |
+| `store/wanted.py` | 想读队列 JSONL（L7-6） | append-only；幂等追加；坏行显式返回；`want_command()` 是命令的唯一来源 |
 | `collectors/fulltext.py` | arXiv HTML 临时抓取 | ★ 只在内存，抓完即弃，**永不入库** |
 | `collectors/hf.py` | HF Daily Papers 抓取 | ★ 窗口**从昨天开始**（榜单滞后发布，请求当天必 400，L6-1）；失败带截断响应体 |
 | `pipeline/prescreen.py` | 零成本预筛（规则负面排除） | ★ 只决定是否跟踪；`r` 是淘汰集留存率 |
@@ -191,7 +206,9 @@ cli.py (typer)
 | **signals 时序快照**（被引增长曲线） | ❌ | `data/signals/YYYY-MM.jsonl` | **✓ public** |
 | 每日报告 md + json | ✅ | `data/reports/YYYY-MM-DD.{md,json}` | **✓ public** |
 | **推演记分板**（可验证判断快照） | ❌ | `data/predictions/scoreboard.jsonl` | **✓ public** |
+| **想读队列**（报告/站点点读，L7-6） | ❌ | `data/wanted.jsonl`（append-only；`export` 消费后置 `selected=1`） | **✓ public** |
 | **长期观点**（不可证伪） | ❌ | `data/predictions/opinions.jsonl` | **✓ public**（但不进统计） |
+| **深度分析产物**（六段 / 三句半 / 透镜） | ❌（重跑要花钱） | `data/analyses/{id}.md`（**L7 #4 已接线**；db 只是缓存，`export` 会反向回填） | **✓ public** |
 | 用户笔记 | ❌ | **独立 private vault 仓库**：`~/projects/ai-scholar-vault/` | ✗（不进本仓库） |
 | 论文正文 / 全文 | — | **永不入库**（临时抓取、抓完即弃） | ❌ 绝对禁止 |
 | `config/watchlist.local.yaml` | — | 本地（配置洁癖：不该让别人 clone 到你的兴趣清单） | ✗ |
@@ -370,8 +387,12 @@ uv run ai-scholar enhance [--limit N] [--force] [--dry-run]
                                  # LLM 增强（fast）：一句话/为什么重要/方法标签 + 关联解读
 uv run ai-scholar grade [--limit N] [--force] [--dry-run]
                                  # 文献定级（fast）：延迟定级 → Tier 1/2/3 + 原始证据
-uv run ai-scholar analyze [--ids a,b] [--limit N] [--force] [--dry-run]
-                                 # 深度分析（strong）：三句半/六段/透镜 + 正文临时抓取
+uv run ai-scholar analyze [--ids a,b] [--limit N] [--force] [--dry-run] [--check]
+#   --check：零 LLM，只核对 data/analyses/ 是否齐备（缺/过期 ⇒ 退出码 1）
+#   ★ --limit 0 = 只做「db 已有分析 → 补写真源」的自愈，一分钱不花
+uv run ai-scholar collect --classics        # 直采 config/classics.yaml 的经典清单（arXiv id_list）
+uv run python scripts/probe_classics.py     # 实测核对清单 id → 标题（改清单后必跑）
+                                 # ↑ analyze：三句半/六段/透镜 + 正文临时抓取
 uv run ai-scholar predict [--limit N] [--dry-run] [--insight TEXT]
                                  # 可验证推演（零 LLM）：写 data/predictions/scoreboard.jsonl
 uv run ai-scholar stats [--verify] [--calibration] [--impact] [--limit N]
@@ -419,6 +440,7 @@ uv build                         # hatchling：构建 sdist + wheel（默认写 
 | `pipeline/stats.py` | `pytest -k stats`（★ insufficient 不计分母 / 样本不足不下结论）+ 实跑 `stats --verify` |
 | `pipeline/score.py` | `pytest -k score`（★ 三分量独立 / 无 total） |
 | `pipeline/report.py` · `templates/report/` | `pytest -k report`（★ 当天重跑无 diff；只读 DB） |
+| `pipeline/site.py` · `export/html.py` | `pytest -k site` + 实跑 `ai-scholar site --check`（应退出 0；★ 无生成时间 ⇒ 逐字节幂等） |
 | `budget.py` · 预算配置 | `pytest -k budget` + `ai-scholar budget ...` 演练（零网络） |
 | `scripts/probe_sources.py` | 实跑一次 + 检查 `docs/数据源手册.md`；不可达时确认是 skip 不是伪造 |
 | `cli.py` | `pytest -k cli` + `uv run ai-scholar --help` |
@@ -441,6 +463,13 @@ uv build                         # hatchling：构建 sdist + wheel（默认写 
 - 除 `test_live_arxiv_parse` / `test_live_hf_parse_may_skip` 外，网络一律 respx 拦截；
   这两个联网冒烟在连接失败、非 200 或无数据时 skip，但解析断言失败仍会让测试红。
 - 断言要落在**实际收到的值**上（如 `settings.llm.base_url`），不是"加载成功"。
+- 基线（tag `l7`）：`uv run pytest -q` = **309 passed / 1 skipped**；数字对不上先查原因再往下做。
+  单条 / 单文件：`uv run pytest tests/test_export.py::test_xxx -q`、`uv run pytest -k "config or watchlist" -q`。
+- ★ **离线跑法**：`uv run pytest -m "not live" -q`。联网冒烟（`test_live_arxiv_parse` /
+  `test_live_hf_parse_may_skip`）带 `@pytest.mark.live`，拿不到真实响应就 skip。
+- ★ **CODEBUDDY 里的行号引用会被机器校验**：凡是写成 `path.py:NNN 符号` 的（如
+  `pipeline/collect.py:277 run_collect`），`tests/test_docs_consistency.py::test_codebuddy_line_anchors`
+  会断言该行附近确有该符号 —— **改完代码记得重跑，漂了就改文档**。
 - `tests/test_docs_consistency.py` 是阶段收尾的机械门禁：若 CODEBUDDY 标记当前阶段「已完成」，
   则 `docs/handoff/` 下必须存在**下一阶段**的 `L*-开工.md`（未归档），且维护日志已登记。
 - CI：`ubuntu-24.04` + Python 3.11 固定，依赖安装为 `uv sync --frozen || uv sync`；

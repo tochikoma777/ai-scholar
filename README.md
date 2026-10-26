@@ -43,6 +43,7 @@ uv run ai-scholar analyze --ids arXiv:2610.30132   # 深度分析（strong；正
 uv run ai-scholar predict    # 可验证推演（零 LLM）：进记分板，到期自动验证
 uv run ai-scholar stats      # 记分板命中率；--calibration / --impact 看校准与影响
 uv run ai-scholar mark arXiv:2610.30122      # 显式收藏（export 默认只导收藏的）
+uv run ai-scholar want arXiv:2610.30122      # 想读（报告/站点点读用的就是这条：写 data/wanted.jsonl 并置位）
 uv run ai-scholar related arXiv:2610.30122   # 看某篇的关联（引用了 / 被引用 两栏）
 ```
 
@@ -160,7 +161,8 @@ groups:
 ## 开发
 
 ```bash
-uv run pytest                     # 全量测试（含 2 个联网冒烟；其余 respx mock）
+uv run pytest                     # 全量测试（含 2 个 @pytest.mark.live 联网冒烟；其余 respx mock）
+uv run pytest -m "not live"       # 离线全量（跳过联网冒烟，无网环境用这条）
 uv run ruff check . && uv run ruff format --check .
 uv run mypy src/ai_scholar
 uv run python scripts/probe_sources.py    # 数据源探测（需联网，产出 docs/数据源手册.md）

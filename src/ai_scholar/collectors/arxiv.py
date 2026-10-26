@@ -13,6 +13,7 @@ import xml.etree.ElementTree as ET
 from datetime import date
 
 from ai_scholar.collectors.base import SOURCE_ARXIV, RawPaper
+from ai_scholar.store.hash import canonical_arxiv_id
 from ai_scholar.utils.http import HttpClient
 
 ATOM = "{http://www.w3.org/2005/Atom}"
@@ -58,6 +59,40 @@ def parse_feed(xml_text: str) -> tuple[int, list[RawPaper]]:
             )
         )
     return total, items
+
+
+async def fetch_arxiv_ids(
+    client: HttpClient,
+    ids: list[str],
+    endpoint: str,
+    batch_size: int = 50,
+) -> tuple[list[RawPaper], list[str]]:
+    """按 arXiv id **批量直采**（`id_list`），返回 `(条目, 未命中的 id)`。
+
+    ★ 经典种子清单专用（v1.11）：ID 确定、无搜索噪声、零配额问题。
+    ★ **未命中的 id 必须显式返回** —— arXiv 对不存在的 id 是静默跳过，
+      不核对会让"清单 33 条"变成"入库 30 条"却无人察觉（静默失败最危险）。
+    """
+    items: list[RawPaper] = []
+    for start in range(0, len(ids), batch_size):
+        chunk = ids[start : start + batch_size]
+        response = await client.get(
+            endpoint,
+            params={"id_list": ",".join(chunk), "max_results": batch_size},
+            source="arxiv",
+            rate_limit="1/3s",
+            timeout=None,
+        )
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"arXiv HTTP {response.status_code}（id_list={len(chunk)} 项）："
+                f"{response.text[:200]}"
+            )
+        _total, page_items = parse_feed(response.text)
+        items.extend(page_items)
+    got = {canonical_arxiv_id(raw.arxiv_id) for raw in items if raw.arxiv_id}
+    missing = [i for i in ids if canonical_arxiv_id(i) not in got]
+    return items, missing
 
 
 async def fetch_arxiv_day(

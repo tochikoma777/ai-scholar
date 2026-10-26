@@ -32,6 +32,7 @@ from ai_scholar.store.scoreboard import (
     opinions_path,
     scoreboard_path,
 )
+from ai_scholar.store.wanted import want_command
 from ai_scholar.utils.timeutil import DEFAULT_TZ, day_window, parse_iso_date
 
 SCHEMA_VERSION = 1
@@ -46,6 +47,11 @@ class ReportHit(BaseModel):
     title: str
     score: float = 0.0  # ★ watchlist 命中分（只用于排序，不是门槛）
     groups: list[str] = Field(default_factory=list)
+
+    @property
+    def want_cmd(self) -> str:
+        """★ L7-6「点读入口」：把这篇标记想读的可复制命令（唯一来源，别在模板里手写）。"""
+        return want_command(self.id)
 
 
 class RunStatus(BaseModel):

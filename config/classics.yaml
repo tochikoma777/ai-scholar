@@ -1,0 +1,82 @@
+# ★ 经典论文种子清单（v1.11 定案：`config/classics.yaml`）
+#
+# 定位：**人工审校入口** —— 只有被公认的经典才进清单，**不用算法猜"什么是经典"**。
+# 经典文献不会出现在「arXiv 7 天回看」或「HF 当日榜单」里，必须有独立获取路径。
+#
+# 消费方（★ 每个字段都要有读者，不留死配置）：
+#   1. `collect --classics`：用 arXiv `id_list` **批量直采**入库（ID 确定、无搜索噪声）；
+#   2. 深度分析 D 排序的**经典侧**（`pipeline/deep_analysis.py`）：清单内的论文是经典候选。
+#
+# 字段分工：
+#   `note`  = 简称（给人看）
+#   `title` = **实测标题**（给机器核对）—— 由 `uv run python scripts/probe_classics.py` 比对。
+# ★ 2026-10-25 实测：本清单全部 id 真实命中且标题逐条核对通过（41 → 49 条）。
+#   id 写错会静默拉到别的论文（如把 T5 写成 1910.01108 会拉到 DistilBERT），
+#   **新增条目后必须跑探测脚本复核**，不许凭印象声称"清单已核验"。
+
+version: 1
+
+groups:
+  - name: 基础架构
+    papers:
+      - { id: "1706.03762", note: "Attention", title: "Attention Is All You Need" }
+      - { id: "1502.03167", note: "BatchNorm", title: "Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift" }
+      - { id: "1512.03385", note: "ResNet", title: "Deep Residual Learning for Image Recognition" }
+      - { id: "1607.06450", note: "LayerNorm", title: "Layer Normalization" }
+      - { id: "1901.02860", note: "Transformer-XL", title: "Transformer-XL: Attentive Language Models Beyond a Fixed-Length Context" }
+      - { id: "2004.05150", note: "Longformer", title: "Longformer: The Long-Document Transformer" }
+      - { id: "2001.04451", note: "Reformer", title: "Reformer: The Efficient Transformer" }
+      - { id: "2009.14794", note: "Performer", title: "Rethinking Attention with Performers" }
+      - { id: "2312.00752", note: "Mamba", title: "Mamba: Linear-Time Sequence Modeling with Selective State Spaces" }
+
+  - name: 预训练范式
+    papers:
+      - { id: "1810.04805", note: "BERT", title: "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding" }
+      - { id: "1910.10683", note: "T5", title: "Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer" }
+      - { id: "2010.11929", note: "ViT", title: "An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale" }
+      - { id: "2005.14165", note: "GPT-3", title: "Language Models are Few-Shot Learners" }
+      - { id: "2103.00020", note: "CLIP", title: "Learning Transferable Visual Models From Natural Language Supervision" }
+      - { id: "2006.11239", note: "DDPM", title: "Denoising Diffusion Probabilistic Models" }
+      - { id: "2112.10752", note: "Latent Diffusion", title: "High-Resolution Image Synthesis with Latent Diffusion Models" }
+      - { id: "2001.08361", note: "Scaling Laws", title: "Scaling Laws for Neural Language Models" }
+      - { id: "2203.15556", note: "Chinchilla", title: "Training Compute-Optimal Large Language Models" }
+      - { id: "2302.13971", note: "LLaMA", title: "LLaMA: Open and Efficient Foundation Language Models" }
+      - { id: "2307.09288", note: "Llama 2", title: "Llama 2: Open Foundation and Fine-Tuned Chat Models" }
+      - { id: "2310.06825", note: "Mistral 7B", title: "Mistral 7B" }
+      - { id: "2401.04088", note: "Mixtral", title: "Mixtral of Experts" }
+      - { id: "2412.19437", note: "DeepSeek-V3", title: "DeepSeek-V3 Technical Report" }
+
+  - name: 推理与效率
+    papers:
+      - { id: "2205.14135", note: "FlashAttention", title: "FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness" }
+      - { id: "2307.08691", note: "FlashAttention-2", title: "FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning" }
+      - { id: "2309.06180", note: "vLLM / PagedAttention", title: "Efficient Memory Management for Large Language Model Serving with PagedAttention" }
+      - { id: "2211.17192", note: "Speculative Decoding", title: "Fast Inference from Transformers via Speculative Decoding" }
+      - { id: "2305.13245", note: "GQA", title: "GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints" }
+      - { id: "2305.14314", note: "QLoRA", title: "QLoRA: Efficient Finetuning of Quantized LLMs" }
+      - { id: "2106.09685", note: "LoRA", title: "LoRA: Low-Rank Adaptation of Large Language Models" }
+      - { id: "1910.02054", note: "ZeRO", title: "ZeRO: Memory Optimizations Toward Training Trillion Parameter Models" }
+      - { id: "1909.08053", note: "Megatron-LM", title: "Megatron-LM: Training Multi-Billion Parameter Language Models Using Model Parallelism" }
+
+  - name: 对齐与推理链
+    papers:
+      - { id: "1706.03741", note: "RLHF 起点", title: "Deep reinforcement learning from human preferences" }
+      - { id: "1707.06347", note: "PPO", title: "Proximal Policy Optimization Algorithms" }
+      - { id: "2203.02155", note: "InstructGPT", title: "Training language models to follow instructions with human feedback" }
+      - { id: "2305.18290", note: "DPO", title: "Direct Preference Optimization: Your Language Model is Secretly a Reward Model" }
+      - { id: "2402.03300", note: "DeepSeekMath / GRPO", title: "DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models" }
+      - { id: "2201.11903", note: "CoT", title: "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models" }
+      - { id: "2203.11171", note: "Self-Consistency", title: "Self-Consistency Improves Chain of Thought Reasoning in Language Models" }
+      - { id: "2305.10601", note: "Tree of Thoughts", title: "Tree of Thoughts: Deliberate Problem Solving with Large Language Models" }
+      - { id: "2005.11401", note: "RAG", title: "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks" }
+      - { id: "2302.04761", note: "Toolformer", title: "Toolformer: Language Models Can Teach Themselves to Use Tools" }
+      - { id: "2501.12948", note: "DeepSeek-R1", title: "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning" }
+
+  - name: 智能体
+    papers:
+      - { id: "2210.03629", note: "ReAct", title: "ReAct: Synergizing Reasoning and Acting in Language Models" }
+      - { id: "2303.11366", note: "Reflexion", title: "Reflexion: Language Agents with Verbal Reinforcement Learning" }
+      - { id: "2304.03442", note: "Generative Agents", title: "Generative Agents: Interactive Simulacra of Human Behavior" }
+      - { id: "2308.08155", note: "AutoGen", title: "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation" }
+      - { id: "2305.16291", note: "Voyager", title: "Voyager: An Open-Ended Embodied Agent with Large Language Models" }
+      - { id: "2310.03714", note: "DSPy", title: "DSPy: Compiling Declarative Language Model Calls into Self-Improving Pipelines" }

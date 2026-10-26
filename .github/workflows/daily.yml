@@ -49,6 +49,12 @@ jobs:
       - name: Collect
         run: uv run ai-scholar collect
 
+      # ★ L7-5：经典种子清单直采（config/classics.yaml，arXiv id_list）。
+      #   经典文献不在「7 天回看 / HF 当日榜单」里，必须有独立获取路径；
+      #   已入库的条目命中 upsert 的"内容未变 ⇒ deduped"，不会每天新增。
+      - name: Collect classics
+        run: uv run ai-scholar collect --classics
+
       - name: Enrich
         run: uv run ai-scholar enrich
 
@@ -63,6 +69,20 @@ jobs:
 
       - name: Grade
         run: uv run ai-scholar grade
+
+      # ★ L7-1：`analyze` 接入自动管道（§5.5 通道 A"立刻执行"）。
+      #   ★ off 档（未配 LLM secret）⇒ run_deep_analysis 直接返回，0 调用、退出码 0。
+      #   ★ 每周最多 5 篇（注意力预算），每天实跑约 1 篇 ≈ ¥0.12/天。
+      - name: Analyze
+        env:
+          AI_SCHOLAR_LLM__BASE_URL: ${{ secrets.AI_SCHOLAR_LLM__BASE_URL }}
+          AI_SCHOLAR_LLM__API_KEY: ${{ secrets.AI_SCHOLAR_LLM__API_KEY }}
+        run: uv run ai-scholar analyze
+
+      # ★ L7-4：核对 public 真源 data/analyses/ 齐备（零 LLM / 零网络）。
+      #   缺失 ⇒ 退出码 1，让"分析过但产物没落盘"这类静默失败在 CI 里直接变红。
+      - name: Check analyses source
+        run: uv run ai-scholar analyze --check
 
       # ★ L4：零 LLM / 零网络。先生成可验证推演（同目标已有 open 则跳过），再验证到期项
       - name: Predict
@@ -82,7 +102,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/first_seen.jsonl data/signals data/reports data/predictions
+          git add data/first_seen.jsonl data/signals data/reports data/predictions data/analyses
           if git diff --cached --quiet; then
             echo "无变更，跳过 commit"
             exit 0

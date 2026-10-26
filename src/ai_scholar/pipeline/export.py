@@ -24,10 +24,11 @@ from ai_scholar.config import (
     project_root,
     watchlist_paths,
 )
-from ai_scholar.export.base import ExportContext, ExportDoc, LinkRef
+from ai_scholar.export.base import ExportContext, ExportDoc, LinkEdge, LinkRef
 from ai_scholar.export.obsidian import ObsidianExporter, note_name
 from ai_scholar.models import WatchlistConfig
 from ai_scholar.pipeline.report import DailyReport, build_daily_report
+from ai_scholar.pipeline.score import score_many
 from ai_scholar.store.db import default_db_path
 from ai_scholar.store.models import (
     LINK_TYPE_BIBCOUPLING,
@@ -37,6 +38,7 @@ from ai_scholar.store.models import (
     PaperLink,
     Run,
 )
+from ai_scholar.store.wanted import load_wanted_with_errors, wanted_path
 from ai_scholar.utils.errors import UnsafeOutputPath
 from ai_scholar.utils.timeutil import day_window, today_local, utcnow
 
@@ -55,6 +57,11 @@ class ExportReport:
     changed: list[Path] = field(default_factory=list)
     # ★ 默认只导 selected；为空时 CLI 要给明确提示，不能静默导出 0 篇
     empty_selection: bool = False
+    # ★ L7-4：从 public 真源 data/analyses/ 回填进 db 的篇数
+    analyses_backfilled: int = 0
+    # ★ L7-6：想读队列（data/wanted.jsonl）本次新置位 / 队列总数
+    wanted_applied: int = 0
+    wanted_total: int = 0
 
 
 def resolve_out_dir(out: Path | str | None, settings: Settings | None = None) -> Path:
@@ -169,6 +176,119 @@ def load_link_refs(
         if row.dst_id in ids:
             bucket[row.dst_id].append(to_ref(row.src_id, row))
     return out_map, in_map, similar_map, coupled_map
+
+
+def build_link_edges(
+    out_map: dict[str, list[LinkRef]],
+    in_map: dict[str, list[LinkRef]],
+    similar_map: dict[str, list[LinkRef]],
+    coupled_map: dict[str, list[LinkRef]],
+) -> list[LinkEdge]:
+    """把「渲染视角」的四类关联还原成 `links.json` 用的**有向边**。
+
+    ★ 方向语义（与笔记渲染一致，别搞反）：
+      - 出边 `out_map[pid]` ⇒ `pid → 对端`（我引用了它）
+      - 入边 `in_map[pid]` ⇒ `对端 → pid`（它引用了我）
+    ★ 对称边（similarity / bibcoupling）在库里只存一条，这里**只发一次**（按 id 字典序定向），
+      否则每条边会出现两遍。
+    """
+    edges: list[LinkEdge] = []
+    for pid, refs in out_map.items():
+        for ref in refs:
+            edges.append(
+                LinkEdge(
+                    src_id=pid,
+                    dst_id=ref.paper_id,
+                    link_type=ref.link_type,
+                    weight=ref.weight,
+                    evidence=ref.evidence,
+                )
+            )
+    for pid, refs in in_map.items():
+        for ref in refs:
+            edges.append(
+                LinkEdge(
+                    src_id=ref.paper_id,
+                    dst_id=pid,
+                    link_type=ref.link_type,
+                    weight=ref.weight,
+                    evidence=ref.evidence,
+                )
+            )
+    for bucket in (similar_map, coupled_map):
+        for pid, refs in bucket.items():
+            for ref in refs:
+                if pid > ref.paper_id:
+                    continue  # ★ 对称边只发一次
+                edges.append(
+                    LinkEdge(
+                        src_id=pid,
+                        dst_id=ref.paper_id,
+                        link_type=ref.link_type,
+                        weight=ref.weight,
+                        evidence=ref.evidence,
+                    )
+                )
+    return edges
+
+
+def backfill_analyses(session: Session, settings: Settings) -> int:
+    """★ L7-4 的下半段：把 public 真源 `data/analyses/` **物化回 db**。
+
+    Actions 跑的分析写在 Actions 的 db（缓存会丢）；本地 db 是另一份。
+    ⇒ 本地 `git pull` 拿到 `data/analyses/{id}.md` 后回填，才能在 `export` 时
+    把深度分析写进 vault 笔记（§5.6 Option B 的全部意义就在这里）。
+
+    ★ 幂等：db 已有就不覆盖（真源只是补漏，不是权威覆盖）。
+    """
+    from ai_scholar.export.obsidian import parse_frontmatter
+    from ai_scholar.pipeline.deep_analysis import analysis_path
+
+    filled = 0
+    rows = list(session.exec(select(Paper).where(col(Paper.deep_analysis_md).is_(None))).all())
+    for paper in rows:
+        path = analysis_path(settings, paper.id)
+        if not path.exists():
+            continue
+        fields, body = parse_frontmatter(path.read_text(encoding="utf-8"))
+        content = body.strip()
+        if not content:
+            continue
+        paper.deep_analysis_md = content
+        paper.deep_analyzed_at = str(fields.get("analyzed_at") or "") or None
+        paper.deep_content_hash = str(fields.get("content_hash") or "") or paper.content_hash
+        paper.deep_status = "done"
+        # ★ 分析过的论文就该进 vault（置位途径 ①，与本地直跑一致）
+        paper.selected = True
+        filled += 1
+    return filled
+
+
+def consume_wanted(session: Session, settings: Settings) -> tuple[int, int, list[str]]:
+    """★ L7-6：把 `data/wanted.jsonl`（报告/站点点读）落到 `selected=1`。
+
+    返回 `(新置位数, 队列总数, 库内不存在的 id)`。
+
+    ★ 为什么在 export 里消费：`export` 默认只导 `selected` —— 在这里置位，
+      同一次导出就能把"刚点读的论文"写进 vault（否则要等下一轮）。
+    ★ 幂等：已 `selected=1` 的论文不计入"新置位"；坏行显式返回，不静默吞。
+    """
+    entries, bad = load_wanted_with_errors(wanted_path(settings.data_dir()))
+    if not entries:
+        return 0, 0, bad
+
+    ids = [e.paper_id for e in entries]
+    rows = session.exec(select(Paper).where(col(Paper.id).in_(ids))).all()
+    by_id = {row.id: row for row in rows}
+    applied = 0
+    for pid in ids:
+        paper = by_id.get(pid)
+        if paper is None or paper.selected:
+            continue
+        paper.selected = True
+        applied += 1
+    missing = [pid for pid in ids if pid not in by_id]
+    return applied, len(ids), bad + [f"库内无此条目：{pid}" for pid in missing]
 
 
 def _file_matches(path: Path, content: str) -> bool:
@@ -397,6 +517,18 @@ def run_export(
 
     docs: list[ExportDoc] = []
     with Session(engine) as session:
+        # ★ 两个 public 真源必须在**选篇之前**消费 —— 它们都会改 `selected`，
+        #   而 `export` 默认只导 selected；顺序反了就是"点读了但导不出"（L7 接线陷阱）。
+        #   ① L7-4：`data/analyses/` 回填 db（Actions 分析产物在这里）
+        report.analyses_backfilled = backfill_analyses(session, settings)
+        #   ② L7-6：想读队列（报告/站点点读）⇒ selected=1
+        report.wanted_applied, report.wanted_total, wanted_errors = consume_wanted(
+            session, settings
+        )
+        if wanted_errors:
+            # ★ 坏行 / 库外 id 都要显式暴露（静默失败最危险），最多列 5 条
+            report.degraded["wanted"] = "；".join(wanted_errors[:5])
+
         if check and all_papers:
             # ★ --check --all：校验**磁盘上真实存在的全部笔记**（不只本次选集）。
             #   不依赖 note_path 是否回填过：按论文算一遍目标路径，文件存在就校验。
@@ -424,6 +556,10 @@ def run_export(
         watchlist = load_watchlist()
         # ★ 双轨渲染索引：本次导出的论文才有 vault 笔记；其余目标只给文本 + 外链
         note_index = {p.id: note_name(p, max_len=settings.export.filename_max_len) for p in papers}
+
+        # ★ L7-8：客观信号分（分项）—— 归一化在**全库**内做，选集变化不会让分数漂移
+        all_rows = list(session.exec(select(Paper)).all())
+        scores = score_many(all_rows, watchlist)
 
         # ★ 关联边（出边 / 入边）→ 渲染用 LinkRef
         out_map, in_map, similar_map, coupled_map = load_link_refs(session, [p.id for p in papers])
@@ -459,6 +595,7 @@ def run_export(
                 coupled=coupled_map.get(paper.id, []),
                 watchlist_groups=hit.groups if hit.matched else [],
                 degraded=report.degraded,
+                score=scores.get(paper.id),
             )
             content = exporter.render(paper, context)
             path = exporter.note_path(paper, context)
@@ -469,11 +606,13 @@ def run_export(
                 if paper.note_path != rel:
                     paper.note_path = rel
 
-        # links.json（本阶段空结构）
+        # links.json（★ L7-7：填真实关联，不再是空壳）
         docs.append(
             ExportDoc(
                 path=vault_dir / "90-元数据" / "links.json",
-                content=exporter.render_links_json([]),
+                content=exporter.render_links_json(
+                    build_link_edges(out_map, in_map, similar_map, coupled_map)
+                ),
             )
         )
 

@@ -177,6 +177,11 @@ deep_analysis:
   max_fulltext_chars: 100000
   # ★ 正文下限：短于此视为元数据/占位页（ar5iv 实测只给约 5k 的 abs 页），丢弃
   min_fulltext_chars: 2000
+  # ★ D 排序（v1.11 定案：热度 / 经典**交替** + 已读去重，§5.5）
+  #   热度侧 = hf_score 非空且 first_seen 在最近 N 天内的新增（缺失显示 —，不当作 0）
+  trending_lookback_days: 1
+  #   经典侧来源之一：库内**引用榜** Top N（被本库论文引用最多的工作，零成本、数据驱动）
+  citation_leaders: 10
   # 背景透镜（默认芯片/硬件；可换 generic/backend）
   lens:
     profile: chip

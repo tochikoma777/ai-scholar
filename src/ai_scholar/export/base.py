@@ -13,6 +13,7 @@ import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from ai_scholar.store.models import Paper
 
@@ -29,6 +30,21 @@ class LinkRef:
     evidence: str | None = None  # ★ 可解释性：为什么关联
     interpretation: str | None = None  # ★ L3a 关联解读（强相似边的 LLM 一句解读）
     published_at: str | None = None  # 无笔记时的排序依据
+
+
+@dataclass(frozen=True)
+class LinkEdge:
+    """一条**有向**关联（`links.json` 用；`LinkRef` 是渲染用的"对端"视角）。
+
+    ★ `links.json` 必须有 `src_id` / `dst_id`：只有单向会让人分不清"A 引用了 B"
+      还是"B 引用了 A"（与笔记里出边/入边分开渲染是同一个道理）。
+    """
+
+    src_id: str
+    dst_id: str
+    link_type: str
+    weight: float | None = None
+    evidence: str | None = None
 
 
 @dataclass
@@ -48,6 +64,8 @@ class ExportContext:
     # ★ watchlist 命中组名（只打★与排序，**不决定是否导出**）
     watchlist_groups: list[str] = field(default_factory=list)
     degraded: dict[str, str] = field(default_factory=dict)
+    # ★ L7-8：客观信号分（**分项**：heat / cross_source / topic，★ 红线 11：永不合成总分）
+    score: Any | None = None
 
 
 @dataclass
