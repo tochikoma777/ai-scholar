@@ -1,0 +1,151 @@
+{
+  "date": "2026-10-28",
+  "schema_version": 1,
+  "total_papers": 3369,
+  "new_today": 814,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2610.33650",
+      "title": "TAD: Distilling Vision-Language-Action Policies from Teacher Trajectories Alone",
+      "score": 2.9,
+      "groups": [
+        "multimodal",
+        "efficient-inference",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.35497",
+      "title": "When Fine-Grained Credit Assignment Helps and Hurts: Multimodal Agentic Reinforcement Learning through Video Editing",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ]
+    },
+    {
+      "id": "arXiv:2610.35698",
+      "title": "From Self-Confidence to Statistical Accuracy: Scaling Human-in-the-Loop Evaluation with Direct and LLM-Assisted Auditing",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.35586",
+      "title": "Linear Probes Transfer from Base to Distilled Language Models despite Rotation",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.35430",
+      "title": "Faithful Explanations under Missing Modalities in Multimodal Dementia Prognosis",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.35416",
+      "title": "ImgMT: Wikipedia-based Dataset For Evaluating Text-in-Image Translation",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.35355",
+      "title": "OneEEG: A Unified Signal-Visual Multimodal Language Model with Task-Aware Mixture of Projectors for Multi-Task EEG Understanding",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.35293",
+      "title": "AgenticCity-Bench: Longitudinal Multimodal Observations of Urban Dynamics with Agentic Reasoning",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.35138",
+      "title": "Co-Design Bench: Multimodal Collaborative Coding Evaluation for Agentic Models",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.34991",
+      "title": "Diagnosing and Mitigating Long-Session Degradation in Full-Duplex Speech Models",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ]
+    }
+  ],
+  "deep_analyzed": [],
+  "new_graded": [
+    {
+      "id": "arXiv:2610.33405",
+      "title": "Data Optimization for LLMs: A Survey",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2412.19437",
+      "title": "DeepSeek-V3 Technical Report",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2610.32748",
+      "title": "On the Identifiability of Hybrid Deep Generative Models: Meta-Learning as a Solution",
+      "score": 0.0,
+      "groups": []
+    },
+    {
+      "id": "arXiv:2610.23036",
+      "title": "Towards Looped Models Done Right, Part I: Topology, Input Injection, Recurrent-State Design",
+      "score": 0.0,
+      "groups": []
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "d3e77c8ec0ca",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1723,
+      "new": 814,
+      "degraded": []
+    },
+    {
+      "run_id": "981f520bcdc9",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.0593,
+  "cost_anomalies": []
+}
