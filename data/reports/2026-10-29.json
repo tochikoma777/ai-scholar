@@ -1,0 +1,144 @@
+{
+  "date": "2026-10-29",
+  "schema_version": 1,
+  "total_papers": 3847,
+  "new_today": 477,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2610.36729",
+      "title": "Hy-Nomas: Towards Free-form Interactive World Generation",
+      "score": 2.9,
+      "groups": [
+        "multimodal",
+        "efficient-inference",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.37211",
+      "title": "Uncovering Shortcut Amplification in Video RLVR through the Lens of Perceptual Uncertainty Collapse",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.36959",
+      "title": "Live-OPSD: On-Policy Self-Distillation for Proactive Streaming Large Video Models",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.37662",
+      "title": "Can Discrete Tokens Serve as Semantically Lossless Representations of Visual Signals?",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.36013",
+      "title": "OmniBrain-0: A Unified Agentic Model for Embodied Intelligence",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.37599",
+      "title": "MoI-Bench: A Benchmark for Image Generation and Editing on Mobile Devices",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.37437",
+      "title": "Representing the Unseen: Rethinking Visual Imagination for Spatial Reasoning",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.37430",
+      "title": "When Visual Evidence Is Insufficient: How Instructions, Post-Training, and Internal Activations Shape Refusal in Multimodal Language Models",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.37037",
+      "title": "Zooming without Zooming v2: From Seeing Details to Connecting Evidence for Generalizable Multimodal Perception",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.36929",
+      "title": "DocXEval: A Systematic Evaluation of Explainability in Multimodal Document Understanding",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    }
+  ],
+  "deep_analyzed": [],
+  "new_graded": [
+    {
+      "id": "arXiv:2610.36108",
+      "title": "Log-To-Leak: Prompt Injection Attacks on Tool-Using LLM Agents via the Model Context Protocol",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "30b21ea7a03f",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1763,
+      "new": 478,
+      "degraded": []
+    },
+    {
+      "run_id": "52a3d4db64a9",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.0327,
+  "cost_anomalies": []
+}
