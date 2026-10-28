@@ -1,0 +1,67 @@
+---
+period: {{ recap.period }}
+slug: {{ recap.slug }}
+start: {{ recap.start }}
+end: {{ recap.end }}
+schema_version: 1
+---
+
+# {{ recap.title }}
+
+> 由 `data/reports/YYYY-MM-DD.json` 重算的**派生产物**（零 LLM、零网络）。
+> {{ recap.coverage_text }}
+
+## 采集
+
+- 新增论文：{{ recap.new_papers }} 篇
+- 运行次数：{{ recap.runs_total }} 次
+
+## ★ 命中 Top{{ recap.top_hits|length }}
+
+{% if recap.top_hits %}
+{% for hit in recap.top_hits %}
+{% set groups_txt = " · " ~ hit.groups|join("、") if hit.groups else "" %}
+- `{{ hit.id }}` — {{ hit.title }}（命中 {{ hit.days }} 天{{ groups_txt }}）
+{% endfor %}
+{% else %}
+- 区间内无 watchlist 命中
+{% endif %}
+
+## LLM 产物
+
+- 新增定级：{{ recap.graded_total }} 篇{{ recap.graded_by_tier_text }}
+- 深度分析：{{ recap.deep_analyzed_total }} 篇
+
+## 成本
+
+{% if recap.cost_days %}
+- 区间合计：¥{{ "%.4f"|format(recap.cost_total) }}（{{ recap.cost_days }} 天有花费记录）
+- 日均：¥{{ "%.4f"|format(recap.cost_avg_cny) }}
+- 最高单日：¥{{ "%.4f"|format(recap.cost_peak_cny) }}（{{ recap.cost_peak_day }}）
+{% else %}
+- 区间内无成本记录（off 档或报告缺 `cost_cny`）
+{% endif %}
+- 成本异常天数：{{ recap.anomaly_days_text }}
+
+## 推演
+
+- 命中 {{ recap.predictions_hit }} · 未命中 {{ recap.predictions_miss }}
+- 命中率：{{ "%.1f%%"|format(recap.hit_rate * 100) if recap.hit_rate is not none else "样本不足" }}（★ `insufficient` 不进分母）
+
+## 降级复发
+
+{% if recap.degraded_days %}
+{% for key, days in recap.degraded_days.items() %}
+- {{ key }}：{{ days }} 天
+{% endfor %}
+{% else %}
+- 区间内无降级记录
+{% endif %}
+{% if recap.notes %}
+
+## 数据说明
+
+{% for note in recap.notes %}
+- {{ note }}
+{% endfor %}
+{% endif %}

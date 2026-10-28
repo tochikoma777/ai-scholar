@@ -22,7 +22,14 @@ from typing import Any
 
 import yaml
 
-from ai_scholar.export.base import ExportContext, ExportDoc, Exporter, LinkEdge, LinkRef
+from ai_scholar.export.base import (
+    ExportContext,
+    ExportDoc,
+    Exporter,
+    LinkEdge,
+    LinkRef,
+    TopicEntry,
+)
 from ai_scholar.store.models import LINK_TYPE_BIBCOUPLING, LINK_TYPE_SIMILARITY, Paper
 from ai_scholar.utils.timeutil import DEFAULT_TZ, format_local, today_local
 
@@ -67,6 +74,11 @@ def sanitize_title(title: str, *, max_len: int = DEFAULT_MAX_LEN) -> str:
 
 def short_hash(seed: str) -> str:
     return hashlib.sha256(seed.encode("utf-8")).hexdigest()[:8]
+
+
+def topic_note_path(vault_dir: Path, topic: str) -> Path:
+    """`20-主题/{topic}.md`（★ 组名也走 `sanitize_title`，防止非法字符写盘失败）。"""
+    return Path(vault_dir) / "20-主题" / f"{sanitize_title(topic)}.md"
 
 
 def note_name(paper: Paper, *, max_len: int = DEFAULT_MAX_LEN) -> str:
@@ -389,6 +401,55 @@ class ObsidianExporter(Exporter):
         return (
             f"{dump_frontmatter(fields)}\n{BEGIN_MARKER}\n" + "\n".join(lines) + f"{END_MARKER}\n"
         )
+
+    def render_topic_moc(
+        self,
+        existing: str,
+        *,
+        topic: str,
+        keywords: list[str],
+        entries: list[TopicEntry],
+        pending: int,
+        total: int,
+    ) -> str:
+        """`20-主题/{topic}.md` MOC（L9-B：主题维度入口）。
+
+        ★ 三条边界：
+        1. **只链到已有笔记**（`note_name is None` ⇒ 纯文本），死链比没有链接更糟；
+        2. **不含生成时间** ⇒ 幂等（`--check` 会比对它，与首页同口径）；
+        3. 用户区在标记块**外**，永不覆盖（与 Daily Note 同机理）。
+        """
+        _old_fields, old_body = parse_frontmatter(existing)
+        _old_generated, old_user = split_generated(old_body)
+        user = old_user.lstrip("\n")
+        if USER_SECTION_TITLE not in user:
+            user = f"{USER_SECTION_TITLE}\n"
+        elif not user.endswith("\n"):
+            user += "\n"
+
+        lines = [
+            "",
+            f"命中论文：{total} 篇（有笔记 {len(entries)} 篇 · 未导出 {pending} 篇）",
+            "",
+        ]
+        if keywords:
+            lines += [f"> 关键词（watchlist 组 `{topic}`）：{'、'.join(keywords)}", ""]
+        lines += ["## 有笔记"]
+        if entries:
+            for entry in entries:
+                meta = f"`{entry.id}` · 首见 {entry.first_seen or '—'}"
+                if entry.tier is not None:
+                    meta += f" · Tier {entry.tier}"
+                title = entry.title[:80]
+                if entry.note_name:
+                    lines.append(f"- [[{entry.note_name}]] — {title}（{meta}）")
+                else:  # ★ 无笔记 ⇒ 不做 wikilink
+                    lines.append(f"- {title}（{meta}）")
+        else:
+            lines.append("- 该主题下还没有笔记（收藏 / 点读后 `export` 即出现）")
+        body = f"{BEGIN_MARKER}\n" + "\n".join(lines) + f"\n{END_MARKER}\n\n{user}"
+        fields = {"title": f"主题 · {topic}", "topic": topic, "schema_version": SCHEMA_VERSION}
+        return f"{dump_frontmatter(fields)}\n{body}"
 
     def render_report(
         self,

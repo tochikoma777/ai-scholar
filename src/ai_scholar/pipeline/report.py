@@ -18,6 +18,7 @@ import os
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel, Field
@@ -35,6 +36,9 @@ from ai_scholar.store.scoreboard import (
 from ai_scholar.store.wanted import want_command
 from ai_scholar.utils.timeutil import DEFAULT_TZ, day_window, parse_iso_date
 
+if TYPE_CHECKING:  # ★ 只在类型检查时导入，避免与 pipeline.recap 循环依赖
+    from ai_scholar.pipeline.recap import RecapReport
+
 SCHEMA_VERSION = 1
 WATCHLIST_TOP_N = 10
 _TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates" / "report"
@@ -47,6 +51,8 @@ class ReportHit(BaseModel):
     title: str
     score: float = 0.0  # ★ watchlist 命中分（只用于排序，不是门槛）
     groups: list[str] = Field(default_factory=list)
+    # ★ L3b-1 定级结果（只在「今日定级」段有值；未定级 None）
+    tier: int | None = None
 
     @property
     def want_cmd(self) -> str:
@@ -230,7 +236,9 @@ def build_daily_report(
 
     graded_today = list(session.exec(select(Paper).where(col(Paper.graded_at) == day)).all())
     graded_today.sort(key=lambda p: (p.tier or 9, p.title))
-    new_graded = [ReportHit(id=p.id, title=p.title, score=0.0, groups=[]) for p in graded_today]
+    new_graded = [
+        ReportHit(id=p.id, title=p.title, score=0.0, groups=[], tier=p.tier) for p in graded_today
+    ]
 
     analyzed_today = list(
         session.exec(select(Paper).where(col(Paper.deep_analyzed_at) == day)).all()
@@ -271,20 +279,28 @@ def build_daily_report(
     )
 
 
-def render_markdown(report: DailyReport) -> str:
-    """用 Jinja 模板渲染 md（★ 调格式只改 .j2）。"""
-    env = Environment(
+def _jinja_env() -> Environment:
+    """模板环境（★ daily 与 recap 共用同一套 jinja 配置）。"""
+    return Environment(
         loader=FileSystemLoader(str(_TEMPLATE_DIR)),
         autoescape=False,
         keep_trailing_newline=True,
         trim_blocks=True,
         lstrip_blocks=True,
     )
-    template = env.get_template("daily.md.j2")
-    return template.render(report=report)
 
 
-def _atomic_write(path: Path, content: str) -> None:
+def render_markdown(report: DailyReport) -> str:
+    """用 Jinja 模板渲染 md（★ 调格式只改 .j2）。"""
+    return _jinja_env().get_template("daily.md.j2").render(report=report)
+
+
+def render_recap(recap: RecapReport) -> str:
+    """渲染周报 / 月报 md（★ 加新报告类型 = 新增渲染器 + 模板，§6.6）。"""
+    return _jinja_env().get_template("recap.md.j2").render(recap=recap)
+
+
+def atomic_write(path: Path, content: str) -> None:
     """原子写（★ 与 export/base.py 同一机制，防半截文件）。"""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
@@ -296,6 +312,6 @@ def write_report(report: DailyReport, out_dir: Path) -> ReportOutcome:
     """写 `YYYY-MM-DD.md` + `.json`（★ json 给机器/AI 工具看，顺带兑现核心判据）。"""
     md_path = out_dir / f"{report.date}.md"
     json_path = out_dir / f"{report.date}.json"
-    _atomic_write(md_path, render_markdown(report))
-    _atomic_write(json_path, report.model_dump_json(indent=2) + "\n")
+    atomic_write(md_path, render_markdown(report))
+    atomic_write(json_path, report.model_dump_json(indent=2) + "\n")
     return ReportOutcome(report=report, md_path=md_path, json_path=json_path)

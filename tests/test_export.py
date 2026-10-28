@@ -18,7 +18,7 @@ from sqlmodel import Session, SQLModel, select
 from typer.testing import CliRunner
 
 from ai_scholar.cli import app
-from ai_scholar.config import Settings
+from ai_scholar.config import Settings, WatchlistConfig, WatchlistGroup
 from ai_scholar.export.base import ExportContext, LinkRef
 from ai_scholar.export.obsidian import (
     BEGIN_MARKER,
@@ -903,3 +903,66 @@ def test_analyses_backfilled_from_public_source(tmp_path: Path) -> None:
 
     note = next((vault / "10-文献").rglob("*.md"))
     assert "来自 public 真源" in note.read_text(encoding="utf-8")
+
+
+# ── 主题 MOC（L9-B）────────────────────────────────────────────────────────
+def _fixed_watchlist(monkeypatch: pytest.MonkeyPatch) -> None:
+    """★ 固定 watchlist：主题 MOC 的口径就是分组，不能跟着本地 `.local.yaml` 漂移。"""
+    cfg = WatchlistConfig(
+        default_threshold=0.9,
+        groups=[
+            WatchlistGroup(name="multimodal", weight=1.0, keywords=["multimodal"]),
+            WatchlistGroup(name="ai-safety", weight=1.0, keywords=["reward hacking"]),
+        ],
+    )
+    monkeypatch.setattr("ai_scholar.pipeline.export.load_watchlist", lambda: cfg)
+
+
+def test_topic_moc_generated_only_for_matched_groups(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_path = tmp_path / "data" / "t.db"
+    _seed_db(
+        db_path,
+        [
+            make_paper("arXiv:1", "Multimodal Benchmark Study", selected=True),
+            make_paper("arXiv:2", "Multimodal on-device quantization", selected=False),
+        ],
+    )
+    _fixed_watchlist(monkeypatch)
+    vault = tmp_path / "vault"
+    run_export(settings=_settings(tmp_path), db_path=db_path, out=vault)
+
+    topic = vault / "20-主题" / "multimodal.md"
+    assert topic.exists(), "命中的组必须生成主题页"
+    assert not (vault / "20-主题" / "ai-safety.md").exists(), "无命中的组不生成（避免空壳）"
+
+    text = topic.read_text(encoding="utf-8")
+    assert "命中论文：2 篇（有笔记 1 篇 · 未导出 1 篇）" in text
+    # ★ 死链禁令：只有 1 篇有笔记 ⇒ 全文只能有 1 个 wikilink
+    assert text.count("[[") == 1
+    assert "[[2026-10-20__Multimodal-Benchmark-Study-" in text
+    # ★ 未导出的只进计数、不列行（否则主题页会塞进几百条无笔记的条目）
+    assert "未导出 1 篇" in text
+    assert "Multimodal on-device quantization" not in text
+
+
+def test_topic_moc_idempotent_and_keeps_user_section(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """★ 两条硬约束：连续两次导出无 diff；标记块外的用户区永不覆盖。"""
+    db_path = tmp_path / "data" / "t.db"
+    _seed_db(db_path, [make_paper("arXiv:1", "Multimodal Benchmark Study")])
+    _fixed_watchlist(monkeypatch)
+    vault = tmp_path / "vault"
+    run_export(settings=_settings(tmp_path), db_path=db_path, out=vault)
+    topic = vault / "20-主题" / "multimodal.md"
+    first = topic.read_text(encoding="utf-8")
+
+    topic.write_text(first + "\n我的主题笔记：这条必须活下来\n", encoding="utf-8")
+    run_export(settings=_settings(tmp_path), db_path=db_path, out=vault)
+    second = topic.read_text(encoding="utf-8")
+
+    assert "我的主题笔记：这条必须活下来" in second
+    generated = second.split(END_MARKER, 1)[0]
+    assert generated == first.split(END_MARKER, 1)[0], "生成区必须逐字节一致（无时间戳）"

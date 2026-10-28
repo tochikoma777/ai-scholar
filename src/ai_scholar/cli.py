@@ -1220,12 +1220,29 @@ def stats(
 def report(
     day: str | None = typer.Option(None, "--date", help="报告日期（默认今天，YYYY-MM-DD）"),
     out: str | None = typer.Option(None, "--out", help="输出目录（默认 data/reports）"),
+    weekly: bool = typer.Option(
+        False, "--weekly", help="改出**周报**（自然周，锚点 = --date 或今天）"
+    ),
+    monthly: bool = typer.Option(
+        False, "--monthly", help="改出**月报**（自然月，锚点 = --date 或今天）"
+    ),
 ) -> None:
-    """生成当日报告快照：`data/reports/YYYY-MM-DD.md` + `.json`（★ 只读，不写库）。
+    """生成报告快照（★ 只读，不写库；零 LLM）。
 
-    ★ 聚合「概览 / ★命中 Top10 / 深度分析 / 新定级 / 今日推演 / 想读 / 运行状态 / 成本」各块；
-    深度分析与新定级自 L7 起按当日 `deep_analyzed_at` / 定级时间填充（不再是恒空占位）。
+    - 默认：`data/reports/YYYY-MM-DD.md` + `.json`
+    - `--weekly`：`weekly-YYYY-Www.{md,json}`；`--monthly`：`monthly-YYYY-MM.{md,json}`
+
+    ★ 周报/月报是**派生产物**：只读 `data/reports/*.json` 真源重算，不读 db、不读 vault，
+      不含生成时间 ⇒ 同一份输入重跑逐字节一致。
+    ★ 每日报告聚合「概览 / ★命中 Top10 / 深度分析 / ★今日定级 / 今日推演 / 想读 /
+      运行状态 / 成本」。
     """
+    from ai_scholar.pipeline.recap import (
+        build_recap,
+        month_window,
+        week_window,
+        write_recap,
+    )
     from ai_scholar.pipeline.report import build_daily_report, write_report
     from ai_scholar.utils.timeutil import today_local
 
@@ -1246,6 +1263,28 @@ def report(
     else:
         out_dir = settings.data_dir() / "reports"
 
+    if weekly and monthly:
+        console.print("[red]--weekly 与 --monthly 只能选一个[/]")
+        raise typer.Exit(2)
+    if weekly or monthly:
+        window = week_window(today) if weekly else month_window(today)
+        # ★ 真源固定是 `data/reports/`（`--out` 只改派生产物的落点，不动真源口径）
+        recap = build_recap(settings.data_dir() / "reports", window=window)
+        outcome = write_recap(recap, out_dir)
+        table = Table(title=f"report · {recap.title}", title_justify="left")
+        table.add_column("项")
+        table.add_column("值")
+        table.add_row("覆盖天数", f"{recap.days_covered} / {recap.days_expected}")
+        table.add_row("新增论文", str(recap.new_papers))
+        table.add_row("新增定级", str(recap.graded_total))
+        table.add_row("成本合计", f"¥{recap.cost_total:.4f}")
+        table.add_row("md", str(outcome.md_path))
+        table.add_row("json", str(outcome.json_path))
+        console.print(table)
+        for note in recap.notes:
+            console.print(f"[yellow]note[/] {note}")
+        raise typer.Exit(0)
+
     engine = create_engine(f"sqlite:///{settings.db_path()}", echo=False)
     watchlist = load_watchlist()
     with Session(engine) as session:
@@ -1257,7 +1296,7 @@ def report(
             timezone=settings.app.timezone,
         )
 
-    outcome = write_report(daily, out_dir)
+    daily_outcome = write_report(daily, out_dir)
 
     table = Table(title=f"report · {daily.date}", title_justify="left")
     table.add_column("项")
@@ -1266,8 +1305,8 @@ def report(
     table.add_row("今日新增", str(daily.new_today))
     table.add_row("★ 命中", str(len(daily.watchlist_hits)))
     table.add_row("今日 run", str(len(daily.runs)))
-    table.add_row("md", str(outcome.md_path))
-    table.add_row("json", str(outcome.json_path))
+    table.add_row("md", str(daily_outcome.md_path))
+    table.add_row("json", str(daily_outcome.json_path))
     console.print(table)
     if daily.degraded:
         for key, reason in daily.degraded.items():

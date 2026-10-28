@@ -47,6 +47,17 @@ class LinkEdge:
     evidence: str | None = None
 
 
+@dataclass(frozen=True)
+class TopicEntry:
+    """主题 MOC 里的一行（★ `note_name` 为 None ⇒ **不做 wikilink**，避免死链）。"""
+
+    id: str
+    title: str
+    first_seen: str | None = None
+    tier: int | None = None
+    note_name: str | None = None
+
+
 @dataclass
 class ExportContext:
     """渲染一篇笔记所需的一切（不让它自己去查库 / 读配置）。"""

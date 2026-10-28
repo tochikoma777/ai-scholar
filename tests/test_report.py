@@ -13,6 +13,7 @@ from ai_scholar.config import WatchlistConfig, WatchlistGroup
 from ai_scholar.pipeline.report import (
     DailyReport,
     PredictionBrief,
+    ReportHit,
     RunStatus,
     build_daily_report,
     render_markdown,
@@ -148,8 +149,35 @@ def test_empty_state_renders_placeholder(tmp_path: Path) -> None:
     md = render_markdown(report)
     assert "# 2026-10-24" in md
     assert "今日无 watchlist 命中" in md
-    assert "暂无（L3 实现后填充）" in md
+    # ★ 回归（2026-10-28）：空态文案曾写成「暂无（L3 实现后填充）」—— L3 早已交付，
+    #   这句话会让读者以为功能没做（负责人已在真实报告 2026-10-28.md 里读到过）。
+    assert "L3 实现后填充" not in md
+    assert "今日无新增深度分析" in md
+    assert "今日无新增定级" in md
     assert "今日无运行记录" in md
+
+
+def test_graded_shows_tier_and_predictions_fallback_keeps_newline(tmp_path: Path) -> None:
+    """★ 回归（2026-10-28）：① 定级段不显示 Tier ② 推演空态与「观点」挤成一行。
+
+    判据同样按行计数：`- 今日无新增、到期或已验证的推演- 观点 0 条` 这种拼接
+    用子串断言是恒真的，必须断言「观点」独占一行。
+    """
+    report = DailyReport(
+        date="2026-10-24",
+        new_graded=[
+            ReportHit(id="arXiv:1", title="Tier 1 论文", tier=1),
+            ReportHit(id="arXiv:2", title="未定级论文"),
+        ],
+    )
+    md = render_markdown(report)
+    assert "- `arXiv:1` — Tier 1 论文（Tier 1）" in md
+    assert "- `arXiv:2` — 未定级论文（定级中）" in md
+
+    lines = md.split("## 今日推演", 1)[1].split("## ★ 想读", 1)[0].splitlines()
+    bullet_lines = [ln for ln in lines if ln.startswith("- ")]
+    assert "- 今日无新增、到期或已验证的推演" in bullet_lines
+    assert "- 观点 0 条（★ 不可证伪，不进统计）" in bullet_lines
 
 
 def test_multi_item_sections_render_one_line_each(tmp_path: Path) -> None:

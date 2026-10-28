@@ -34,17 +34,19 @@ schema_version: {{ report.schema_version }}
 - `{{ hit.id }}` — {{ hit.title }}
 {% endfor -%}
 {%- else -%}
-- 暂无（L3 实现后填充）
+- 今日无新增深度分析（已有产物见 `data/analyses/`）
 {%- endif %}
 
-## 新定级
+## ★ 今日定级
 
 {% if report.new_graded -%}
 {% for hit in report.new_graded %}
-- `{{ hit.id }}` — {{ hit.title }}
+{#- ★ 行尾必须落在变量标签上：jinja 开了 trim_blocks，块标签后的换行会被吃掉，多条会挤成一行 -#}
+{% set tier_txt = "（Tier " ~ hit.tier ~ "）" if hit.tier is not none else "（定级中）" %}
+- `{{ hit.id }}` — {{ hit.title }}{{ tier_txt }}
 {% endfor -%}
 {%- else -%}
-- 暂无（L3 实现后填充）
+- 今日无新增定级
 {%- endif %}
 
 ## 今日推演
@@ -68,7 +70,7 @@ schema_version: {{ report.schema_version }}
 {%- endif %}
 {%- if not report.predictions_new and not report.predictions_verified and not report.predictions_due -%}
 - 今日无新增、到期或已验证的推演
-{%- endif %}
+{% endif %}
 - 观点 {{ report.opinions_total }} 条（★ 不可证伪，不进统计）
 
 ## ★ 想读（点读入口）

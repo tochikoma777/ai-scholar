@@ -24,8 +24,8 @@ from ai_scholar.config import (
     project_root,
     watchlist_paths,
 )
-from ai_scholar.export.base import ExportContext, ExportDoc, LinkEdge, LinkRef
-from ai_scholar.export.obsidian import ObsidianExporter, note_name
+from ai_scholar.export.base import ExportContext, ExportDoc, LinkEdge, LinkRef, TopicEntry
+from ai_scholar.export.obsidian import ObsidianExporter, note_name, topic_note_path
 from ai_scholar.models import WatchlistConfig
 from ai_scholar.pipeline.report import DailyReport, build_daily_report
 from ai_scholar.pipeline.score import score_many
@@ -499,6 +499,65 @@ def _daily_note_lines(
     return lines
 
 
+def _topic_docs(
+    watchlist: WatchlistConfig,
+    *,
+    papers: list[Paper],
+    noted_ids: set[str],
+    note_names: dict[str, str],
+    vault_dir: Path,
+    exporter: ObsidianExporter,
+) -> list[ExportDoc]:
+    """`20-主题/{组}.md`（L9-B）：按 **watchlist 分组**聚出主题页。
+
+    ★ 口径：组 = 主题（负责人 2026-10-28 定案，不另建 topics.yaml）。
+    ★ 边界：无命中的组**不生成**；未导出的论文**不做 wikilink**（死链最差）；
+      排序确定（首见日 → id）⇒ 幂等。
+    """
+    by_group: dict[str, list[Paper]] = {group.name: [] for group in watchlist.groups}
+    for paper in papers:
+        hit = match_watchlist(watchlist, paper.title, paper.abstract or "")
+        if not hit.matched:
+            continue
+        for name in hit.groups:
+            if name in by_group:
+                by_group[name].append(paper)
+
+    docs: list[ExportDoc] = []
+    for group in watchlist.groups:
+        hits = by_group[group.name]
+        if not hits:
+            continue
+        noted = [p for p in hits if p.id in noted_ids]
+        noted.sort(key=lambda p: (p.first_seen_at or "", p.id), reverse=True)
+        entries = [
+            TopicEntry(
+                id=p.id,
+                title=p.title,
+                first_seen=(p.first_seen_at or "")[:10] or None,
+                tier=p.tier,
+                note_name=note_names.get(p.id),
+            )
+            for p in noted
+        ]
+        path = topic_note_path(vault_dir, group.name)
+        existing = path.read_text(encoding="utf-8") if path.exists() else ""
+        docs.append(
+            ExportDoc(
+                path=path,
+                content=exporter.render_topic_moc(
+                    existing,
+                    topic=group.name,
+                    keywords=list(group.keywords),
+                    entries=entries,
+                    pending=len(hits) - len(noted),
+                    total=len(hits),
+                ),
+            )
+        )
+    return docs
+
+
 def run_export(
     *,
     limit: int | None = None,
@@ -665,6 +724,20 @@ def run_export(
             note_names=index_names,
         )
         docs.append(ExportDoc(path=vault_dir / "00-首页.md", content=index_text))
+
+        # 20-主题/{组}.md（L9-B：主题 MOC，口径 = watchlist 分组）
+        noted_ids = {p.id for p in index_papers}
+        library_papers = list(session.exec(select(Paper)).all())
+        docs.extend(
+            _topic_docs(
+                watchlist,
+                papers=library_papers,
+                noted_ids=noted_ids,
+                note_names=index_names,
+                vault_dir=vault_dir,
+                exporter=exporter,
+            )
+        )
 
         # 40-日志/YYYY-MM-DD.md（L2-C Daily Note：本地 export 产物，§6.6）
         day = today or today_local()
