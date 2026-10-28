@@ -112,6 +112,8 @@ migrate → collect → collect --classics → enrich → signals → relate →
 - ★ **两份 db**：Actions 用 actions-cache 里的 db，本地是 `data/ai_scholar.db`（gitignored）。
   ⇒ 典型现象：`data/analyses/` 有产物但本地 vault 没有 —— 该论文不在**本地** db，
   本地补跑 `collect` 再 `export` 即可（不是 bug）。
+- ★ `daily.yml` 有 `concurrency` 分组：防两次 run 并发 push 互相覆盖 public 真源。
+  本地要与 bot 双写同一分支 ⇒ **push 前先 rebase**（见 `docs/经验固化.md`）。
 
 **站点发布**（L8-C）：`daily` job 内 `ai-scholar site --out _site` → `upload-pages-artifact`
 → 独立 `deploy-pages` job（`github-pages` environment）→
@@ -249,6 +251,8 @@ migrate → collect → collect --classics → enrich → signals → relate →
 
 ★ **vault 与代码仓库物理隔离**。本项目的 Actions **只 commit public 仓库**；
 vault 由本地 `export` 写入。任何"让 Actions 写 private vault"的设计都已被否掉，不要提出。
+★ vault 的 commit / push **由本地手动完成**（Actions 不碰它）：先 `git -C ~/projects/ai-scholar-vault status -sb`
+看改动，再自己提交推送；别把 vault 路径写进本仓库的 remote 或 workflow。
 
 ★ **public 真源由 daily bot 提交，本地不要顺手 commit `data/`**（经验固化 G5）：
 本地跑 `report` / `collect` 后用本地 db 覆盖 `data/reports` 会抹掉 bot 的
@@ -396,8 +400,20 @@ vault 由本地 `export` 写入。任何"让 Actions 写 private vault"的设计
 
 ## 常用命令（随阶段扩充）
 
+### 从零起跑（新环境最短路径）
+
 ```bash
-uv sync                          # 安装依赖（含 dev）
+uv sync                                   # 依赖（含 dev）
+uv run ai-scholar init                    # 目录骨架 + watchlist.local.yaml + .env 骨架
+uv run ai-scholar doctor                  # 体检（无 key 也全绿，退出码 0）
+uv run ai-scholar collect --days 2
+uv run ai-scholar mark arXiv:2610.30122   # ★ 不 mark 就没有产出：export 默认只导 selected=1
+uv run ai-scholar export
+```
+
+★ 没配 LLM key ⇒ 自动降级 `off`，整条链路照跑（增强 / 定级 / 分析跳过），**不要为此报错或改代码**。
+
+```bash
 uv run ai-scholar --help         # 命令树
 uv run ai-scholar init           # 目录骨架 + watchlist.local.yaml + .env 骨架
 uv run ai-scholar doctor         # 环境体检（无 key 时提示降级 off，退出码 0）
@@ -446,6 +462,11 @@ uv run ai-scholar report [--date YYYY-MM-DD] [--out DIR]
 uv run ai-scholar budget --input-tokens N --max-tokens M [--tier fast|strong]
                                  # 预算演练（★ 不调 LLM，只估算成本 + 过闸门）
 uv run alembic upgrade head      # 建库（★ 空 data/ 目录也能跑）
+
+# 改 schema（新增表 / 列）时
+uv run alembic revision --autogenerate -m "add xxx"
+#   ★ 已知坑：生成的迁移用 sqlmodel 的 AutoString() 却没 import sqlmodel ⇒ upgrade 直接
+#     NameError。把 AutoString() 手改成 sa.String()（docs/开发日志.md「踩到的坑」#1）。
 
 uv run python scripts/probe_sources.py        # 数据源探测（需联网，产出 docs/数据源手册.md）
 
@@ -508,14 +529,19 @@ gh run list --workflow=daily.yml --limit 3        # 最近三次 daily 是否 su
 - 除 `test_live_arxiv_parse` / `test_live_hf_parse_may_skip` 外，网络一律 respx 拦截；
   这两个联网冒烟在连接失败、非 200 或无数据时 skip，但解析断言失败仍会让测试红。
 - 断言要落在**实际收到的值**上（如 `settings.llm.base_url`），不是"加载成功"。
-- 基线（tag `l8a` + 2026-10-26 审计修复）：`uv run pytest -m "not live" -q` = **382 passed**；
-  全量 378（多 2 个 `@pytest.mark.live` 联网冒烟，无真实响应时 skip）。
+- 基线（tag `l8a` + 2026-10-26 审计修复）：`uv run pytest -m "not live"` = **382 passed**；
+  全量 **384**（= 382 + 2 个 `@pytest.mark.live` 联网冒烟，无真实响应时 skip）。
+  ★ 核对口径：`uv run pytest --collect-only -o addopts="" | tail -2`（避免 `-qq` 吞掉汇总行）。
   ★ `-q` 叠加 `pyproject` 里的 `addopts = "-q"` 会变成 `-qq`，**pytest 不再打印
   `N passed` 汇总行** —— 要数字就去掉一个 `-q` 或用 `--collect-only` 计数。
   数字对不上先查原因再往下做。
   单条 / 单文件：`uv run pytest tests/test_export.py::test_xxx -q`、`uv run pytest -k "config or watchlist" -q`。
 - ★ **离线跑法**：`uv run pytest -m "not live" -q`。联网冒烟（`test_live_arxiv_parse` /
   `test_live_hf_parse_may_skip`）带 `@pytest.mark.live`，拿不到真实响应就 skip。
+- ★ **本地 shell 里的 `AI_SCHOLAR_*` 环境变量会污染测试**（pydantic-settings 优先读
+  `os.environ`，conftest 只打桩 `load_dotenv`）。典型症状：`tier` 断言 `off` 却拿到 `fast`，
+  2 个用例红而 CI 绿。验证前先清：
+  `env -u AI_SCHOLAR_MODE -u AI_SCHOLAR_LLM__API_KEY -u AI_SCHOLAR_LLM__BASE_URL uv run pytest -m "not live"`。
 - ★ **CODEBUDDY 里的行号引用会被机器校验**：凡是写成 `path.py:NNN 符号` 的（如
   `pipeline/collect.py:310 run_collect`），`tests/test_docs_consistency.py::test_codebuddy_line_anchors`
   会断言该行附近确有该符号 —— **改完代码记得重跑，漂了就改文档**。
@@ -532,7 +558,7 @@ gh run list --workflow=daily.yml --limit 3        # 最近三次 daily 是否 su
 | 源 | 可用性 | 说明 |
 |---|---|---|
 | arXiv API | `always` | 限速约 1 req / 3s |
-| HF Daily Papers | `always` | ★ availability 描述"源本身是否公开可用"，**不是**"从某台机器能不能访问"；本地 WSL 连不上官方域名是**网络环境问题**，配 `hf_base_url`（镜像）即可解，不可达只 warning + 跳过、**不计失败** |
+| HF Daily Papers | `always` | ★ availability 描述"源本身是否公开可用"，**不是**"从某台机器能不能访问"；本地 WSL 连不上官方域名是**网络环境问题**，配 `hf_base_url`（镜像，环境变量 `AI_SCHOLAR_SOURCES__HF_DAILY__HF_BASE_URL`）即可解，不可达只 warning + 跳过、**不计失败** |
 | Semantic Scholar（L1+） | `always` | 只走 `POST /graph/v1/paper/batch` |
 
 ★ 本地（WSL）**可联网**，探测与采集均可在本地完成；Actions 是自动化通道，不是唯一验证途径。
