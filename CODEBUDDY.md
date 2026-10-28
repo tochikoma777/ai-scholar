@@ -241,11 +241,13 @@ migrate → collect → collect --classics → enrich → signals → relate →
 | **`first_seen_at`**（首次见到它的日期） | ❌ | `data/first_seen.jsonl` | **✓ public** |
 | **signals 时序快照**（被引增长曲线） | ❌ | `data/signals/YYYY-MM.jsonl` | **✓ public** |
 | 每日报告 md + json | ✅ | `data/reports/YYYY-MM-DD.{md,json}` | **✓ public** |
+| 周报 / 月报（L9-A 派生） | ✅（可由日报重算） | `data/reports/weekly-YYYY-Www.{md,json}` · `monthly-YYYY-MM.{md,json}` | 未入 daily（手动 `report --weekly/--monthly`） |
 | **推演记分板**（可验证判断快照） | ❌ | `data/predictions/scoreboard.jsonl` | **✓ public** |
 | **想读队列**（报告/站点点读，L7-6） | ❌ | `data/wanted.jsonl`（append-only；`export` 消费后置 `selected=1`） | **✓ public** |
 | **长期观点**（不可证伪） | ❌ | `data/predictions/opinions.jsonl` | **✓ public**（但不进统计） |
 | **深度分析产物**（六段 / 三句半 / 透镜） | ❌（重跑要花钱） | `data/analyses/{id}.md`（**L7 #4 已接线**；db 只是缓存，`export` 会反向回填） | **✓ public** |
 | 用户笔记 | ❌ | **独立 private vault 仓库**：`~/projects/ai-scholar-vault/` | ✗（不进本仓库） |
+| **主题 MOC**（L9-B，按 watchlist 分组） | ✅（可由 db 重算） | vault `20-主题/{组}.md`（只链**已有笔记**；`export` 生成，未命中组不生成） | ✗（vault 是 private） |
 | 论文正文 / 全文 | — | **永不入库**（临时抓取、抓完即弃） | ❌ 绝对禁止 |
 | `config/watchlist.local.yaml` | — | 本地（配置洁癖：不该让别人 clone 到你的兴趣清单） | ✗ |
 
@@ -459,6 +461,12 @@ uv run ai-scholar list [--limit N] [--since DATE] [--watchlist-only]
                                  # ★ = watchlist 命中（只做展示筛选）
 uv run ai-scholar report [--date YYYY-MM-DD] [--out DIR]
                                  # 每日报告（只读 DB，写 data/reports/YYYY-MM-DD.{md,json}）
+uv run ai-scholar report --weekly [--date YYYY-MM-DD] [--out DIR]
+                                 # 周报（自然周）：weekly-YYYY-Www.{md,json}
+uv run ai-scholar report --monthly [--date YYYY-MM-DD] [--out DIR]
+                                 # 月报（自然月）：monthly-YYYY-MM.{md,json}
+                                 # ★ 二者互斥；只读 data/reports/*.json 真源重算（零 LLM、不读 db），
+                                 #   --out 只改派生产物落点；不含生成时间 ⇒ 幂等
 uv run ai-scholar budget --input-tokens N --max-tokens M [--tier fast|strong]
                                  # 预算演练（★ 不调 LLM，只估算成本 + 过闸门）
 uv run alembic upgrade head      # 建库（★ 空 data/ 目录也能跑）
@@ -469,6 +477,8 @@ uv run alembic revision --autogenerate -m "add xxx"
 #     NameError。把 AutoString() 手改成 sa.String()（docs/开发日志.md「踩到的坑」#1）。
 
 uv run python scripts/probe_sources.py        # 数据源探测（需联网，产出 docs/数据源手册.md）
+uv run python scripts/probe_openreview.py --n 20 --no-write
+                                 # OpenReview 实测（标题命中率 + 误命中 + 耗时；先实测再接线 D1）
 
 uv run pytest                    # 全量（含 2 个联网冒烟；其余网络用 respx mock）
 uv run pytest tests/test_export.py -q          # 单文件
@@ -502,6 +512,9 @@ gh run list --workflow=daily.yml --limit 3        # 最近三次 daily 是否 su
 | `pipeline/stats.py` | `pytest -k stats`（★ insufficient 不计分母 / 样本不足不下结论）+ 实跑 `stats --verify` |
 | `pipeline/score.py` | `pytest -k score`（★ 三分量独立 / 无 total） |
 | `pipeline/report.py` · `templates/report/` | `pytest -k report`（★ 当天重跑无 diff；只读 DB） |
+| `templates/report/*.md.j2` | `pytest -k report`（★ **trim_blocks**：行尾别放 `{% endif %}`，否则换行被吃掉、多条挤成一行，2026-10-26/28 各踩一次） |
+| `pipeline/recap.py` · `templates/report/recap.md.j2` | `pytest -k recap`（★ 幂等 / 坏 JSON 与缺目录显式上报 / 只读 `data/reports/*.json`） |
+| `pipeline/export.py` 的 `_topic_docs` · `export/obsidian.py` 的 `render_topic_moc` | `pytest -k export`（★ 死链不出现 / 未命中组不生成 / 用户区保留） |
 | `pipeline/site.py` · `export/html.py` | `pytest -k site` + 实跑 `ai-scholar site --check`（应退出 0；★ 无生成时间 ⇒ 逐字节幂等） |
 | `budget.py` · 预算配置 | `pytest -k budget` + `ai-scholar budget ...` 演练（零网络） |
 | `pipeline/cost.py` · `ai-scholar cost` | `pytest -k cost`（★ 累计真源 = `data/reports/*.json`；db 只用于分项） |
@@ -529,8 +542,8 @@ gh run list --workflow=daily.yml --limit 3        # 最近三次 daily 是否 su
 - 除 `test_live_arxiv_parse` / `test_live_hf_parse_may_skip` 外，网络一律 respx 拦截；
   这两个联网冒烟在连接失败、非 200 或无数据时 skip，但解析断言失败仍会让测试红。
 - 断言要落在**实际收到的值**上（如 `settings.llm.base_url`），不是"加载成功"。
-- 基线（tag `l8a` + 2026-10-26 审计修复）：`uv run pytest -m "not live"` = **382 passed**；
-  全量 **384**（= 382 + 2 个 `@pytest.mark.live` 联网冒烟，无真实响应时 skip）。
+- 基线（tag `l8a` + L9 文档/报告审计 + L9-A/B）：`uv run pytest -m "not live"` = **393 passed**；
+  全量 **395**（= 393 + 2 个 `@pytest.mark.live` 联网冒烟，无真实响应时 skip）。
   ★ 核对口径：`uv run pytest --collect-only -o addopts="" | tail -2`（避免 `-qq` 吞掉汇总行）。
   ★ `-q` 叠加 `pyproject` 里的 `addopts = "-q"` 会变成 `-qq`，**pytest 不再打印
   `N passed` 汇总行** —— 要数字就去掉一个 `-q` 或用 `--collect-only` 计数。
@@ -560,6 +573,7 @@ gh run list --workflow=daily.yml --limit 3        # 最近三次 daily 是否 su
 | arXiv API | `always` | 限速约 1 req / 3s |
 | HF Daily Papers | `always` | ★ availability 描述"源本身是否公开可用"，**不是**"从某台机器能不能访问"；本地 WSL 连不上官方域名是**网络环境问题**，配 `hf_base_url`（镜像，环境变量 `AI_SCHOLAR_SOURCES__HF_DAILY__HF_BASE_URL`）即可解，不可达只 warning + 跳过、**不计失败** |
 | Semantic Scholar（L1+） | `always` | 只走 `POST /graph/v1/paper/batch` |
+| OpenReview（**未接线**，L9-C 实测） | 实测可达 | 只探过 `GET api2.openreview.net/notes/search?term=`：`content.venue/venueid` 可用，但 20 篇抽样里 7/8 是 `…Conference Submission`（**投稿中**，非接收）；有同领域误命中（相似度 0.6~0.9）；**无批量接口**（1 req/2s）。★ 接不接线见 `docs/任务卡/L9-C-OpenReview.md` §7 |
 
 ★ 本地（WSL）**可联网**，探测与采集均可在本地完成；Actions 是自动化通道，不是唯一验证途径。
 

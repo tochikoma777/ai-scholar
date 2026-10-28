@@ -171,6 +171,7 @@ AI_SCHOLAR_LLM__API_KEY=sk-...
 | `export --check` | 只比对不落盘：无变更退出 0，有变更退出 1 |
 | `site [--out DIR] [--days N] [--limit N]` | 生成静态 HTML 单文件看板（筛选 / 排序 / 搜索，零后端） |
 | `report [--date YYYY-MM-DD]` | 生成当日报告快照（只读 DB + JSONL） |
+| `report --weekly` / `--monthly` | 周报 / 月报：由 `data/reports/*.json` 真源重算（零 LLM，幂等） |
 
 **查阅与运维**
 
@@ -247,6 +248,7 @@ uv run ai-scholar analyze --ids arXiv:2610.30132
 vault/
 ├── 00-首页.md                # 概览 + 最近导出（生成区受标记块保护）
 ├── 10-文献/2026/2026-10-02__Paper-Title.md
+├── 20-主题/multimodal.md      # 主题 MOC（按 watchlist 分组；只链已有笔记）
 ├── 40-日志/2026-10-26.md     # Daily Note（★ 我的笔记摘要 + 待办 在标记块外）
 └── 90-元数据/
     ├── links.json            # 关联有向边（src/dst）
@@ -389,7 +391,8 @@ uv run python scripts/probe_sources.py   # 数据源探测（需联网，产出 
 - [x] **L8** 运营验证：Actions 开 LLM（稳态 ¥0.14/天）+ 真实 vault 物化 + Pages 发布 + collect 加固 + 成本可见性
 - [ ] **L9** 运营期：持续观察与按需维护，**默认不新增功能**
 
-下一阶段候选（需负责人定案）：周报 / 月报 · 主题 MOC（`20-主题/`）· OpenReview 顶会信号 · S2 付费 key。
+下一阶段候选（需负责人定案）：OpenReview 顶会信号（已实测，接线待定）· 成本分项进日报 · S2 付费 key。
+已完成（2026-10-28）：周报 / 月报 · 主题 MOC（`20-主题/`）。
 
 ---
 
