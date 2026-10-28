@@ -538,10 +538,10 @@ gh run list --workflow=daily.yml --limit 3        # 最近三次 daily 是否 su
   单条 / 单文件：`uv run pytest tests/test_export.py::test_xxx -q`、`uv run pytest -k "config or watchlist" -q`。
 - ★ **离线跑法**：`uv run pytest -m "not live" -q`。联网冒烟（`test_live_arxiv_parse` /
   `test_live_hf_parse_may_skip`）带 `@pytest.mark.live`，拿不到真实响应就 skip。
-- ★ **本地 shell 里的 `AI_SCHOLAR_*` 环境变量会污染测试**（pydantic-settings 优先读
-  `os.environ`，conftest 只打桩 `load_dotenv`）。典型症状：`tier` 断言 `off` 却拿到 `fast`，
-  2 个用例红而 CI 绿。验证前先清：
-  `env -u AI_SCHOLAR_MODE -u AI_SCHOLAR_LLM__API_KEY -u AI_SCHOLAR_LLM__BASE_URL uv run pytest -m "not live"`。
+- ★ **本地 shell 的 `AI_SCHOLAR_*` 由 conftest 隔离**：`_isolate_env` 会 `delenv` 掉全部
+  `AI_SCHOLAR_*` 并打桩 `load_dotenv`（否则 pydantic-settings 优先读 `os.environ`，本地导出
+  真实 key / `MODE=fast` 就会让"应降级 off"的断言红、CI 绿）。若仍出现此类红灯，
+  说明有用例绕过了 conftest 或直接读 `os.environ` —— 去修那里，别手工清环境凑绿。
 - ★ **CODEBUDDY 里的行号引用会被机器校验**：凡是写成 `path.py:NNN 符号` 的（如
   `pipeline/collect.py:310 run_collect`），`tests/test_docs_consistency.py::test_codebuddy_line_anchors`
   会断言该行附近确有该符号 —— **改完代码记得重跑，漂了就改文档**。
