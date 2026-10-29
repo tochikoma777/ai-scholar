@@ -37,3 +37,10 @@ vault/
 .idea/
 .vscode/
 *.swp
+
+# ★ 本地文档（负责人决定不入库）：审查报告 / 复盘归档 / 功能总览
+#   仍在磁盘上，clear+init 后照常可读；进 .gitignore 只是保证 `git status` 不被它们弄脏，
+#   并防止 `git add -A` 误提交。要入库时从这里删掉再 add。
+docs/审查报告/
+项目复盘归档/
+docs/功能总览.md
