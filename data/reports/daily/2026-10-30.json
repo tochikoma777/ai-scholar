@@ -1,0 +1,114 @@
+{
+  "date": "2026-10-30",
+  "schema_version": 1,
+  "total_papers": 3855,
+  "new_today": 8,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2610.34186",
+      "title": "HuGe: Scaling Humanoid Generalist Vision-Language-Action Models with Egocentric Experience",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.29702",
+      "title": "CausGround: Causal Interaction Grounding for Adaptive Embodied Planning",
+      "score": 1.0,
+      "groups": [
+        "multimodal"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.37230",
+      "title": "TAO: Tool-Aware Joint Scheduling for LLM-Based Agentic Serving",
+      "score": 0.9,
+      "groups": [
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.32749",
+      "title": "Efficient Streaming Audio-Visual Target Speaker Extraction for Real-World Acoustic Scenes",
+      "score": 0.9,
+      "groups": [
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.22507",
+      "title": "RealCLI: Toward a Unified Evaluation of Human-Agent Collaboration for CLI Agents",
+      "score": 0.9,
+      "groups": [
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.20832",
+      "title": "Amortizing Sequential Experimental Design in Reasoning LLMs",
+      "score": 0.9,
+      "groups": [
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.30161",
+      "title": "TauIndianBankBench: Procedure-Aware, Action-Oriented Evaluation of Tool-Using Conversational Agents",
+      "score": 0.9,
+      "groups": [
+        "eval-benchmark"
+      ],
+      "tier": null
+    }
+  ],
+  "deep_analyzed": [],
+  "new_graded": [
+    {
+      "id": "arXiv:2610.34961",
+      "title": "C-SafeGen: Certified Safe LLM Generation with Claim-Based Streaming Guardrails",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3
+    },
+    {
+      "id": "arXiv:2610.35212",
+      "title": "One-Shot Federated Model Editing for Device Dynamics at the Edge",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "cf07a2763841",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1369,
+      "new": 8,
+      "degraded": []
+    },
+    {
+      "run_id": "6331c70b4a4f",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.0406,
+  "cost_anomalies": []
+}
