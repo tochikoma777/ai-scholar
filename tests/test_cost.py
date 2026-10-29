@@ -54,7 +54,11 @@ def test_load_reports_reports_bad_files(tmp_path: Path) -> None:
     _write_report(tmp_path / "reports", "2026-10-24", 0.1)
     _write_report(tmp_path / "reports", "2026-10-25", None)
     _write_report(tmp_path / "reports", "2026-10-26", 0.0, raw="{not json")
-    _write_report(tmp_path / "reports", "x", 0.0, raw='{"date": "bad", "cost_cny": 1}')
+    # ★ 文件名仍是日期形状、但 payload 里的 date 非法（这是真实故障形态：
+    #   文件名不是日报的直接被忽略，属"不是日报"而不是"坏日报"）
+    (tmp_path / "reports" / "2026-10-27.json").write_text(
+        '{"date": "bad", "cost_cny": 1}', encoding="utf-8"
+    )
     costs, bad = load_report_costs(tmp_path)
     assert costs == {date(2026, 10, 24): 0.1}
     assert len(bad) == 3, bad

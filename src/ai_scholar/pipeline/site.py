@@ -12,7 +12,6 @@
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -34,12 +33,11 @@ from ai_scholar.pipeline.report import DailyReport, PredictionBrief
 from ai_scholar.pipeline.score import score_many
 from ai_scholar.pipeline.stats import CalibrationReport, summarize
 from ai_scholar.pipeline.stats import calibration as run_calibration
+from ai_scholar.report_paths import iter_daily_jsons
 from ai_scholar.store.db import engine_for
 from ai_scholar.store.models import Paper
 from ai_scholar.utils.errors import ConfigError
 from ai_scholar.utils.timeutil import today_local
-
-_DATE_FILE = re.compile(r"^(\d{4}-\d{2}-\d{2})\.json$")
 
 
 @dataclass
@@ -76,12 +74,7 @@ def load_reports(data_dir: Path, *, days: int) -> tuple[list[DailyReport], int]:
     report_dir = Path(data_dir) / "reports"
     if not report_dir.is_dir():
         return [], 0
-    dated: list[tuple[str, Path]] = []
-    for path in report_dir.glob("*.json"):
-        match = _DATE_FILE.match(path.name)
-        if match:
-            dated.append((match.group(1), path))
-    dated.sort(key=lambda item: item[0], reverse=True)
+    dated = list(reversed(iter_daily_jsons(report_dir)))
 
     reports: list[DailyReport] = []
     broken = 0
@@ -194,7 +187,11 @@ def build_site_data(
     papers, db_total = _site_papers(settings, limit=limit)
     # ★ L8-F：成本趋势（旧→新）+ 本月累计 + 异常（异常字段来自报告 JSON）
     cost_series = [
-        SiteCostPoint(date=report.date, cost=float(report.cost_cny or 0.0))
+        SiteCostPoint(
+            date=report.date,
+            cost=float(report.cost_cny or 0.0),
+            anomaly=bool(report.cost_anomalies),
+        )
         for report in reversed(reports)
     ]
     cost_month = round(

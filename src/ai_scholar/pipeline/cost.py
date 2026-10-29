@@ -20,6 +20,7 @@ from pathlib import Path
 from statistics import median
 
 from ai_scholar.config import BudgetSettings, Settings
+from ai_scholar.report_paths import iter_daily_jsons
 
 # ★ 与 `llm_usage.purpose` 的实际取值一一对应（grep 得出，勿凭印象改）
 USAGE_LABELS = {
@@ -53,27 +54,20 @@ class CostSummary:
         return bool(self.anomalies)
 
 
-def reports_dir(data_dir: Path) -> Path:
-    return Path(data_dir) / "reports"
-
-
 def load_report_costs(data_dir: Path) -> tuple[dict[date, float], list[str]]:
-    """读 `data/reports/*.json` 的 `cost_cny`。返回 `(日期→成本, 坏文件说明)`。
+    """读日报真源的 `cost_cny`（`reports/daily/` 优先，兼容旧的平铺布局）。
 
     ★ 坏文件**不静默跳过**：返回说明，由 CLI 展示（静默失败最危险）。
     """
     costs: dict[date, float] = {}
     bad: list[str] = []
-    folder = reports_dir(data_dir)
-    if not folder.exists():
-        return costs, bad
-    for path in sorted(folder.glob("*.json")):
+    for day_text, path in iter_daily_jsons(Path(data_dir) / "reports"):
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             bad.append(f"{path.name}：JSON 解析失败")
             continue
-        raw_day = payload.get("date")
+        raw_day = payload.get("date", day_text)
         value = payload.get("cost_cny")
         try:
             day = date.fromisoformat(str(raw_day))

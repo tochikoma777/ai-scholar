@@ -11,7 +11,6 @@
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
@@ -19,8 +18,8 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from ai_scholar.pipeline.report import DailyReport, atomic_write, render_recap
+from ai_scholar.report_paths import iter_daily_jsons
 
-REPORT_NAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})\.json$")
 PERIOD_WEEK = "week"
 PERIOD_MONTH = "month"
 
@@ -67,6 +66,18 @@ def month_window(anchor: date) -> PeriodWindow:
     else:
         end = start.replace(month=start.month + 1, day=1) - timedelta(days=1)
     return PeriodWindow(PERIOD_MONTH, start, end)
+
+
+def previous_period(window: PeriodWindow) -> PeriodWindow:
+    """上一周期：周一 → 上一周；1 号 → 上个月。
+
+    ★ 为什么需要：自然周/月**第一天生成当期报告只会得到空表**（W44 在周一才刚开始）。
+      自动化必须生成**已结束**的周期。
+    """
+    day_before = window.start - timedelta(days=1)
+    if window.period == PERIOD_WEEK:
+        return week_window(day_before)
+    return month_window(day_before)
 
 
 class RecapHit(BaseModel):
@@ -155,18 +166,15 @@ class RecapReport(BaseModel):
 
 
 def load_daily_reports(reports_dir: Path) -> tuple[dict[date, DailyReport], list[str]]:
-    """读 `YYYY-MM-DD.json`；★ 坏文件 / 坏 JSON **显式返回原因**，不静默跳过。"""
+    """读日报 JSON（`reports/daily/` 优先，兼容旧平铺）；★ 坏文件 / 坏 JSON **显式返回原因**。"""
     found: dict[date, DailyReport] = {}
     notes: list[str] = []
     directory = Path(reports_dir)
     if not directory.is_dir():
         return {}, [f"报告目录不存在：{directory}"]
-    for path in sorted(directory.glob("*.json")):
-        match = REPORT_NAME_RE.match(path.name)
-        if not match:  # weekly-*.json / monthly-*.json 不是日报，跳过
-            continue
+    for day_text, path in iter_daily_jsons(directory):
         try:
-            day = date.fromisoformat(match.group(1))
+            day = date.fromisoformat(day_text)
         except ValueError:
             notes.append(f"{path.name}: 日期非法")
             continue

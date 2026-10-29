@@ -157,3 +157,18 @@ def test_rendered_markdown_has_all_sections_and_no_timestamp(tmp_path: Path) -> 
         assert section in md, section
     assert "生成时间" not in md
     assert "- `arXiv:1` — 命中论文（命中 1 天 · multimodal）" in md
+
+
+def test_previous_period_returns_finished_week_and_month() -> None:
+    """★ 自动化口径：周一生成"上周"、1 号生成"上月"（当期还没数据）。"""
+    from ai_scholar.pipeline.recap import previous_period
+
+    this_week = week_window(date(2026, 10, 26))  # 周一
+    last_week = previous_period(this_week)
+    assert (last_week.start, last_week.end) == (date(2026, 10, 19), date(2026, 10, 25))
+    assert last_week.slug == "weekly-2026-W43"
+
+    this_month = month_window(date(2026, 10, 1))
+    last_month = previous_period(this_month)
+    assert (last_month.start, last_month.end) == (date(2026, 9, 1), date(2026, 9, 30))
+    assert last_month.slug == "monthly-2026-09"

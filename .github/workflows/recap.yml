@@ -1,0 +1,89 @@
+name: recap
+
+# ★ L9-D：周报 / 月报自动生成（零 LLM、零网络；只读 public 真源 data/reports/*.json）。
+#
+# 触发（UTC，对应北京时间次日）：
+#   - 每周一 00:35（UTC 周一 16:35）→ 生成**上一周**周报
+#   - 每月 1 号 00:35              → 生成**上个月**月报
+# ★ 为什么是"上一周期"：自然周/月**第一天生成当期只会得到空表**（W44 在周一才刚开始）。
+#
+# ★ 与 daily 共用同一个 concurrency 组：两个 workflow 都会 push 到 main，
+#   分组不同就会互相覆盖 public 真源（G5 教训）。
+on:
+  schedule:
+    - cron: "35 16 * * 1"   # 周一 → weekly --previous
+    - cron: "35 16 1 * *"   # 每月 1 号 → monthly --previous
+  workflow_dispatch:
+    inputs:
+      period:
+        description: "生成哪一类（weekly / monthly）"
+        type: choice
+        options: [weekly, monthly]
+        default: weekly
+      previous:
+        description: "生成上一周期（默认 true；调试当期可关）"
+        type: boolean
+        default: true
+
+concurrency:
+  group: ai-scholar-daily
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  recap:
+    runs-on: ubuntu-24.04 # ★ 固定，不用 ubuntu-latest（红线 12）
+    timeout-minutes: 15
+    env:
+      AI_SCHOLAR_ENV: actions
+      # ★ 周报/月报零 LLM：这里**故意不注入 LLM 凭据**，顺带验证"off 档也能出报告"
+      AI_SCHOLAR_MODE: "off"
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.11
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --frozen || uv sync
+
+      # ★ 两个 cron 走同一套步骤：用 event.schedule 区分（手动触发用 inputs.period）
+      - name: Weekly recap
+        if: github.event.schedule == '35 16 * * 1' || inputs.period == 'weekly'
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.previous }}" = "false" ]; then
+            uv run ai-scholar report --weekly
+          else
+            uv run ai-scholar report --weekly --previous
+          fi
+
+      - name: Monthly recap
+        if: github.event.schedule == '35 16 1 * *' || inputs.period == 'monthly'
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.previous }}" = "false" ]; then
+            uv run ai-scholar report --monthly
+          else
+            uv run ai-scholar report --monthly --previous
+          fi
+
+      # ★ 只 add 派生产物；日报/真源由 daily 负责，避免两个 workflow 抢同一批文件。
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/reports/weekly data/reports/monthly
+          if git diff --cached --quiet; then
+            echo "无变更，跳过 commit"
+            exit 0
+          fi
+          git commit -m "chore(recap): 周报/月报 $(date -u +%Y-%m-%d)"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main

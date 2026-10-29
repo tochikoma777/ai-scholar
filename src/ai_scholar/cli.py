@@ -1226,6 +1226,9 @@ def report(
     monthly: bool = typer.Option(
         False, "--monthly", help="改出**月报**（自然月，锚点 = --date 或今天）"
     ),
+    previous: bool = typer.Option(
+        False, "--previous", help="出**上一**周期（周一→上周，1 号→上月；自动化用）"
+    ),
 ) -> None:
     """生成报告快照（★ 只读，不写库；零 LLM）。
 
@@ -1240,6 +1243,7 @@ def report(
     from ai_scholar.pipeline.recap import (
         build_recap,
         month_window,
+        previous_period,
         week_window,
         write_recap,
     )
@@ -1256,20 +1260,29 @@ def report(
             console.print(f"[red]日期格式错误[/]：{day}（应为 YYYY-MM-DD）")
             raise typer.Exit(2) from None
 
+    from ai_scholar.report_paths import daily_dir, monthly_dir, weekly_dir
+
+    reports_root = settings.data_dir() / "reports"
     if out:
         out_dir = Path(out).expanduser()
         if not out_dir.is_absolute():
             out_dir = project_root() / out_dir
+    elif weekly:
+        out_dir = weekly_dir(reports_root)
+    elif monthly:
+        out_dir = monthly_dir(reports_root)
     else:
-        out_dir = settings.data_dir() / "reports"
+        out_dir = daily_dir(reports_root)
 
     if weekly and monthly:
         console.print("[red]--weekly 与 --monthly 只能选一个[/]")
         raise typer.Exit(2)
     if weekly or monthly:
         window = week_window(today) if weekly else month_window(today)
+        if previous:  # ★ 周一/1 号生成"上一周期"，否则当期还没数据
+            window = previous_period(window)
         # ★ 真源固定是 `data/reports/`（`--out` 只改派生产物的落点，不动真源口径）
-        recap = build_recap(settings.data_dir() / "reports", window=window)
+        recap = build_recap(reports_root, window=window)
         outcome = write_recap(recap, out_dir)
         table = Table(title=f"report · {recap.title}", title_justify="left")
         table.add_column("项")

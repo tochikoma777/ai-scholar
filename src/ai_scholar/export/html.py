@@ -234,10 +234,11 @@ class SiteTrendRow:
 
 @dataclass(frozen=True)
 class SiteCostPoint:
-    """成本趋势的一个点（日期 + 当日实际花费）。"""
+    """成本趋势的一个点（日期 + 当日实际花费 + 当日是否命中异常规则）。"""
 
     date: str
     cost: float
+    anomaly: bool = False
 
 
 @dataclass
@@ -411,20 +412,53 @@ class HtmlExporter(Exporter):
         points = data.cost_series
         peak = max((p.cost for p in points), default=0.0)
         scale = peak if peak > 0 else 1.0
-        width, height, pad = 640, 120, 8
+        width, height, pad = 640, 140, 8
+        plot_h = height - 46
         slot = (width - pad * 2) / max(len(points), 1)
-        bar_w = max(slot - 6, 4)
+        bar_w = max(slot * 0.62, 4)
+
+        def _point_xy(index: int, cost: float) -> tuple[float, float]:
+            x = pad + index * slot + slot / 2
+            y = height - 28 - (0.0 if scale == 0 else (cost / scale) * plot_h)
+            return x, y
+
         bars: list[str] = []
+        centres: list[tuple[float, float]] = []
         for index, point in enumerate(points):
-            bar_h = 0.0 if scale == 0 else (point.cost / scale) * (height - 34)
+            bar_h = 0.0 if scale == 0 else (point.cost / scale) * plot_h
             x = pad + index * slot + (slot - bar_w) / 2
-            y = height - 18 - bar_h
+            y = height - 28 - bar_h
             bars.append(
                 f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_w:.1f}" '
                 f'height="{max(bar_h, 1.0):.1f}" rx="2" fill="var(--accent)" '
-                f'opacity="{0.45 + 0.55 * (point.cost / scale if scale else 0):.2f}">'
+                f'opacity="{0.35 + 0.45 * (point.cost / scale if scale else 0):.2f}">'
                 f"<title>{_e(point.date)} ¥{point.cost:.4f}</title></rect>"
             )
+            centres.append(_point_xy(index, point.cost))
+
+        # ★ L9-D：折线 = 7 日移动平均（看得见趋势，不被单日尖峰带偏）
+        avg_points: list[str] = []
+        window: list[float] = []
+        for index, point in enumerate(points):
+            window.append(point.cost)
+            if len(window) > 7:
+                window.pop(0)
+            x, y = _point_xy(index, sum(window) / len(window))
+            avg_points.append(f"{x:.1f},{y:.1f}")
+        line = ""
+        if len(avg_points) > 1:
+            line = (
+                f'<polyline points="{" ".join(avg_points)}" fill="none" '
+                f'stroke="var(--fg)" stroke-width="1.6" stroke-opacity="0.55" '
+                f'stroke-linejoin="round" stroke-linecap="round"/>'
+            )
+        # ★ 异常日打红点（异常来自各日报告的 cost_anomalies，不是前端猜的）
+        dots = "".join(
+            f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.2" fill="var(--bad)">'
+            f"<title>{_e(point.date)} 成本异常 ¥{point.cost:.4f}</title></circle>"
+            for point, (x, y) in zip(points, centres, strict=True)
+            if point.anomaly
+        )
         first, last = points[0].date, points[-1].date
         labels = (
             f'<text x="{pad}" y="{height - 4}" font-size="10" fill="var(--muted)">'
@@ -434,15 +468,19 @@ class HtmlExporter(Exporter):
         )
         svg = (
             f'<svg viewBox="0 0 {width} {height}" width="100%" height="{height}" '
-            f'role="img" aria-label="每日 LLM 成本">{"".join(bars)}{labels}</svg>'
+            f'role="img" aria-label="每日 LLM 成本与 7 日均线">'
+            f"{''.join(bars)}{line}{dots}{labels}</svg>"
         )
         anomaly = ""
         if data.cost_anomalies:
             items = "；".join(_e(reason) for reason in data.cost_anomalies)
             anomaly = f'\n<p class="badge bad">⚠️ 成本异常：{items}</p>'
         return (
-            head + f'<p class="meta">近 {len(points)} 日每日成本 · 峰值 ¥{peak:.4f} · '
-            f"本月累计 <b>¥{data.cost_month:.4f}</b></p>\n" + svg + anomaly + "\n</section>"
+            head + f'<p class="meta">近 {len(points)} 日每日成本（柱）· 7 日均线（折线）'
+            f" · 红点=异常日 · 峰值 ¥{peak:.4f} · 本月累计 <b>¥{data.cost_month:.4f}</b></p>\n"
+            + svg
+            + anomaly
+            + "\n</section>"
         )
 
     @staticmethod

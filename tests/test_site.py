@@ -483,3 +483,37 @@ def test_site_cost_section_is_idempotent(tmp_path: Path) -> None:
     first = (out / "index.html").read_bytes()
     run_site(out=out, settings=settings, today=TODAY)
     assert (out / "index.html").read_bytes() == first
+
+
+# ── L9-D：成本折线（7 日均线）+ 异常红点 ─────────────────────────────────
+def test_site_cost_chart_has_moving_average_line_and_anomaly_dots(tmp_path: Path) -> None:
+    """★ 判据：① 有折线（polyline）② 异常日有红点 ③ 红点数量 = 异常天数（不多画）。"""
+    settings = _settings(tmp_path)
+    eng = engine_for(settings.db_path())
+    SQLModel.metadata.create_all(eng)
+    _seed_reports(
+        tmp_path,
+        [(date(2026, 10, 23), 0.10), (date(2026, 10, 24), 0.12), (date(2026, 10, 25), 0.30)],
+        anomalies=["今日 ¥0.3000 > 日限额一半 ¥1.00"],
+    )
+    out = tmp_path / "site"
+    run_site(out=out, settings=settings, today=TODAY)
+    html = (out / "index.html").read_text(encoding="utf-8")
+
+    assert "<polyline" in html, "7 日均线缺失"
+    assert "7 日均线" in html
+    assert html.count('fill="var(--bad)"') == 3, "3 天报告都注入了同一条异常 ⇒ 3 个红点"
+    assert "红点=异常日" in html
+
+
+def test_site_cost_chart_without_anomaly_has_no_dots(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    eng = engine_for(settings.db_path())
+    SQLModel.metadata.create_all(eng)
+    _seed_reports(tmp_path, [(date(2026, 10, 24), 0.1), (date(2026, 10, 25), 0.2)])
+    out = tmp_path / "site"
+    run_site(out=out, settings=settings, today=TODAY)
+    html = (out / "index.html").read_text(encoding="utf-8")
+    assert "<polyline" in html
+    cost_section = html.split('<section id="cost">', 1)[1].split("</section>", 1)[0]
+    assert 'fill="var(--bad)"' not in cost_section
