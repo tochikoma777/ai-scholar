@@ -112,8 +112,10 @@ migrate → collect → collect --classics → enrich → signals → relate →
 - ★ **两份 db**：Actions 用 actions-cache 里的 db，本地是 `data/ai_scholar.db`（gitignored）。
   ⇒ 典型现象：`data/analyses/` 有产物但本地 vault 没有 —— 该论文不在**本地** db，
   本地补跑 `collect` 再 `export` 即可（不是 bug）。
-- ★ `daily.yml` 有 `concurrency` 分组：防两次 run 并发 push 互相覆盖 public 真源。
-  本地要与 bot 双写同一分支 ⇒ **push 前先 rebase**（见 `docs/经验固化.md`）。
+- ★ `daily.yml` 与 `recap.yml` **共用** `concurrency: ai-scholar-daily`：两个 workflow 都 push
+  同一分支，分组不同就会互相覆盖 public 真源。本地要与 bot 双写 ⇒ **push 前先 rebase**。
+- ★ `recap.yml`（L9-D）：每周一 / 每月 1 号 UTC 16:35 跑 `report --weekly|--monthly --previous`，
+  只 commit `data/reports/{weekly,monthly}`；**故意不注入 LLM 凭据**（顺带验证 off 档）。
 
 **站点发布**（L8-C）：`daily` job 内 `ai-scholar site --out _site` → `upload-pages-artifact`
 → 独立 `deploy-pages` job（`github-pages` environment）→
@@ -240,8 +242,8 @@ migrate → collect → collect --classics → enrich → signals → relate →
 | 论文元数据、关联边、引用列表 | ✅ 重采即回 | `data/ai_scholar.db`（**可丢弃缓存**） | ✗ |
 | **`first_seen_at`**（首次见到它的日期） | ❌ | `data/first_seen.jsonl` | **✓ public** |
 | **signals 时序快照**（被引增长曲线） | ❌ | `data/signals/YYYY-MM.jsonl` | **✓ public** |
-| 每日报告 md + json | ✅ | `data/reports/YYYY-MM-DD.{md,json}` | **✓ public** |
-| 周报 / 月报（L9-A 派生） | ✅（可由日报重算） | `data/reports/weekly-YYYY-Www.{md,json}` · `monthly-YYYY-MM.{md,json}` | 未入 daily（手动 `report --weekly/--monthly`） |
+| 每日报告 md + json | ✅ | `data/reports/daily/YYYY-MM-DD.{md,json}`（旧平铺路径仍兼容） | **✓ public** |
+| 周报 / 月报（L9-A，L9-D 自动化） | ✅（可由日报重算） | `data/reports/weekly/weekly-YYYY-Www.{md,json}` · `data/reports/monthly/monthly-YYYY-MM.{md,json}` | **✓ public**（`recap.yml` 周一/1 号提交） |
 | **推演记分板**（可验证判断快照） | ❌ | `data/predictions/scoreboard.jsonl` | **✓ public** |
 | **想读队列**（报告/站点点读，L7-6） | ❌ | `data/wanted.jsonl`（append-only；`export` 消费后置 `selected=1`） | **✓ public** |
 | **长期观点**（不可证伪） | ❌ | `data/predictions/opinions.jsonl` | **✓ public**（但不进统计） |
@@ -460,11 +462,12 @@ uv run python scripts/probe_prescreen.py     # 预筛通过率 p + SQLite 行字
 uv run ai-scholar list [--limit N] [--since DATE] [--watchlist-only]
                                  # ★ = watchlist 命中（只做展示筛选）
 uv run ai-scholar report [--date YYYY-MM-DD] [--out DIR]
-                                 # 每日报告（只读 DB，写 data/reports/YYYY-MM-DD.{md,json}）
-uv run ai-scholar report --weekly [--date YYYY-MM-DD] [--out DIR]
-                                 # 周报（自然周）：weekly-YYYY-Www.{md,json}
-uv run ai-scholar report --monthly [--date YYYY-MM-DD] [--out DIR]
-                                 # 月报（自然月）：monthly-YYYY-MM.{md,json}
+                                 # 每日报告（只读 DB，写 data/reports/daily/YYYY-MM-DD.{md,json}）
+uv run ai-scholar report --weekly [--date YYYY-MM-DD] [--previous] [--out DIR]
+                                 # 周报（自然周）：{weekly/}weekly-YYYY-Www.{md,json}
+                                 # ★ --previous = 上一周期（自动化在周一用，当期还没数据）
+uv run ai-scholar report --monthly [--date YYYY-MM-DD] [--previous] [--out DIR]
+                                 # 月报（自然月）：{monthly/}monthly-YYYY-MM.{md,json}
                                  # ★ 二者互斥；只读 data/reports/*.json 真源重算（零 LLM、不读 db），
                                  #   --out 只改派生产物落点；不含生成时间 ⇒ 幂等
 uv run ai-scholar budget --input-tokens N --max-tokens M [--tier fast|strong]
@@ -491,6 +494,7 @@ uv build                         # hatchling：构建 sdist + wheel（默认写 
 # 阶段收尾门禁 / 运维巡检
 uv run pytest tests/test_docs_consistency.py -q   # handoff 指针 + 行号锚点（收尾必绿）
 gh run list --workflow=daily.yml --limit 3        # 最近三次 daily 是否 success
+gh run list --workflow=recap.yml --limit 3        # 最近三次周报/月报是否 success
 ```
 
 ---
@@ -514,6 +518,7 @@ gh run list --workflow=daily.yml --limit 3        # 最近三次 daily 是否 su
 | `pipeline/report.py` · `templates/report/` | `pytest -k report`（★ 当天重跑无 diff；只读 DB） |
 | `templates/report/*.md.j2` | `pytest -k report`（★ **trim_blocks**：行尾别放 `{% endif %}`，否则换行被吃掉、多条挤成一行，2026-10-26/28 各踩一次） |
 | `pipeline/recap.py` · `templates/report/recap.md.j2` | `pytest -k recap`（★ 幂等 / 坏 JSON 与缺目录显式上报 / 只读 `data/reports/*.json`） |
+| `report_paths.py`（报告目录布局）· `.github/workflows/recap.yml` | `pytest -k report_paths`（★ `daily/` 优先 / 旧平铺兼容 / 非日报文件名不误扫） |
 | `pipeline/export.py` 的 `_topic_docs` · `export/obsidian.py` 的 `render_topic_moc` | `pytest -k export`（★ 死链不出现 / 未命中组不生成 / 用户区保留） |
 | `pipeline/site.py` · `export/html.py` | `pytest -k site` + 实跑 `ai-scholar site --check`（应退出 0；★ 无生成时间 ⇒ 逐字节幂等） |
 | `budget.py` · 预算配置 | `pytest -k budget` + `ai-scholar budget ...` 演练（零网络） |
@@ -542,8 +547,8 @@ gh run list --workflow=daily.yml --limit 3        # 最近三次 daily 是否 su
 - 除 `test_live_arxiv_parse` / `test_live_hf_parse_may_skip` 外，网络一律 respx 拦截；
   这两个联网冒烟在连接失败、非 200 或无数据时 skip，但解析断言失败仍会让测试红。
 - 断言要落在**实际收到的值**上（如 `settings.llm.base_url`），不是"加载成功"。
-- 基线（tag `l8a` + L9 文档/报告审计 + L9-A/B）：`uv run pytest -m "not live"` = **393 passed**；
-  全量 **395**（= 393 + 2 个 `@pytest.mark.live` 联网冒烟，无真实响应时 skip）。
+- 基线（tag `l8a` + L9 文档/报告审计 + L9-A/B/C/D）：`uv run pytest -m "not live"` = **400 passed**；
+  全量 **402**（= 400 + 2 个 `@pytest.mark.live` 联网冒烟，无真实响应时 skip）。
   ★ 核对口径：`uv run pytest --collect-only -o addopts="" | tail -2`（避免 `-qq` 吞掉汇总行）。
   ★ `-q` 叠加 `pyproject` 里的 `addopts = "-q"` 会变成 `-qq`，**pytest 不再打印
   `N passed` 汇总行** —— 要数字就去掉一个 `-q` 或用 `--collect-only` 计数。

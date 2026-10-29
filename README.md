@@ -171,7 +171,7 @@ AI_SCHOLAR_LLM__API_KEY=sk-...
 | `export --check` | 只比对不落盘：无变更退出 0，有变更退出 1 |
 | `site [--out DIR] [--days N] [--limit N]` | 生成静态 HTML 单文件看板（筛选 / 排序 / 搜索，零后端） |
 | `report [--date YYYY-MM-DD]` | 生成当日报告快照（只读 DB + JSONL） |
-| `report --weekly` / `--monthly` | 周报 / 月报：由 `data/reports/*.json` 真源重算（零 LLM，幂等） |
+| `report --weekly` / `--monthly` | 周报 / 月报：由 `data/reports/*.json` 真源重算（零 LLM，幂等；`--previous` 出上一周期，自动化用） |
 
 **查阅与运维**
 
@@ -365,7 +365,7 @@ migrate → collect → collect --classics → enrich → signals → relate
 
 ```bash
 uv run pytest                        # 全量（含 2 个 @pytest.mark.live 联网冒烟；其余 respx mock）
-uv run pytest -m "not live"          # 离线全量（无网环境用这条；基线 382 passed）
+uv run pytest -m "not live"          # 离线全量（无网环境用这条；基线 400 passed）
 uv run ruff check . && uv run ruff format --check .
 uv run mypy src/ai_scholar           # strict
 uv run python scripts/probe_sources.py   # 数据源探测（需联网，产出 docs/数据源手册.md）
