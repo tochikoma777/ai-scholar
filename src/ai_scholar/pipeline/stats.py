@@ -26,6 +26,7 @@ from ai_scholar.store.scoreboard import (
     Prediction,
     append_snapshot,
     load_latest,
+    load_latest_with_errors,
     load_opinions,
     opinions_path,
     scoreboard_path,
@@ -62,6 +63,8 @@ class ScoreboardSummary:
     hit_rate: float | None = None
     opinions: int = 0
     due_open: int = 0
+    # ★ 坏行数：坏行会让条目从统计里消失 ⇒ 必须显式暴露（否则命中率分母被静默改变）
+    bad_lines: int = 0
 
 
 @dataclass
@@ -273,8 +276,8 @@ def summarize(
 ) -> ScoreboardSummary:
     settings = settings or load_settings()
     day = today or today_local()
-    predictions = load_latest(scoreboard_path(settings.data_dir()))
-    summary = ScoreboardSummary()
+    predictions, bad_lines = load_latest_with_errors(scoreboard_path(settings.data_dir()))
+    summary = ScoreboardSummary(bad_lines=len(bad_lines))
     for item in predictions:
         if item.status == "open":
             summary.open += 1

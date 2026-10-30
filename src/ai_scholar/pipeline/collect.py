@@ -269,14 +269,16 @@ async def _collect_source(
 
         cfg = settings.source("arxiv")
         endpoint = cfg.endpoint if cfg else "https://export.arxiv.org/api/query"
+        rate_limit = cfg.rate_limit if cfg else "1/3s"
         ids = load_classics().ids()
         if not ids:
             raise RuntimeError("config/classics.yaml 为空 —— 清单缺失时不发请求")
-        items, missing = await fetch_arxiv_ids(client, ids, endpoint)
+        items, missing = await fetch_arxiv_ids(client, ids, endpoint, rate_limit=rate_limit)
         return items, [canonical_arxiv_id(i) for i in missing], failures
     if name == "arxiv":
         cfg = settings.source("arxiv")
         endpoint = cfg.endpoint if cfg else "https://export.arxiv.org/api/query"
+        rate_limit = cfg.rate_limit if cfg else "1/3s"
         categories = cfg.categories() if cfg else ["cs.AI", "cs.CL", "cs.LG"]
         read_timeout = float(settings.collect.arxiv_read_timeout_s) or None
         for day in days:
@@ -289,6 +291,7 @@ async def _collect_source(
                         endpoint,
                         max_results,
                         read_timeout_s=read_timeout,
+                        rate_limit=rate_limit,
                     )
                 )
             except Exception as exc:  # noqa: BLE001 —— 单日失败必须隔离
@@ -297,14 +300,34 @@ async def _collect_source(
     elif name == "hf_daily":
         cfg = settings.source("hf_daily")
         base_url = cfg.hf_url() if cfg else "https://huggingface.co/api/daily_papers"
+        rate_limit = cfg.rate_limit if cfg else "10/1s"
         # ★ L6-1：HF 榜单滞后发布，请求「今天」必 400 ⇒ 窗口从昨天开始（不含今天）
         hf_days = hf_collect_days(days[0], len(days))
         for day in hf_days:
             try:
-                items.extend(await fetch_hf_day(client, day, base_url))
+                items.extend(await fetch_hf_day(client, day, base_url, rate_limit=rate_limit))
             except Exception as exc:  # noqa: BLE001 —— 同样逐日隔离
                 failures.append(_failure_text(exc, context=f"{day.isoformat()} · {base_url}"))
     return items, [], failures
+
+
+def _source_gate(name: str, settings: Settings) -> str | None:
+    """源级开关：`sources.*.enabled` 与 `availability` 的**唯一消费点**。
+
+    ★ 两个键此前全仓无人读（E1 死配置，2026-10-29 审查）。`enabled=false` 或
+      `availability=actions_only` 且当前不在 Actions ⇒ 跳过该源，并把原因写进
+      `degraded`（**不是静默跳过** —— 静默跳过和"源挂了"在报告里长得一样）。
+    """
+    cfg_name = "arxiv" if name == "classics" else name
+    cfg = settings.source(cfg_name)
+    if cfg is None:
+        return None
+    if not cfg.enabled:
+        return f"已跳过：源已在配置中禁用（sources.{cfg_name}.enabled=false）"
+    if not cfg.is_available():
+        reason = cfg.availability_reason or "未说明原因"
+        return f"已跳过：源在当前环境不可用（availability={cfg.availability}；{reason}）"
+    return None
 
 
 async def run_collect(
@@ -357,6 +380,13 @@ async def run_collect(
         with Session(engine) as session:
             for name in names:
                 outcome = SourceOutcome(name=name)
+                gate = _source_gate(name, settings)
+                if gate is not None:
+                    outcome.failed = True
+                    outcome.degraded = gate
+                    report.degraded[name] = gate
+                    report.outcomes.append(outcome)
+                    continue
                 try:
                     items, missing, failures = await _collect_source(
                         name, http, settings, day_list, max_results

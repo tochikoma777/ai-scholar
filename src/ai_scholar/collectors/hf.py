@@ -62,7 +62,9 @@ def parse_daily_papers(payload: Any) -> list[RawPaper]:
     return items
 
 
-async def fetch_hf_day(client: HttpClient, day: date, base_url: str) -> list[RawPaper]:
+async def fetch_hf_day(
+    client: HttpClient, day: date, base_url: str, *, rate_limit: str = "10/1s"
+) -> list[RawPaper]:
     """抓某一天的上榜论文。不可达时抛异常（由 pipeline 转成 warning + 跳过）。
 
     ★ 失败信息带**截断的响应体**（L6-1）：只有状态码无法区分
@@ -71,7 +73,7 @@ async def fetch_hf_day(client: HttpClient, day: date, base_url: str) -> list[Raw
     params = {"date": day.isoformat()}
     try:
         response = await client.get(
-            base_url, params=params, source="hf_daily", rate_limit="10/1s", timeout=None
+            base_url, params=params, source="hf_daily", rate_limit=rate_limit, timeout=None
         )
     except (httpx.HTTPError, OSError) as exc:
         raise RuntimeError(f"{type(exc).__name__}: {exc}") from exc

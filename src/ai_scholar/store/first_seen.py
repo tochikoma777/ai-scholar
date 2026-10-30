@@ -2,7 +2,9 @@
 
 ★ 为什么必须有它（设计方案 §3.7.1）：`first_seen_at` 是**唯一不可再生**的数据
 （"我们第一次见到它是哪天"）。db 里的 `first_seen_at` **只是缓存**，
-真源是这个文件；db 可由它 + 数据源重建。
+真源是这个文件。
+★ 2026-10-29 判定：**没有「一键 rebuild」命令** —— db 丢失后的恢复路径是
+「重采（本文件负责去重/幂等）+ 数据源」，不要假设能从本文件单独回灌 db。
 
 约束：
 - **append-only**：已有 id **绝不覆盖**（重写即永久丢失首见日）
@@ -18,6 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ai_scholar.config import Settings, load_settings
+from ai_scholar.utils.logging import get_logger
 
 
 def default_first_seen_path(settings: Settings | None = None) -> Path:
@@ -48,14 +51,22 @@ class FirstSeenStore:
         if not self.path.exists():
             return
         with self.path.open(encoding="utf-8") as fh:
-            for line in fh:
+            for lineno, line in enumerate(fh, 1):
                 line = line.strip()
                 if not line:
                     continue
                 try:
                     row = json.loads(line)
-                except json.JSONDecodeError:
-                    continue  # 坏行跳过，不让它打断整条采集
+                except json.JSONDecodeError as exc:
+                    # ★ 坏行不能让整条采集崩，但**必须留痕**：被跳过的 id 会被当成"没见过"，
+                    #   下次 append 会再写一行（2026-10-29 审查：静默跳过 = 重复追加无人知）。
+                    get_logger(__name__).warning(
+                        "first_seen.jsonl 坏行（已跳过，该 id 可能被重复追加）",
+                        file=str(self.path),
+                        line=lineno,
+                        error=type(exc).__name__,
+                    )
+                    continue
                 pid = str(row.get("id") or "").strip()
                 if pid:
                     self._known[pid] = FirstSeenRecord(

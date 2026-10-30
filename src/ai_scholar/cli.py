@@ -1105,11 +1105,20 @@ def predict(
 @app.command()
 def stats(
     verify: bool = typer.Option(False, "--verify", help="验证所有到期推演（零网络）"),
-    calibration: bool = typer.Option(False, "--calibration", help="定级校准（Tier vs 引用）"),
-    impact: bool = typer.Option(False, "--impact", help="被引增长与开创/跟风候选"),
+    calibration: bool = typer.Option(
+        False, "--calibration", help="定级校准（Tier vs 引用）· 人工按需，不在自动化里"
+    ),
+    impact: bool = typer.Option(
+        False, "--impact", help="被引增长与开创/跟风候选 · 人工按需，不在自动化里"
+    ),
     limit: int = typer.Option(20, "--limit", help="影响分析显示条数"),
 ) -> None:
-    """记分板统计：命中率只算 hit/miss，`insufficient` 与观点都不进分母。"""
+    """记分板统计：命中率只算 hit/miss，`insufficient` 与观点都不进分母。
+
+    ★ `--calibration` / `--impact` 是**人工按需**分析（读 db，需要成熟样本），
+      不在 daily / recap 的自动化里 —— 想定期跑就手动执行，不要接进 workflow
+      （recap 的设计前提是"只读 `data/reports/*.json` 真源、不读 db"）。
+    """
     from ai_scholar.pipeline.stats import (
         calibration as run_calibration,
     )
@@ -1158,7 +1167,14 @@ def stats(
     table.add_row("命中率（不含 insufficient）", hit_rate)
     table.add_row("数据不足（不计入分母）", str(summary.insufficient))
     table.add_row("观点（★ 不进统计）", str(summary.opinions))
+    if summary.bad_lines:
+        table.add_row("[yellow]坏行（已跳过）[/]", f"[yellow]{summary.bad_lines}[/]")
     console.print(table)
+    if summary.bad_lines:
+        console.print(
+            f"[yellow]warning[/] 记分板有 {summary.bad_lines} 行坏数据被跳过 —— "
+            "命中率分母可能因此偏小，请先修 `data/predictions/scoreboard.jsonl`"
+        )
 
     if calibration:
         if not settings.db_path().exists():
@@ -1330,6 +1346,11 @@ def report(
 def main() -> None:
     """包入口（`ai-scholar`）。配置错误统一收敛成一条提示，退出码 1。"""
     try:
+        settings = load_settings()
+        # ★ `app.log_level` 的**唯一消费点**（2026-10-29 审查：此前该键全仓无人读）
+        from ai_scholar.utils.logging import configure_logging
+
+        configure_logging(level=settings.app.log_level)
         app()
     except ConfigError as exc:
         console.print(f"[red]配置错误[/]：{exc}")

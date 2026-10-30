@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 from pathlib import Path
 
@@ -21,7 +22,7 @@ from sqlmodel import Session, SQLModel, select
 from ai_scholar.collectors.arxiv import parse_feed, submitted_query
 from ai_scholar.collectors.base import SOURCE_ARXIV, SOURCE_HF, RawPaper
 from ai_scholar.collectors.hf import fetch_hf_day, parse_daily_papers
-from ai_scholar.config import Settings
+from ai_scholar.config import Settings, SourceSettings, load_settings
 from ai_scholar.pipeline.collect import (
     canonical_id_for,
     llm_usage_rows,
@@ -110,12 +111,17 @@ def _engine(tmp_path: Path):
 
 # ── ① content_hash 三条硬约束 ───────────────────────────────────────────
 def test_content_hash_excludes_citation_count() -> None:
-    """★ 改引用数不改 hash（引用数是观测值，进 hash 会导致每天重复入库）。"""
-    base = content_hash("Title", "Abstract", ["John Doe"], "NeurIPS 2026")
-    # 引用数变化不参与 hash 计算 —— hash 只吃 title/abstract/authors/venue
-    same = content_hash("Title", "Abstract", ["John Doe"], "NeurIPS 2026")
-    assert base == same
-    assert "citation" not in base  # hash 不可能包含观测值字段名
+    """★ 引用数是观测值，**不许成为 `content_hash` 的入参**（进 hash ⇒ 每天重复入库）。
+
+    ★ 2026-10-29 审查：原断言是恒真的（两次调用入参完全相同；且 sha256 十六进制里
+      永远不可能出现 `"citation"` 这个词）。真正能拦住"把观测值塞进 hash"的是**签名守卫**：
+      参数只允许 title / abstract / authors / venue 四项。
+    """
+    params = list(inspect.signature(content_hash).parameters)
+    assert params == ["title", "abstract", "authors", "venue"]
+    assert content_hash("Title", "Abstract", ["John Doe"], "NeurIPS 2026") == content_hash(
+        "Title", "Abstract", ["John Doe"], "NeurIPS 2026"
+    )
 
 
 def test_content_hash_excludes_hf_score() -> None:
@@ -329,6 +335,79 @@ async def test_watchlist_does_not_change_ingest_count(tmp_path: Path) -> None:
     )
     assert first.fetched == second.fetched == 2
     assert (first.new, first.deduped) == (second.new, second.deduped)
+
+
+# ── ④b 源级开关与限速（★ 2026-10-29 审查：这些配置此前全是死件）───────────
+def with_source(settings: Settings, name: str, **update: object) -> Settings:
+    """复制一份 settings 并覆盖某个源的配置（`Settings()` 默认 `sources={}`，必须用仓库配置）。"""
+    base = settings.sources.get(name) or SourceSettings()
+    return settings.model_copy(
+        update={"sources": {**settings.sources, name: base.model_copy(update=update)}}
+    )
+
+
+@respx.mock
+async def test_disabled_source_is_skipped_and_degraded(tmp_path: Path) -> None:
+    """`sources.arxiv.enabled=false` 必须**真的不发请求**，且原因进 degraded（不静默）。"""
+    arxiv_route = respx.get(ARXIV_URL).mock(
+        return_value=httpx.Response(200, text=atom_feed(arxiv_entry(), total=1))
+    )
+    respx.get(HF_URL).mock(return_value=httpx.Response(200, json=[]))
+    settings = with_source(load_settings(), "arxiv", enabled=False)
+
+    report = await run_collect(
+        days=1, settings=settings, db_path=tmp_path / "a.db", first_seen_path=tmp_path / "fs.jsonl"
+    )
+
+    assert arxiv_route.call_count == 0
+    assert "enabled=false" in report.degraded["arxiv"]
+
+
+@respx.mock
+async def test_actions_only_source_skipped_outside_actions(tmp_path: Path) -> None:
+    """`availability=actions_only` + 非 Actions 环境 ⇒ 跳过并说明原因（本地别硬报错）。"""
+    arxiv_route = respx.get(ARXIV_URL).mock(
+        return_value=httpx.Response(200, text=atom_feed(arxiv_entry(), total=1))
+    )
+    respx.get(HF_URL).mock(return_value=httpx.Response(200, json=[]))
+    settings = with_source(
+        load_settings(), "arxiv", availability="actions_only", availability_reason="本地不可达"
+    )
+
+    report = await run_collect(
+        days=1, settings=settings, db_path=tmp_path / "a.db", first_seen_path=tmp_path / "fs.jsonl"
+    )
+
+    assert arxiv_route.call_count == 0
+    assert "本地不可达" in report.degraded["arxiv"]
+
+
+async def test_rate_limit_comes_from_config(tmp_path: Path, monkeypatch) -> None:
+    """★ `sources.*.rate_limit` 必须真正传给 collector（此前被代码硬编码覆盖）。"""
+    seen: list[tuple[str, str]] = []
+
+    async def fake_arxiv(
+        client, day, categories, endpoint, max_results, *, read_timeout_s=None, rate_limit="1/3s"
+    ):
+        seen.append(("arxiv", rate_limit))
+        return []
+
+    async def fake_hf(client, day, base_url, *, rate_limit="10/1s"):
+        seen.append(("hf", rate_limit))
+        return []
+
+    monkeypatch.setattr("ai_scholar.pipeline.collect.fetch_arxiv_day", fake_arxiv)
+    monkeypatch.setattr("ai_scholar.pipeline.collect.fetch_hf_day", fake_hf)
+    settings = with_source(
+        with_source(load_settings(), "arxiv", rate_limit="1/9s"), "hf_daily", rate_limit="3/7s"
+    )
+
+    await run_collect(
+        days=1, settings=settings, db_path=tmp_path / "a.db", first_seen_path=tmp_path / "fs.jsonl"
+    )
+
+    assert ("arxiv", "1/9s") in seen
+    assert ("hf", "3/7s") in seen
 
 
 # ── ⑤ off 档：0 次 LLM 调用 + llm_usage 0 行 ────────────────────────────

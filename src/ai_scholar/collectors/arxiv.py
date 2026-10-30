@@ -71,6 +71,7 @@ async def fetch_arxiv_ids(
     batch_size: int = 50,
     *,
     rate_limit_backoff_s: tuple[float, ...] = (20.0, 40.0),
+    rate_limit: str = "1/3s",
 ) -> tuple[list[RawPaper], list[str]]:
     """按 arXiv id **批量直采**（`id_list`），返回 `(条目, 未命中的 id)`。
 
@@ -88,7 +89,7 @@ async def fetch_arxiv_ids(
             endpoint,
             params={"id_list": ",".join(chunk), "max_results": batch_size},
             source="arxiv",
-            rate_limit="1/3s",
+            rate_limit=rate_limit,
             timeout=None,
         )
         waits = list(rate_limit_backoff_s)
@@ -98,7 +99,7 @@ async def fetch_arxiv_ids(
                 endpoint,
                 params={"id_list": ",".join(chunk), "max_results": batch_size},
                 source="arxiv",
-                rate_limit="1/3s",
+                rate_limit=rate_limit,
                 timeout=None,
             )
         if response.status_code != 200:
@@ -121,6 +122,7 @@ async def fetch_arxiv_day(
     max_results: int = 600,
     *,
     read_timeout_s: float | None = None,
+    rate_limit: str = "1/3s",
 ) -> list[RawPaper]:
     """抓某一天（按 submittedDate 框定）的论文，自动翻页。
 
@@ -146,7 +148,7 @@ async def fetch_arxiv_day(
             base_params, start=start, max_results=min(PAGE_SIZE, max_results - len(items))
         )
         response = await client.get(
-            endpoint, params=params, source="arxiv", rate_limit="1/3s", timeout=timeout
+            endpoint, params=params, source="arxiv", rate_limit=rate_limit, timeout=timeout
         )
         if response.status_code != 200:
             raise RuntimeError(f"arXiv HTTP {response.status_code}（day={day}）")

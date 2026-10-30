@@ -48,6 +48,7 @@ from ai_scholar.store.models import (
 )
 from ai_scholar.utils.errors import SourceError
 from ai_scholar.utils.http import HttpClient
+from ai_scholar.utils.logging import get_logger
 from ai_scholar.utils.timeutil import age_days_since, parse_iso_date, today_local
 
 SAMPLED_STATES = (SIGNAL_PENDING, SIGNAL_TRACKED, SIGNAL_DORMANT, SIGNAL_SAMPLE)
@@ -111,13 +112,21 @@ def _load_jsonl_seen(path: Path) -> set[tuple[str, str]]:
     seen: set[tuple[str, str]] = set()
     if not path.exists():
         return seen
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         line = line.strip()
         if not line:
             continue
         try:
             row = json.loads(line)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as exc:
+            # ★ 坏行跳过但留痕：被跳过的 (paper_id, 日期) 会被当成"没采过"，
+            #   下次同一天再跑 signals 会重复追加（2026-10-29 审查）。
+            get_logger(__name__).warning(
+                "signals JSONL 坏行（已跳过，可能重复追加）",
+                file=str(path),
+                line=lineno,
+                error=type(exc).__name__,
+            )
             continue
         seen.add((str(row.get("paper_id") or ""), str(row.get("observed_at") or "")))
     return seen

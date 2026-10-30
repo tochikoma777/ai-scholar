@@ -76,6 +76,8 @@ class DeepAnalysisReport:
     llm_calls: int = 0
     cost_cny: float = 0.0
     fulltext_hits: int = 0
+    # ★ 正文抓取失败篇数：失败只回 None，从前在 Actions 完全不可见（2026-10-29 审查，E5）
+    fulltext_misses: int = 0
     # ★ L7-4：产物落 public 真源 `data/analyses/{id}.md`（Option B）
     analyses_written: int = 0
     # ★ `--check`：缺失 / 过期的产物（退出码 1 的依据）
@@ -199,6 +201,9 @@ def _select(
         chosen = [p for p in chosen if _needs_analysis(p, force=force)]
         return chosen[:limit], len(eligible) - len(chosen)
 
+    # ★ 入场资格（2026-10-29 负责人定案）：**只看 watchlist 命中或 Tier 1**。
+    #   非命中且未定级的论文不进池子 ⇒ 也进不了下面的当日 Top N。
+    #   这不是"Tier 当排序权重"，而是"Tier 1 = 入场券"；放宽会直接抬高 strong 档成本。
     pool = [
         p
         for p in papers
@@ -209,7 +214,7 @@ def _select(
     # ★ 已收藏（`selected=1`）不占自动配额；但 `--force` 是用户显式要求重做 ⇒ 优先
     candidates = [p for p in pool if _needs_analysis(p, force=force) and (force or not p.selected)]
 
-    # ── 通道 A（意图驱动，立刻执行，不看 Tier）────────────────────────────
+    # ── 通道 A（意图驱动，从入场池里立刻执行）────────────────────────────
     #   ① watchlist 命中：按命中分降序，最多 a_cap 篇（用户点名的兴趣优先）
     watched = [(p, match_watchlist(watchlist, p.title, p.abstract or "").score) for p in candidates]
     watched = [item for item in watched if _watched(item[0], watchlist)]
@@ -465,6 +470,9 @@ async def run_deep_analysis(
                     )
                 if fulltext:
                     report.fulltext_hits += 1
+                elif not dry_run and paper.arxiv_id:
+                    # ★ 失败不再静默：正文缺失 ⇒ 只能按摘要分析（质量下降），必须进 degraded
+                    report.fulltext_misses += 1
 
                 days_since = age_days_since(paper.published_at, day)
                 prompt = render_prompt(
@@ -571,6 +579,11 @@ async def run_deep_analysis(
                 if write_analysis(settings, paper):
                     report.analyses_written += 1
 
+            if report.fulltext_misses:
+                # ★ E5：失败信息必须能自证 —— 否则"花了 strong 的钱、按摘要分析"完全不可见
+                report.degraded["fulltext"] = (
+                    f"{report.fulltext_misses} 篇未取到 arXiv HTML 正文（已按摘要分析）"
+                )
             if not dry_run:
                 session.commit()
     finally:

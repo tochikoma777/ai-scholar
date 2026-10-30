@@ -365,7 +365,7 @@ migrate → collect → collect --classics → enrich → signals → relate
 
 ```bash
 uv run pytest                        # 全量（含 2 个 @pytest.mark.live 联网冒烟；其余 respx mock）
-uv run pytest -m "not live"          # 离线全量（无网环境用这条；基线 400 passed）
+uv run pytest -m "not live"          # 离线全量（无网环境用这条；基线 407 passed）
 uv run ruff check . && uv run ruff format --check .
 uv run mypy src/ai_scholar           # strict
 uv run python scripts/probe_sources.py   # 数据源探测（需联网，产出 docs/数据源手册.md）

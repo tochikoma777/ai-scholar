@@ -40,6 +40,23 @@ S2_URL = "https://s2.test/graph/v1/paper/batch"
 runner = CliRunner()
 
 
+def test_paper_references_stores_only_external_ids() -> None:
+    """★ 红线 23 守卫（2026-10-29 审查：此前这条红线**没有测试**）。
+
+    1. 表只有 `(paper_id, ref_external_id)` 两列 —— 加一列存被引元数据就会红；
+    2. 引用明细只在 db（可丢弃缓存），**不进 public 真源**：导出 / 站点代码里
+       不得出现 `PaperReference` / `paper_references`。
+    """
+    assert set(PaperReference.__table__.columns.keys()) == {"paper_id", "ref_external_id"}
+
+    root = Path(__file__).resolve().parents[1] / "src" / "ai_scholar" / "pipeline"
+    for name in ("export.py", "site.py", "report.py", "recap.py"):
+        source = (root / name).read_text(encoding="utf-8")
+        assert "PaperReference" not in source and "paper_references" not in source, (
+            f"{name} 读取了引用明细 —— 红线 23：paper_references 只落 db，不进 public 产物"
+        )
+
+
 def make_paper(
     pid: str,
     title: str = "A Study of Things",

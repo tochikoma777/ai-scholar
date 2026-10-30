@@ -17,6 +17,7 @@ from ai_scholar.store.scoreboard import (
     Prediction,
     append_opinion,
     append_snapshot,
+    load_latest_with_errors,
     opinions_path,
     scoreboard_path,
 )
@@ -154,6 +155,28 @@ def test_hit_rate_excludes_insufficient_and_opinions(tmp_path: Path) -> None:
     assert summary.hit_rate == 0.5  # 1/2，insufficient 不进分母
     assert summary.insufficient == 1
     assert summary.opinions == 1
+
+
+def test_bad_scoreboard_line_is_reported_not_silent(tmp_path: Path) -> None:
+    """★ 2026-10-29 审查：坏行以前静默 `continue`，命中率分母被悄悄改变却无人知道。
+
+    现在：① `load_latest_with_errors` 显式返回坏行；② `summarize` 把它记进 `bad_lines`
+    （CLI 据此打 warning）。守卫：把 errors 丢弃 / 计数恒 0 都会让这条红。
+    """
+    settings = tmp_settings(tmp_path)
+    path = scoreboard_path(settings.data_dir())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    good = prediction(
+        "p1", Criterion(type="arxiv_paper_count", target="cs.AI", threshold=1, window_days=30)
+    ).model_copy(update={"status": "hit"})
+    path.write_text(good.model_dump_json() + "\n{ this is not json }\n", encoding="utf-8")
+
+    items, errors = load_latest_with_errors(path)
+    assert [item.id for item in items] == ["p1"]
+    assert len(errors) == 1 and "坏行" in errors[0]
+
+    summary = summarize(settings=settings, today=date(2026, 2, 1))
+    assert summary.bad_lines == 1
 
 
 def test_calibration_refuses_conclusion_on_small_sample(tmp_path: Path) -> None:

@@ -169,7 +169,8 @@ def test_repo_default_settings_load_without_env(monkeypatch: pytest.MonkeyPatch)
             monkeypatch.delenv(key, raising=False)
     settings = load_settings()
     assert settings.effective_mode() is RunMode.OFF
-    assert settings.app.name == "ai-scholar"
+    # ★ `app.log_level` 同理：它是 cli.main() 初始化 structlog 的唯一入口
+    assert settings.app.log_level == "INFO"
 
 
 def test_default_models_migrated_to_v4() -> None:

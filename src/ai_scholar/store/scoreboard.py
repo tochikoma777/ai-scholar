@@ -25,6 +25,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from ai_scholar.utils.logging import get_logger
 from ai_scholar.utils.timeutil import parse_iso_date
 
 CRITERION_TYPES = ("arxiv_paper_count", "entity_mentions", "citation_reach")
@@ -114,24 +115,48 @@ def is_falsifiable(criterion: Criterion, *, due_at: str, today: date) -> bool:
     return not falsifiability_errors(criterion, due_at=due_at, today=today)
 
 
-def load_latest(path: Path) -> list[Prediction]:
-    """读快照流，按 `id` 折叠为最新状态（保持首次出现顺序）。坏行跳过。"""
-    if not path.exists():
-        return []
+def _read_jsonl(
+    path: Path, model: type[Any], errors: list[str]
+) -> tuple[list[str], dict[str, Any]]:
+    """按 `id` 折叠快照流；坏行**记进 errors**（不静默吞）。
+
+    ★ 2026-10-29 审查：从前坏行直接 `continue`，命中率分母会被**静默改变**而无人知道
+      （E5：失败信息必须能自证）。现在调用方可以把 errors 打到日志 / 汇总里。
+    """
     order: list[str] = []
-    latest: dict[str, Prediction] = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
+    latest: dict[str, Any] = {}
+    if not path.exists():
+        return order, latest
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         line = line.strip()
         if not line:
             continue
         try:
-            prediction = Prediction.model_validate(json.loads(line))
-        except (json.JSONDecodeError, ValueError):
+            item = model.model_validate(json.loads(line))
+        except (json.JSONDecodeError, ValueError) as exc:
+            errors.append(f"{path.name}:{lineno} 坏行已跳过（{type(exc).__name__}）")
             continue
-        if prediction.id not in latest:
-            order.append(prediction.id)
-        latest[prediction.id] = prediction
-    return [latest[prediction_id] for prediction_id in order]
+        if item.id not in latest:
+            order.append(item.id)
+        latest[item.id] = item
+    return order, latest
+
+
+def load_latest_with_errors(path: Path) -> tuple[list[Prediction], list[str]]:
+    """读快照流 + 显式返回坏行说明（`load_latest` 的审计版）。"""
+    errors: list[str] = []
+    order, latest = _read_jsonl(path, Prediction, errors)
+    return [latest[i] for i in order], errors
+
+
+def load_latest(path: Path) -> list[Prediction]:
+    """读快照流，按 `id` 折叠为最新状态（保持首次出现顺序）。坏行跳过但会留 warning。"""
+    items, errors = load_latest_with_errors(path)
+    if errors:
+        get_logger(__name__).warning(
+            "scoreboard 存在坏行（已跳过）", file=str(path), count=len(errors), first=errors[0]
+        )
+    return items
 
 
 def append_snapshot(path: Path, prediction: Prediction) -> bool:
@@ -145,23 +170,19 @@ def append_snapshot(path: Path, prediction: Prediction) -> bool:
     return True
 
 
+def load_opinions_with_errors(path: Path) -> tuple[list[Opinion], list[str]]:
+    errors: list[str] = []
+    order, latest = _read_jsonl(path, Opinion, errors)
+    return [latest[i] for i in order], errors
+
+
 def load_opinions(path: Path) -> list[Opinion]:
-    if not path.exists():
-        return []
-    order: list[str] = []
-    latest: dict[str, Opinion] = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            opinion = Opinion.model_validate(json.loads(line))
-        except (json.JSONDecodeError, ValueError):
-            continue
-        if opinion.id not in latest:
-            order.append(opinion.id)
-        latest[opinion.id] = opinion
-    return [latest[oid] for oid in order]
+    items, errors = load_opinions_with_errors(path)
+    if errors:
+        get_logger(__name__).warning(
+            "opinions 存在坏行（已跳过）", file=str(path), count=len(errors), first=errors[0]
+        )
+    return items
 
 
 def append_opinion(path: Path, opinion: Opinion) -> bool:

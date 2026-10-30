@@ -1,7 +1,7 @@
-"""CLI 骨架测试。
+"""CLI 覆盖：每个子命令都能跑通 / 参数错误退出码 2 / 配置错误退出码 1。
 
-★ `collect` / `export` / `list` 是**刻意占位**：断言它们抛 NotImplementedError，
-但 `--help` 必须可见（不是漏实现）。
+★ 2026-10-29 审查：本文件旧注释写「`collect` / `export` / `list` 是刻意占位，
+  断言它们抛 NotImplementedError」—— 三者早已实现，旧注释会让人误判实现状态。
 """
 
 from __future__ import annotations

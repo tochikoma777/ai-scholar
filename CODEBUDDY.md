@@ -28,12 +28,16 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 > B（真实 vault 物化）· C（Pages 发布）· D-1（collect 逐日隔离 + 60s 读超时）·
 > F（成本可见性三件套）。稳态成本 **≈¥0.14/天（¥52/年）**；
 > 站点 `https://tochikoma777.github.io/ai-scholar/`（daily 内构建 → deploy-pages）。
-> ★ **v1.11 已定决策（勿推翻）**：D 排序（热度/经典交替 + 去重）；Tier 1 不是深度分析门槛
-> （通道 B 是并行补读）；经典获取 = 种子清单 `config/classics.yaml` 为主；
-> 深度分析产物写成 public 真源 `data/analyses/`。
+> ★ **v1.11 已定决策（勿推翻）**：D 排序（热度/经典交替 + 去重）；经典获取 = 种子清单
+> `config/classics.yaml` 为主；深度分析产物写成 public 真源 `data/analyses/`。
+> ★ **深度分析入场资格（2026-10-29 负责人定案，取代 v1.11 时期「Tier 1 不是门槛」的说法）**：
+> 自动跑只做 **watchlist 命中 或 Tier 1** 的论文（候选池硬条件），Tier 1 是入场券不是排序加分。
 > ★ **daily 已接入 `site`**（L8-C 推翻 2026-10-25「不接入」的旧决定）：
 > 站点要读 db 元数据，而 db 只存在于 actions-cache ⇒ 必须在 daily job 内构建。
 > ★ 前置审计教训（E7）：能力已实现≠已接线 —— 各阶段 DoD 必须回答「产出凭什么被下一阶段拿到」。
+> ★ **L10 草稿已就位但尚未启用**：`docs/handoff/L10-草稿.md`（结项验收）要等
+> **观察满 14 天 = 2026-11-11** 后才由负责人启用。**在未启用前它不是开工入口**，
+> 开工仍看 `L9-开工.md`（机械校验按 `L*-开工.md` 取最大阶段号，草稿不匹配该模式）。
 
 上一阶段：**L6（运营修复）已完成**（tag `l6`）：HF 400 根因修复、成本可见性、端到端实测。
 上一阶段：**L5（呈现形态）已完成**（tag `l5a` / `l5b`）：静态 HTML + 交互看板。
@@ -102,6 +106,11 @@ migrate → collect → collect --classics → enrich → signals → relate →
 → Cost guard（::warning）→ site --out _site → upload-pages-artifact → commit → deploy-pages
 ```
 
+> ★ **还有第二条自动化链**（易漏看，两个 workflow 共 push 同一分支）：
+> `recap.yml`（周一 / 每月 1 号 UTC 16:35，见下方 bullet）跑
+> `report --weekly|--monthly --previous` → 只 commit `data/reports/{weekly,monthly}`。
+> 它是 daily 之外的**独立触发**，不在上面的箭头链里。
+
 - LLM 环节只有三个：`enhance`(fast, 20) · `grade`(fast, **8**) · `analyze`(strong, 周 5 篇上限)。
 - 末尾只 commit `data/first_seen.jsonl` / `data/signals/` / `data/reports/` /
   `data/predictions/` / `data/analyses/` 五类真源
@@ -138,7 +147,7 @@ migrate → collect → collect --classics → enrich → signals → relate →
 
 ### 两条主线的关键路径
 
-**collect** — `pipeline/collect.py:310 run_collect`
+**collect** — `pipeline/collect.py:333 run_collect`
 
 1. `_days_back(days)` 逐日抓取（arXiv 按 `submittedDate` 精确框定并翻页；HF 按 `date`）。
 2. `canonical_id_for` → `_resolve_via_alias` → `upsert_paper`。三级去重：
@@ -168,7 +177,7 @@ migrate → collect → collect --classics → enrich → signals → relate →
 | 路径 | 职责 | 关键点 |
 |---|---|---|
 | `cli.py` | **二十个**子命令：`init`/`doctor`/`collect`（`--classics` 是它的 flag）/`export`/`site`/`enrich`/`enhance`/`analyze`/`grade`/`mark`/`want`/`signals`/`relate`/`related`/`list`/`cost`/`budget`/`predict`/`stats`/`report` | 退出码：正常恒 0、`ConfigError` 1、参数错误 2 |
-| `config.py` | YAML 加载、`${ENV}` 插值、watchlist 双文件合并、`Settings` | `load_settings` 带 `lru_cache`；环境变量前缀 `AI_SCHOLAR_`，嵌套分隔 `__` |
+| `config.py` | YAML 加载、`${ENV}` 插值、watchlist 双文件合并、`Settings` | `load_settings` 带 `lru_cache`；环境变量前缀 `AI_SCHOLAR_`，嵌套分隔 `__`；★ 每个键都要有消费方：`app.log_level`→`cli.main()`、`sources.*.enabled`/`availability`→`pipeline/collect.py` 的 `_source_gate`、S2 的 `rate_limit`→`enrich`/`signals`；`time_semantics` 是**声明性元数据**（代码不读，改它不改变行为） |
 | `models.py` | pydantic 域模型：`WatchlistConfig` / `Availability` / `TimeSemantics` | **与 `store/models.py` 不是一回事** |
 | `budget.py` | `estimate_cost` + `check_budget` | 纯逻辑；调用前过闸门，调用后按实际 token 记账 |
 | `llm.py` | `build_client` / `NullLLM` / `LLMClient` | 三级降级按 `(model, format)` 记忆；off 档零请求 |
@@ -182,17 +191,20 @@ migrate → collect → collect --classics → enrich → signals → relate →
 | `pipeline/grade.py` | 定级：Tier 1/2/3 + 原始证据 | 延迟定级；幂等 `grade_content_hash`；解析失败不写指纹 |
 | `pipeline/deep_analysis.py` | 深度分析（strong）+ 通道 A/B | 周配额 5；正文临时抓取；幂等 `deep_content_hash`；**D 排序**（热度/经典交替）；完成即置 `selected=1`；产物落 `data/analyses/`（`--check` 核对；`sync_analyses` 自愈补写） |
 | `pipeline/predict.py` | L4 推演生成（★ 零 LLM） | 3 类判据；同目标 open 则跳过；观点另存 |
-| `pipeline/stats.py` | 到期验证 / 记分板 / 校准 / 影响分析 | ★ `insufficient` 不进命中率分母；样本不足不下结论 |
+| `pipeline/stats.py` | 到期验证 / 记分板 / 校准 / 影响分析 | ★ `insufficient` 不进命中率分母；样本不足不下结论；★ 记分板坏行进 `ScoreboardSummary.bad_lines`（不静默，否则分母被悄悄改变）；★ `--calibration`/`--impact` 是**人工按需**（读 db，不进 daily/recap） |
 | `pipeline/score.py` | 热度 / 跨源 / 主题三分量 | ★ 无 `total` 字段，不做加权求和（红线 11） |
 | `store/scoreboard.py` | 记分板 JSONL + 可证伪门禁 | append-only 快照；代码判定可证伪性 |
 | `store/wanted.py` | 想读队列 JSONL（L7-6） | append-only；幂等追加；坏行显式返回；`want_command()` 是命令的唯一来源 |
 | `collectors/fulltext.py` | arXiv HTML 临时抓取 | ★ 只在内存，抓完即弃，**永不入库** |
 | `collectors/hf.py` | HF Daily Papers 抓取 | ★ 窗口**从昨天开始**（榜单滞后发布，请求当天必 400，L6-1）；失败带截断响应体 |
 | `pipeline/prescreen.py` | 零成本预筛（规则负面排除） | ★ 只决定是否跟踪；`r` 是淘汰集留存率 |
-| `pipeline/signals.py` | 采样状态机 + signals 写入 + 月度 JSONL | ★ 状态持久化；两套时钟不可混用；JSONL 是跨 DB 重建的幂等真源 |
+| `pipeline/signals.py` | 采样状态机 + signals 写入 + 月度 JSONL | ★ 状态持久化；两套时钟不可混用；JSONL 是**跨运行幂等去重**的真源（★ `rebuild` 命令**未实现** —— db 丢失后靠重采恢复，别把它当"一键重建"；见设计方案 §6.2） |
 | `pipeline/relate.py` | 文献耦合（倒排）+ TF-IDF 相似（增量） | ★ 禁止全库两两比较；对称边只存一条 |
 | `pipeline/cost.py` | L8-F 成本汇总 | ★ 累计真源 = `data/reports/*.json`；db 只用于**分项**（缓存）；异常只标注不阻断；`live_anomalies()` 供报告实时判定 |
 | `pipeline/report.py` | `DailyReport` + Jinja 渲染 + 原子写 | 只读 DB；当天重跑无生成时间 diff |
+| `report_paths.py` | 报告目录布局的唯一真源（`daily/` / `weekly/` / `monthly/`） | ★ `daily/` 优先、旧平铺路径兼容、**非日报文件名不误扫**；消费方四处：`cost.py` / `site.py` / `recap.py` / `cli.py`（L9-D） |
+| `pipeline/recap.py` | 周报 / 月报重算（L9-A） | ★ 只读 `data/reports/*.json` 真源、**零 LLM 不读 db**；`--previous` = 上一周期；不含生成时间 ⇒ 幂等；坏 JSON / 缺目录显式上报 |
+| `templates/report/recap.md.j2` | 周报 / 月报模板 | ★ Python 侧预拼字符串，模板行尾不放块标签（`trim_blocks` 换行坑） |
 | `pipeline/site.py` | L5a 站点装配：报告 + 记分板 + DB 元数据 | ★ **不读 vault**；缺输入显式降级，不伪造 |
 | `store/hash.py` | 主键归一化 + `content_hash` | hash 只含 title/abstract/authors/venue |
 | `store/first_seen.py` | `first_seen.jsonl` 读写 | append-only，绝不覆盖已有 id |
@@ -301,6 +313,12 @@ vault 由本地 `export` 写入。任何"让 Actions 写 private vault"的设计
 | 当前阶段怎么开工 | `docs/handoff/L*-开工.md`（阶段号最大的那份） |
 | 当前任务卡 / 具体交付口径 | `docs/任务卡/*.md` |
 | 按时间发生的事实 / 文档版本账 | `docs/开发日志.md` · `docs/文档维护日志.md` |
+| **能力清单**（有哪些命令 / 产物，一眼扫完全貌） | `docs/功能总览.md` |
+| **历史审查结论**（定期体检报告，含复现命令） | `docs/审查报告/审查报告-YYYY-MM-DD.md` |
+
+★ `docs/审查报告/` 与 `docs/功能总览.md` 属**本地文档**：`.gitignore` 里已显式排除（2026-10-28
+负责人决定不入库），所以 clone 下来看不到它们 —— **换环境时不要当成"文档丢失"**，
+Agent 可随时重新生成。
 
 ---
 
@@ -334,9 +352,14 @@ vault 由本地 `export` 写入。任何"让 Actions 写 private vault"的设计
 7. ❌ **导出产生 diff 噪音** —— 文件内**只留内容级时间戳**：直接比较新旧生成区文本，
    只有生成区变化才更新 `content_rev_at`，用户笔记变化不触发；导出时间移出文件，
    只进 `90-元数据/生成报告.md`。这里没有单独的导出内容 hash。
-8. ❌ **Tier 当门槛用** —— **Tier 是排序权重，不是门槛**。
-   深度分析通道 A（watchlist 命中 / 显式指定 / 当日 Top N）**立刻执行、不看 Tier**；
-   正文抓取跟随深度分析触发，不按 Tier 限流。
+8. ❌ **Tier 当排序权重用 / 以为深度分析对"所有论文"开放** —— 正确口径（**2026-10-29 负责人定案**）：
+   **自动跑的深度分析只做「watchlist 命中」或「Tier 1」两类论文**，这是**有意收窄**，不是漏接。
+   - 候选池 = `_watched(...) or tier == 1`（`pipeline/deep_analysis.py:202-207`），
+     通道 A/B 都从这个池子里取 ⇒ 非命中且未定级的论文**不进**当日 Top N。
+   - Tier 1 是**入场资格**，不是"分数加成"；不要为"多分析几篇"放宽池子（会直接抬高 strong 档成本）。
+   - 正文抓取跟随深度分析触发，不按 Tier 限流。
+   - ★ 改动这条口径属 L3（需负责人批准）。守卫：`tests/test_deep_analysis.py` 的
+     `test_pool_requires_watchlist_or_tier1`（非命中 + 未定级的高热论文也不入选）。
 9. ❌ **新论文入库即定级** —— 延迟定级。三条判据里的**结构权重需要施引数据**，
    新论文没有；入库只做零成本预筛，等引用数据补齐（或已被顶会接收）才定级。
 10. ❌ **让 LLM 编造历史地位 / 影响力** —— 六段之五「历史地位」是**条件式输出**：
@@ -417,6 +440,32 @@ uv run ai-scholar export
 
 ★ 没配 LLM key ⇒ 自动降级 `off`，整条链路照跑（增强 / 定级 / 分析跳过），**不要为此报错或改代码**。
 
+### 本地复现 daily 全链路（排查 Actions 报错时用）
+
+Actions 里失败的步骤，按同一顺序在本地重演一遍定位（daily.yml 的 step 顺序就是下面这条链）：
+
+```bash
+uv run ai-scholar collect --days 1 && uv run ai-scholar collect --classics \
+  && uv run ai-scholar enrich && uv run ai-scholar signals \
+  && uv run ai-scholar relate && uv run ai-scholar enhance \
+  && uv run ai-scholar grade && uv run ai-scholar analyze \
+  && uv run ai-scholar analyze --check \
+  && uv run ai-scholar predict && uv run ai-scholar stats --verify \
+  && uv run ai-scholar report && uv run ai-scholar site --out /tmp/_site
+```
+★每一步都应退出码 0（真源失败只会进 `degraded`，不让流水线红）。
+★ 复现**周报 / 月报**用 `uv run ai-scholar report --weekly --previous`（recap.yml 的写法）。
+
+### scripts/ 探针（改外部依赖或谓词前后必跑）
+
+| 脚本 | 什么时候跑 | 看什么 / 写什么 |
+|---|---|---|
+| `scripts/probe_sources.py` | 新增或怀疑数据源变化时 | 各源真实响应 → 回填 `docs/数据源手册.md` |
+| `scripts/probe_s2.py --n 50` | S2 字段 / 批量语义变更 | batch 命中率与 `null` 占位 → 手册 §2.6 |
+| `scripts/probe_prescreen.py` | 调预筛口径或估体积 | 通过率 `p` + SQLite 行字节实测值 |
+| `scripts/probe_classics.py` | **改 `config/classics.yaml` 必跑** | 清单 id → 真实标题核对（防止 id 写错静默失败） |
+| `scripts/probe_openreview.py --n 20 --no-write` | 评估是否接线 OpenReview | 命中率 / 误命中 / 耗时（本期结论=不接线） |
+
 ```bash
 uv run ai-scholar --help         # 命令树
 uv run ai-scholar init           # 目录骨架 + watchlist.local.yaml + .env 骨架
@@ -484,9 +533,11 @@ uv run python scripts/probe_openreview.py --n 20 --no-write
                                  # OpenReview 实测（标题命中率 + 误命中 + 耗时；先实测再接线 D1）
 
 uv run pytest                    # 全量（含 2 个联网冒烟；其余网络用 respx mock）
+uv run pytest -m "not live"      # ★ 离线全量（日常推荐；CI 跑的是含 2 个 live 冒烟的全量）
 uv run pytest tests/test_export.py -q          # 单文件
 uv run pytest tests/test_export.py::test_note_name_has_date_prefix_and_short_hash -q   # 单条
 uv run pytest -k "config or watchlist" -q      # 按关键字筛
+uv run pytest -m "not live" --cov=src/ai_scholar --cov-report=term-missing  # 覆盖率（★ E2：覆盖率不等于功能完整）
 uv run ruff check . && uv run ruff format --check .
 uv run mypy src/ai_scholar       # strict，cli.* 与 utils.* 有放宽
 uv build                         # hatchling：构建 sdist + wheel（默认写 dist/）
@@ -547,7 +598,7 @@ gh run list --workflow=recap.yml --limit 3        # 最近三次周报/月报是
 - 除 `test_live_arxiv_parse` / `test_live_hf_parse_may_skip` 外，网络一律 respx 拦截；
   这两个联网冒烟在连接失败、非 200 或无数据时 skip，但解析断言失败仍会让测试红。
 - 断言要落在**实际收到的值**上（如 `settings.llm.base_url`），不是"加载成功"。
-- 基线（tag `l8a` + L9 文档/报告审计 + L9-A/B/C/D）：`uv run pytest -m "not live"` = **400 passed**；
+- 基线（tag `l8a` + L9 文档/报告审计 + L9-A/B/C/D）：`uv run pytest -m "not live"` = **407 passed**；
   全量 **402**（= 400 + 2 个 `@pytest.mark.live` 联网冒烟，无真实响应时 skip）。
   ★ 核对口径：`uv run pytest --collect-only -o addopts="" | tail -2`（避免 `-qq` 吞掉汇总行）。
   ★ `-q` 叠加 `pyproject` 里的 `addopts = "-q"` 会变成 `-qq`，**pytest 不再打印
@@ -561,13 +612,23 @@ gh run list --workflow=recap.yml --limit 3        # 最近三次周报/月报是
   真实 key / `MODE=fast` 就会让"应降级 off"的断言红、CI 绿）。若仍出现此类红灯，
   说明有用例绕过了 conftest 或直接读 `os.environ` —— 去修那里，别手工清环境凑绿。
 - ★ **CODEBUDDY 里的行号引用会被机器校验**：凡是写成 `path.py:NNN 符号` 的（如
-  `pipeline/collect.py:310 run_collect`），`tests/test_docs_consistency.py::test_codebuddy_line_anchors`
+  `pipeline/collect.py:333 run_collect`），`tests/test_docs_consistency.py::test_codebuddy_line_anchors`
   会断言该行附近确有该符号 —— **改完代码记得重跑，漂了就改文档**。
 - `tests/test_docs_consistency.py` 是阶段收尾的机械门禁：若 CODEBUDDY 标记当前阶段「已完成」，
   则 `docs/handoff/` 下必须存在**下一阶段**的 `L*-开工.md`（未归档），且维护日志已登记。
-- CI：`ubuntu-24.04` + Python 3.11 固定，依赖安装为 `uv sync --frozen || uv sync`；
-  `lint-and-test` **不读任何 secrets**，执行全量 pytest（未排除联网冒烟）；`probe` 仅在
-  `workflow_dispatch` 下实跑数据源探测，不回写仓库。
+### CI（.github/workflows/ci.yml）
+
+| job | 触发 | 做什么 | 本地等价命令 |
+|---|---|---|---|
+| `lint-and-test` | push 任意分支 / PR / 手动 | ruff → ruff format check → mypy strict → **全量 `pytest`**（含 2 个 live 冒烟） | `uv run ruff check . && uv run ruff format --check . && uv run mypy src/ai_scholar && uv run pytest` |
+| `probe` | **仅 `workflow_dispatch`** | 实跑数据源探测，取证 Actions 环境的可达性（本地 WSL 对 huggingface.co 不可达，环境分级只能靠这里取证） | `uv run python scripts/probe_sources.py --arxiv-max 400`（本地网络环境不同，结论可能不一致，属预期） |
+
+- 运行环境固定 `ubuntu-24.04` + Python 3.11；依赖 `uv sync --frozen || uv sync`。
+- ★ `lint-and-test` **不读任何 secrets** ⇒ **必须在无 key 时全绿**。
+  ⇒ 本地有真 key 时若出现"应降级 off"的红，**是环境副作用**（conftest 已隔离 `AI_SCHOLAR_*`，
+  再红说明有用例绕过了 conftest）。
+- ★ 禁止在 CI 里跑 `ai-scholar export`：Actions 日志默认公开，而 vault 是 private。
+  导出相关测试一律用 `tmp_path`；确需实跑必须显式 `--out` 到临时目录。
 
 ---
 

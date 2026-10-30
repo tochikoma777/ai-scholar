@@ -169,6 +169,31 @@ async def test_channel_a_and_b_selection(tmp_path: Path) -> None:
     assert papers["arXiv:C"].deep_analysis_md is None
 
 
+async def test_pool_requires_watchlist_or_tier1(tmp_path: Path) -> None:
+    """★ 2026-10-29 负责人定案：日常深度分析**只做 watchlist 命中 或 Tier 1**。
+
+    守卫意图：非命中、未定级、但**热度更高**的论文也不该被「当日 Top N」拉进来。
+    若有人放宽候选池（红线 8 的 L3 决策），这条会红 —— 放宽 = strong 档成本直接上升。
+    """
+    db = tmp_path / "d.db"
+    hot = make_paper("arXiv:HOT", title="Very Hot Paper", abstract="unrelated")
+    hot.hf_score = 999
+    seed(db, [hot, make_paper("arXiv:T1", title="Tier One", abstract="unrelated", tier=1)])
+
+    report = await run_deep_analysis(
+        settings=strong_settings(str(tmp_path)),
+        db_path=db,
+        client=FakeDeepLLM(),
+        watchlist=WATCHLIST,
+        today=DAY,
+    )
+
+    assert report.analyzed == 1
+    papers = load_papers(db)
+    assert papers["arXiv:T1"].deep_status == "done"  # Tier 1 = 入场券
+    assert papers["arXiv:HOT"].deep_analysis_md is None  # 高热但未定级 ⇒ 不入选
+
+
 async def test_weekly_quota_blocks(tmp_path: Path) -> None:
     """配额口径 = **本周已产出的篇数**（不是调用次数）。"""
     db = tmp_path / "d.db"
@@ -332,6 +357,31 @@ async def test_fulltext_is_used_and_not_persisted(tmp_path: Path, monkeypatch) -
     # ★ 正文不进库：只存分析 Markdown
     paper = load_papers(db)["arXiv:A"]
     assert "FULLTEXT BODY" not in (paper.deep_analysis_md or "")
+
+
+async def test_fulltext_miss_is_degraded_not_silent(tmp_path: Path, monkeypatch) -> None:
+    """★ 2026-10-29 审查：正文抓不到时只回 None，Actions 里完全不可见
+    （花了 strong 的钱、实际按摘要分析）。现在必须进 `degraded`。
+    """
+    db = tmp_path / "d.db"
+    seed(db, [make_paper("arXiv:A", arxiv_id="2610.00009")])
+
+    async def fake_fetch(http, arxiv_id, *, max_chars=60000, min_chars=2000):
+        return None
+
+    monkeypatch.setattr("ai_scholar.pipeline.deep_analysis.fetch_arxiv_html", fake_fetch)
+    report = await run_deep_analysis(
+        settings=strong_settings(str(tmp_path)),
+        db_path=db,
+        client=FakeDeepLLM(),
+        watchlist=WATCHLIST,
+        today=DAY,
+    )
+
+    assert report.fulltext_hits == 0
+    assert report.fulltext_misses == 1
+    assert "1 篇" in report.degraded["fulltext"]
+    assert report.analyzed == 1  # 缺正文不阻断，只是降级
 
 
 async def test_report_deep_analyzed_filled(tmp_path: Path) -> None:

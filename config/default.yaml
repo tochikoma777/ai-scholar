@@ -6,9 +6,9 @@
 #   算法阈值 / 规模参数可以留字面量。
 
 app:
-  name: ai-scholar
   timezone: Asia/Shanghai          # 存储统一 UTC，仅渲染层转此时区
   data_dir: data
+  # ★ 唯一消费点：cli.main() 用它初始化 structlog（AI_SCHOLAR_LOG_LEVEL=DEBUG 可放大日志）
   log_level: ${AI_SCHOLAR_LOG_LEVEL:-INFO}
 
 # 三档运行模式：off = 零 API 花费；fast = 便宜档；strong = 推理档

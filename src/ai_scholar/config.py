@@ -65,7 +65,6 @@ class RunMode(StrEnum):
 
 
 class AppSettings(BaseModel):
-    name: str = "ai-scholar"
     timezone: str = "Asia/Shanghai"
     data_dir: str = "data"
     log_level: str = "INFO"
@@ -145,7 +144,10 @@ class SourceSettings(BaseModel):
     availability: Availability = "always"
     availability_reason: str = ""
     rate_limit: str = "1/1s"
-    # ★ 时间语义三态：arXiv / HF 索引滞后数天，必须用 discovery（first_seen）过滤
+    # ★ 时间语义三态：arXiv / HF 索引滞后数天，必须用 discovery（first_seen）过滤。
+    #   ★ 2026-10-29 审查注记：该字段是**声明性元数据**（供数据源手册 / 人工核对），
+    #     运行时不按它分支 —— 采集窗口一律用 `first_seen` 的 discovery 语义实现三态，
+    #     改这里**不会**改变行为。真正决定窗口的是 `lookback_days` 与 `hf_collect_days()`。
     time_semantics: TimeSemantics = "event"
     endpoint: str = ""
     # ★ HF 专用：实际请求端点（默认官方，可被镜像覆盖）。写成 ${ENV} 占位符。
