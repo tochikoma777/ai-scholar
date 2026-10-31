@@ -1,0 +1,56 @@
+{
+  "date": "2026-11-01",
+  "schema_version": 1,
+  "total_papers": 4588,
+  "new_today": 1,
+  "watchlist_hits": [],
+  "deep_analyzed": [],
+  "new_graded": [
+    {
+      "id": "arXiv:2610.33749",
+      "title": "Refined Assessment for Translation Evaluation: Rethinking Machine Translation Evaluation in the Era of Human-Level Systems",
+      "score": 0.0,
+      "groups": [],
+      "tier": 2
+    },
+    {
+      "id": "arXiv:2610.38006",
+      "title": "Algorithmic Bias from the Perspectives of Healthcare Professionals",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3
+    },
+    {
+      "id": "arXiv:2610.39009",
+      "title": "Assessing feature scorer results on high-dimensional datasets with t-SNE",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "a2c413a39aa9",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1719,
+      "new": 1,
+      "degraded": []
+    },
+    {
+      "run_id": "c55cacab2708",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.0478,
+  "cost_anomalies": []
+}
