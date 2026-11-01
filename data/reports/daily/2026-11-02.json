@@ -1,0 +1,80 @@
+{
+  "date": "2026-11-02",
+  "schema_version": 1,
+  "total_papers": 4588,
+  "new_today": 0,
+  "watchlist_hits": [],
+  "deep_analyzed": [
+    {
+      "id": "arXiv:2610.01352",
+      "title": "MMVistaReason: Toward Open-Data and Post-Training Recipes for Multimodal Reasoning",
+      "score": 0.0,
+      "groups": [],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.33650",
+      "title": "TAD: Distilling Vision-Language-Action Policies from Teacher Trajectories Alone",
+      "score": 0.0,
+      "groups": [],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.36729",
+      "title": "Hy-Nomas: Towards Free-form Interactive World Generation",
+      "score": 0.0,
+      "groups": [],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.40432",
+      "title": "Soil Moisture Estimation in Precision Agriculture: A Knowledge Distillation Approach",
+      "score": 0.0,
+      "groups": [],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.38095",
+      "title": "Nemotron 3.5 Super and Lightning: Open, Efficient Mixture-of-Experts Hybrid Mamba-Transformer Models for Agentic AI",
+      "score": 0.0,
+      "groups": [],
+      "tier": null
+    }
+  ],
+  "new_graded": [
+    {
+      "id": "arXiv:2610.39551",
+      "title": "Comprehensive empirical evaluation of feature extractors in computer vision",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "ae5203602577",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1243,
+      "new": 0,
+      "degraded": []
+    },
+    {
+      "run_id": "fb6321f6cbfa",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.3108,
+  "cost_anomalies": [
+    "今日 ¥0.3108 > 近 7 日中位数 ¥0.0552 × 3（相对突增）"
+  ]
+}
