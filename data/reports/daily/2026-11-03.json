@@ -1,0 +1,138 @@
+{
+  "date": "2026-11-03",
+  "schema_version": 1,
+  "total_papers": 4968,
+  "new_today": 380,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2610.41399",
+      "title": "scAnyOmics: Foundation-Model Distillation for Any-to-Any Completion of Multi-omics Virtual Cells",
+      "score": 2.9,
+      "groups": [
+        "multimodal",
+        "efficient-inference",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.41307",
+      "title": "Erase the Injected Region: Multimodal Prompt-Injection Defense with On-Policy Self-Distillation",
+      "score": 2.9,
+      "groups": [
+        "multimodal",
+        "efficient-inference",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.41162",
+      "title": "FrontierMat: Benchmarking Language Models at the Frontier of Materials R&D",
+      "score": 2.9,
+      "groups": [
+        "multimodal",
+        "efficient-inference",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.41408",
+      "title": "SACQ: Structure-Aware Codebook Quantization for Ultra-Low-Bit Vision-Language-Action Models",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.41037",
+      "title": "WebOverlay: High-Throughput Vision-Only Distillation for Extreme Aspect-Ratio Web Overlay Detection",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.35850",
+      "title": "OSWAM: An Effective World Action Model with One-Step Action Generation",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.42112",
+      "title": "Subquadratic Attention with a Hierarchical Tree-Structured Indexer",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.41366",
+      "title": "What We Keep of What We Forget: Replacement Operators and Routing Semantics in Training-Free MoE Expert Pruning",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.41358",
+      "title": "Do Transaction Prices Reflect Visual Preference? A Diagnostic Study with Multimodal Language Models",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2610.41177",
+      "title": "TraceSpec: Understanding and Improving Speculative Decoding for LLM Agents",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ],
+      "tier": null
+    }
+  ],
+  "deep_analyzed": [],
+  "new_graded": [],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "6c8fbc282938",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1154,
+      "new": 380,
+      "degraded": []
+    },
+    {
+      "run_id": "b2539fe23114",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.029,
+  "cost_anomalies": []
+}
