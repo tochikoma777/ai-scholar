@@ -1,0 +1,135 @@
+{
+  "date": "2026-11-04",
+  "schema_version": 1,
+  "total_papers": 5997,
+  "new_today": 1029,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2611.02601",
+      "title": "Parallelism-Aligned Pruning and Round-Aware Context Reuse for On-Device Multimodal Agents",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.02501",
+      "title": "SpecPilot: Autonomous Algorithm Discovery and Systems Optimization for Speculative Decoding",
+      "score": 2.0,
+      "groups": [
+        "efficient-inference",
+        "ai-safety"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.01677",
+      "title": "Xiaomi Auto World Model 2.0: Causal World Models for Real-World Driving and Embodied Intelligence",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.01617",
+      "title": "Seeing What Matters, Verifying What Pays: Load-Adaptive Speculative Decoding for Vision-Language Models",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.03627",
+      "title": "Not All Reasoning Generalizes: A Case Study on Learning Generalizable Reasoning Strategies in RLVR",
+      "score": 1.9,
+      "groups": [
+        "ai-safety",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.03377",
+      "title": "Same Outputs, Different Scores: Auditing the Unchecked Graders of Multimodal LLM Benchmarks",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.03309",
+      "title": "MultiInpaintCOCO: Fine-Grained Visual Understanding in Multiple Languages",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.03097",
+      "title": "DR Pixel: Page-Native Deep Research with Vision-Language Models",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.02928",
+      "title": "Lab2Sim: Turning Real-World Experiment Videos into Interactive Virtual Experiments",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.02896",
+      "title": "Bridging Low-Level Image Fusion and High-Level Semantic Understanding",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    }
+  ],
+  "deep_analyzed": [],
+  "new_graded": [],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "6546e250c3e5",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1910,
+      "new": 1029,
+      "degraded": []
+    },
+    {
+      "run_id": "68ff3629221c",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.0316,
+  "cost_anomalies": []
+}
