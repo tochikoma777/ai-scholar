@@ -1,0 +1,143 @@
+{
+  "date": "2026-11-05",
+  "schema_version": 1,
+  "total_papers": 6452,
+  "new_today": 455,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2611.05181",
+      "title": "What Does the Model See? Representation Validity in Multimodal LLM-Based Video Analysis",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.05179",
+      "title": "OperAItor: An Agentic Framework for Fault-Tolerant Operation of Chemical Processes",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.05158",
+      "title": "Perturb, Repair, Verify: Self-Play Vision-Language Verifiers for Compositional Understanding",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.05151",
+      "title": "Catalyzing Interactive HTML Generation Capabilities via High-Fidelity Reinforcement Learning",
+      "score": 1.9,
+      "groups": [
+        "ai-safety",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.05080",
+      "title": "CRONOS: Benchmarking Non-Episodic Reinforcement Learning for Robotic Manipulation",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.04841",
+      "title": "DGC-Net: Cross-Modal Dynamic Routing with Global-Guided Compensation in Multimodal Sentiment Analysis",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.04492",
+      "title": "Hybrid Particle-Voxel Dynamics for Multimodal 3D World Simulation",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.04483",
+      "title": "CogniLife: Continuous Cognitive Distillation for Deployed Multi-Expert Agent Marketplaces",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.04392",
+      "title": "Aero-VPA: Few-Step Flow-Matching Control over Non-Reconstructive JEPA Latents for Agile Flight on Edge Hardware",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.04380",
+      "title": "Twice as Fast, Until It Isn't: Quantized Serving of Mid-Size Open LLMs",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ],
+      "tier": null
+    }
+  ],
+  "deep_analyzed": [],
+  "new_graded": [
+    {
+      "id": "arXiv:2610.40563",
+      "title": "Comparing Human Role-Players and LLM-Simulated Clients in Online Counselling Training: An Analysis of Counselling Patterns",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "c626ad3546f9",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1906,
+      "new": 455,
+      "degraded": []
+    },
+    {
+      "run_id": "32930bc3c6eb",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.0318,
+  "cost_anomalies": []
+}
