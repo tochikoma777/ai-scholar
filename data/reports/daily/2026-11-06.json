@@ -1,0 +1,135 @@
+{
+  "date": "2026-11-06",
+  "schema_version": 1,
+  "total_papers": 6860,
+  "new_today": 408,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2611.06075",
+      "title": "UniCompress: From Multi-LoRA Experts to One Compact Model for Edge Intelligence",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.05894",
+      "title": "RECAP: Context-Aware Prediction Recycling with Request-Local and Persistent Memories for Multimodal Speculative Decoding",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.05715",
+      "title": "CoReFlow: Consistency-Relaxed Flow Maps for Probabilistic Traffic Forecasting",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.05648",
+      "title": "NitroFusion2: Bringing Adversarial Loss to the Text Stream of Multimodal Diffusion Transformers",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.06911",
+      "title": "BEAKER: An Expert-Curated Benchmark for Embodied Brains in Self-Driving Chemical Laboratories",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.06859",
+      "title": "Balancing hierarchical representation and quantization: A performance trade-off in text embeddings",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.06768",
+      "title": "PyRUA-REAL: Robot Exploration and Adaptive Learning through RSI in the Real World",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.06631",
+      "title": "Trick-or-Treat: Adversarial Evaluation of Multimodal Medical Reasoning with Synthetic Images",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.06627",
+      "title": "Interactive World Simulation with Cosmos for Physical AI",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.06518",
+      "title": "EmoReward: Self-Evolving Reward Calibration for Emotional Video Generation RL",
+      "score": 1.9,
+      "groups": [
+        "ai-safety",
+        "eval-benchmark"
+      ],
+      "tier": null
+    }
+  ],
+  "deep_analyzed": [],
+  "new_graded": [],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "4aae23fa5c3f",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1963,
+      "new": 408,
+      "degraded": []
+    },
+    {
+      "run_id": "af32f238903c",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.0298,
+  "cost_anomalies": []
+}
