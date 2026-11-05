@@ -78,7 +78,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/reports/weekly data/reports/monthly
+          # ★ 一次只跑一个周期 ⇒ 另一目录不存在，裸 `git add` 会因 pathspec 不匹配 fatal
+          for d in data/reports/weekly data/reports/monthly; do
+            if [ -d "$d" ]; then git add "$d"; fi
+          done
           if git diff --cached --quiet; then
             echo "无变更，跳过 commit"
             exit 0

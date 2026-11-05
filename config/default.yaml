@@ -13,7 +13,9 @@ app:
 
 # 三档运行模式：off = 零 API 花费；fast = 便宜档；strong = 推理档
 # ★ 缺 api_key（或 base_url）时自动降级 off，不报错退出（退出码 0）
-mode: ${AI_SCHOLAR_MODE:-fast}
+# ★ 必须带引号：off/on/yes/no 在 YAML 1.1 是布尔，插值后裸写 `mode: off` 会被
+#   yaml.safe_load 解析成 False ⇒ ValidationError（2026-11-05 recap.yml 两次失败的根因）
+mode: "${AI_SCHOLAR_MODE:-fast}"
 
 llm:
   enabled: ${AI_SCHOLAR_LLM__ENABLED:-true}

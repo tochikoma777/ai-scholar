@@ -24,6 +24,24 @@ def test_default_yaml_uses_env_placeholders(tmp_path: Path) -> None:
         assert "${" in line, f"{key} 必须是 ${{ENV}} 占位符，实际：{line.strip()}"
 
 
+def test_default_yaml_mode_placeholder_is_quoted() -> None:
+    """★ 机械守卫（2026-11-05）：`mode` 插值必须带引号。
+
+    `off` / `on` / `yes` / `no` 在 YAML 1.1 里是布尔；裸写 `mode: off` 会被
+    `yaml.safe_load` 解析成 False ⇒ `ValidationError: mode / input_value=False`。
+    `recap.yml` 故意用 `AI_SCHOLAR_MODE=off` 验证零 LLM，正好踩中（周报/月报两次全挂）。
+    """
+    raw = (project_root() / "config" / "default.yaml").read_text(encoding="utf-8")
+    line = next(x for x in raw.splitlines() if x.strip().startswith("mode:"))
+    assert '"${' in line, f"mode 必须是带引号的占位符，实际：{line.strip()}"
+
+
+def test_off_mode_from_env_is_not_yaml_bool(monkeypatch: pytest.MonkeyPatch) -> None:
+    """★ 行为回归：真实配置 + `AI_SCHOLAR_MODE=off` 必须拿到 RunMode.OFF，不抛异常。"""
+    monkeypatch.setenv("AI_SCHOLAR_MODE", "off")
+    assert load_settings().mode is RunMode.OFF
+
+
 def test_env_overrides_yaml_mode(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """`AI_SCHOLAR_MODE=strong` 必须真的生效（断言实际枚举值，不是"加载成功"）。"""
     cfg = tmp_path / "default.yaml"

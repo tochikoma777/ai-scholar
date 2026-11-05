@@ -44,9 +44,12 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 > （先 `git mv` 改名再改本指针，顺序反了门禁必红）。
 > ★ 本次会话收尾（2026-11-05）：CODEBUDDY 自审 4 项 + L9-E 日配额削峰 + 11/2 费用归因，
 > 已推送 `6ffa3b4`；基线 409 collected / 407 离线，门禁 9 绿。详见 `L9-开工.md` §6.7。
-> ★ **已知遗留（收尾自查发现，待负责人定案）**：`recap.yml` 11/01、11/02 两次 schedule 全失败 ——
-> `config/default.yaml` 的 `mode` 插值未加引号，`off` 被 YAML 1.1 解析成布尔 `False`。
-> 周报 / 月报至今从未产出；最小修复 = 该行加引号 + 一条回归测试。**本次未改、未 push**。
+> ★ **已修复（2026-11-05）**：`recap.yml` 11/01、11/02 两次 schedule 全失败，两处根因 ——
+> ① `config/default.yaml` 的 `mode` 插值未加引号，`off` 被 YAML 1.1 解析成布尔 `False`；
+> ② `git add` 对不存在的 `weekly|monthly` 目录 pathspec fatal。现 `mode` 加引号 +
+> `git add` 改目录存在性判断；周报 / 月报 off 档实跑产出成功（详见 `L9-开工.md` §6.7）。
+> ★ 教训：环境开关插值成裸标量时，值域含 `off/on/yes/no` 必须加引号；CI 里的 `git add`
+> 别写死两个可能不同时存在的目录。
 
 上一阶段：**L6（运营修复）已完成**（tag `l6`）：HF 400 根因修复、成本可见性、端到端实测。
 上一阶段：**L5（呈现形态）已完成**（tag `l5a` / `l5b`）：静态 HTML + 交互看板。
