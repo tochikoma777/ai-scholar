@@ -178,8 +178,9 @@ grade:
   default_limit: 8
 
 deep_analysis:
-  # ★ 注意力预算：每周最多 5 篇 strong 分析；超限进队列，不降单篇质量
+  # ★ 双层注意力预算：每周最多 5 篇；每日最多 1 篇（削峰，避免周一集中跑满整周额度）
   weekly_limit: 5
+  daily_limit: 1
   default_limit: 5
   # ★ 正文上限：实测 arXiv 正文 38k–184k 字符；超限**中间省略**（保开头与实验/结论段）
   max_fulltext_chars: 100000

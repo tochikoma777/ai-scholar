@@ -81,6 +81,12 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 ## 架构总览（★ 跨文件才看得懂的部分）
 
+> ★ **下面所有模块路径都相对 `src/ai_scholar/`**（源码根），不在仓库根：
+> `cli.py` = `src/ai_scholar/cli.py`、`pipeline/collect.py` = `src/ai_scholar/pipeline/collect.py`，
+> `prompts/*.j2` / `templates/report/*.j2` 同理。入口是 `pyproject.toml` 的
+> `[project.scripts] ai-scholar = "ai_scholar.cli:app"`，wheel `packages = ["src/ai_scholar"]`。
+> 仓库根只有 `config/` · `data/` · `docs/` · `tests/` · `scripts/` · `alembic/` 与配置文件。
+
 ```
 cli.py (typer)
 ├─ collect ─→ pipeline/collect.py ─→ collectors/arxiv.py · hf.py ─→ RawPaper
@@ -115,7 +121,7 @@ migrate → collect → collect --classics → enrich → signals → relate →
 > `report --weekly|--monthly --previous` → 只 commit `data/reports/{weekly,monthly}`。
 > 它是 daily 之外的**独立触发**，不在上面的箭头链里。
 
-- LLM 环节只有三个：`enhance`(fast, 20) · `grade`(fast, **8**) · `analyze`(strong, 周 5 篇上限)。
+- LLM 环节只有三个：`enhance`(fast, 20) · `grade`(fast, **8**) · `analyze`(strong, 日 1 篇 / 周 5 篇上限)。
 - 末尾只 commit `data/first_seen.jsonl` / `data/signals/` / `data/reports/` /
   `data/predictions/` / `data/analyses/` 五类真源
   （db 走 actions-cache，按 `run_id` 作 key，**不入库**）。
@@ -193,7 +199,7 @@ migrate → collect → collect --classics → enrich → signals → relate →
 | `pipeline/enrich.py` | 引用补齐：S2 → 出边 + 队列状态机 | ★ 方向语义固定为 src 引用 dst；入库前先写方向单测 |
 | `pipeline/enhance.py` | LLM 增强 + 强相似边关联解读 | watchlist Top N；预算闸门；幂等 `enhance_content_hash` |
 | `pipeline/grade.py` | 定级：Tier 1/2/3 + 原始证据 | 延迟定级；幂等 `grade_content_hash`；解析失败不写指纹 |
-| `pipeline/deep_analysis.py` | 深度分析（strong）+ 通道 A/B | 周配额 5；正文临时抓取；幂等 `deep_content_hash`；**D 排序**（热度/经典交替）；完成即置 `selected=1`；产物落 `data/analyses/`（`--check` 核对；`sync_analyses` 自愈补写） |
+| `pipeline/deep_analysis.py` | 深度分析（strong）+ 通道 A/B | 日配额 1 / 周配额 5（L9-E 削峰）；正文临时抓取；幂等 `deep_content_hash`；**D 排序**（热度/经典交替）；完成即置 `selected=1`；产物落 `data/analyses/`（`--check` 核对；`sync_analyses` 自愈补写） |
 | `pipeline/predict.py` | L4 推演生成（★ 零 LLM） | 3 类判据；同目标 open 则跳过；观点另存 |
 | `pipeline/stats.py` | 到期验证 / 记分板 / 校准 / 影响分析 | ★ `insufficient` 不进命中率分母；样本不足不下结论；★ 记分板坏行进 `ScoreboardSummary.bad_lines`（不静默，否则分母被悄悄改变）；★ `--calibration`/`--impact` 是**人工按需**（读 db，不进 daily/recap） |
 | `pipeline/score.py` | 热度 / 跨源 / 主题三分量 | ★ 无 `total` 字段，不做加权求和（红线 11） |
@@ -248,6 +254,11 @@ migrate → collect → collect --classics → enrich → signals → relate →
   `cost_anomalies` / 站点「成本」板块 / Actions `::warning::`（daily 的 `Cost guard` 步骤）；
   另有 `ai-scholar cost` 命令可随时查账。**全部只标注，退出码仍 0。**
 - ★ 改"每天必跑"的 LLM 参数前，先算 `日 × 365`：日差 ¥0.1 = 年差 ≈¥36。
+- ★ **周一尖峰已削平（L9-E，2026-11-05）**：11/2 `cost_cny=¥0.3108` 的根因是
+  「自然周配额周一重置 + 单次 run 可跑满 5 篇」⇒ 一天花掉整周 `analyze` 预算
+  （`deep_analyzed=5`，`analyze` 单步 ¥0.2743 占 88%）。现加 `deep_analysis.daily_limit=1`
+  做日削峰，周总额度 5 篇不变 ⇒ **总成本不变、单日峰值降到 ≈¥0.09**。
+  根因 / 预算 / diff 见 `docs/任务卡/L9-E-配额削峰.md`。
 
 ---
 
@@ -378,6 +389,11 @@ vault 由本地 `export` 写入。任何"让 Actions 写 private vault"的设计
     > 直接背叛动机「没看完的东西以后还能用」。
     > 守这条的测试：`test_pipeline_never_imports_watchlist`（源码级断言
     > 采集编排不得引用 watchlist）。
+    > ★ **命中【布尔】与命中【分】是两层，别混**（README §四种典型用法②）：
+    > 布尔 = `score ≥ threshold` ⇒ **触发**（决定要不要它，如通道 A 候选）；
+    > 分 = `Σ(命中组权重)`、同组多次命中只计一次 ⇒ **只用于排序**，不是门槛，
+    > 也不是"更值得收录多少"。匹配范围 title 或 abstract、word-boundary、大小写不敏感。
+    > 两者都**不决定论文是否入库**（入库看 `cs.AI/CL/LG` 领域过滤）。
 14. ❌ **关联方向搞反 / 写库外目标的边** ——
     `paper_links(src,dst,'references')` 的语义固定为 **src 引用了 dst**；
     入边**不单独存储**（`idx_links_dst` 反向查询即得）；
@@ -441,6 +457,8 @@ uv run ai-scholar export
 ```
 
 ★ 没配 LLM key ⇒ 自动降级 `off`，整条链路照跑（增强 / 定级 / 分析跳过），**不要为此报错或改代码**。
+★ 包管理只用 `uv sync`（含 dev 组）：**不要 `pip install -e .`** —— 会绕过 `uv.lock`，
+  与 CI 的 `uv sync --frozen || uv sync` 依赖树不一致（CONTRIBUTING §1）。
 
 ### 本地复现 daily 全链路（排查 Actions 报错时用）
 
@@ -600,8 +618,11 @@ gh run list --workflow=recap.yml --limit 3        # 最近三次周报/月报是
 - 除 `test_live_arxiv_parse` / `test_live_hf_parse_may_skip` 外，网络一律 respx 拦截；
   这两个联网冒烟在连接失败、非 200 或无数据时 skip，但解析断言失败仍会让测试红。
 - 断言要落在**实际收到的值**上（如 `settings.llm.base_url`），不是"加载成功"。
-- 基线（tag `l8a` + L9 文档/报告审计 + L9-A/B/C/D）：`uv run pytest -m "not live"` = **407 passed**；
-  全量 **402**（= 400 + 2 个 `@pytest.mark.live` 联网冒烟，无真实响应时 skip）。
+- 基线（tag `l8a` + L9 文档/报告审计 + L9-A/B/C/D，2026-11-05 复核）：
+  `uv run pytest --collect-only -o addopts=""` = **409 collected**，其中
+  `uv run pytest -m "not live"` = **407 passed**（另 2 个 `@pytest.mark.live` 联网冒烟被 deselect；
+  拿不到真实响应时 skip，故全量常见 408 passed + 1 skipped —— 与 `L9-开工.md` 的口径一致）。
+  ★ 别把绝对数字写死：每加一个用例都会漂，一律以 `--collect-only` 实时核对为准。
   ★ 核对口径：`uv run pytest --collect-only -o addopts="" | tail -2`（避免 `-qq` 吞掉汇总行）。
   ★ `-q` 叠加 `pyproject` 里的 `addopts = "-q"` 会变成 `-qq`，**pytest 不再打印
   `N passed` 汇总行** —— 要数字就去掉一个 `-q` 或用 `--collect-only` 计数。
@@ -649,6 +670,7 @@ gh run list --workflow=recap.yml --limit 3        # 最近三次周报/月报是
 
 ## 提交
 
-- Conventional Commits；每个阶段结束打 tag（`l0a` / `l0b` / ...）
+- Conventional Commits；括号里标阶段 / 模块，例 `feat(L9-D): 报告目录分层`、
+  `fix(collect): 逐日隔离`（CONTRIBUTING §6）；每个阶段结束打 tag（`l0a` / `l0b` / ...）
 - ★ 提交前核对：`git ls-files | grep -E '\.env|\.db$|watchlist\.local'` 必须为空
 - ★ 禁止 `git clean -fd`

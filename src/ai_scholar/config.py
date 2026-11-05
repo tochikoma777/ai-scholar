@@ -313,9 +313,10 @@ class LensSettings(BaseModel):
 
 
 class DeepAnalysisSettings(BaseModel):
-    """L3b-2 深度分析参数（strong）。★ 注意力预算：每周最多 N 篇。"""
+    """L3b-2 深度分析参数（strong）。★ 双层注意力预算：每日 N 篇 + 每周 M 篇。"""
 
     weekly_limit: int = 5
+    daily_limit: int = 1
     default_limit: int = 5
     # ★ 正文上限：实测 arXiv HTML 正文 38k–184k 字符；超限走**中间省略**（保首尾）
     max_fulltext_chars: int = 100000

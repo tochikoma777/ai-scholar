@@ -3,7 +3,8 @@
 ★ 触发（§5.5.2）：
 - 通道 A（意图驱动，**不看 Tier**）：`--ids` 显式 > watchlist 命中 > 当日 Top N。
 - 通道 B（价值驱动）：Tier 1 且未深度分析的补读队列。
-- 注意力预算：每周最多 `deep_analysis.weekly_limit` 篇（默认 5），超限进队列不丢弃。
+- 双层注意力预算：每日最多 `deep_analysis.daily_limit` 篇（默认 1，削峰）
+  + 每周最多 `deep_analysis.weekly_limit` 篇（默认 5）；超限进队列不丢弃。
 
 ★ 正文：arXiv HTML **临时抓取**，抓完即弃，**永不入库**；抓不到退回仅摘要
 （透镜块由 prompt 标【需正文】）。
@@ -290,6 +291,17 @@ def _weekly_analyzed(session: Session, *, today: date) -> int:
     return sum(1 for row in rows if (row.deep_analyzed_at or "") >= start.isoformat()[:10])
 
 
+def _daily_analyzed(session: Session, *, today: date) -> int:
+    """当日**已产出**的深度分析篇数（日配额口径 = 篇，与周配额同）。
+
+    ★ 用 `>=` 而非 `==`：容忍历史上带时间戳的 `deep_analyzed_at`，与 `_weekly_analyzed`
+      风格一致；口径对齐 `pipeline/report.py` 的「当日深度分析」清单。
+    ★ L9-E：日配额是**削峰**闸门 —— 周配额只管总量，管不住"一次 run 把整周跑完"。
+    """
+    rows = session.exec(select(Paper).where(col(Paper.deep_analyzed_at) >= today.isoformat())).all()
+    return len(rows)
+
+
 # ★ 输出最小长度：六段 + 三句半的合理下限；低于此视为被截断/敷衍
 MIN_ANALYSIS_CHARS = 400
 
@@ -410,6 +422,7 @@ async def run_deep_analysis(
     effective_limit = limit if limit is not None else settings.deep_analysis.default_limit
     a_cap = min(settings.collect.deep_dive_top_n, effective_limit)
     weekly_limit = settings.deep_analysis.weekly_limit
+    daily_limit = settings.deep_analysis.daily_limit
     lens = settings.deep_analysis.lens
     provider = settings.llm.provider
     model = settings.llm.strong_model
@@ -422,6 +435,7 @@ async def run_deep_analysis(
     http = http_client or client_from_settings(settings)
     calls = 0
     week_calls = 0
+    day_calls = 0
     # ★ 预算保护：连续 N 次判废 ⇒ 中止本轮（付费仍发生，不许把配额/预算一路烧完）
     consecutive_failures = 0
     max_consecutive_failures = 2
@@ -439,6 +453,7 @@ async def run_deep_analysis(
                 return report
 
             week_calls = _weekly_analyzed(session, today=day)
+            day_calls = _daily_analyzed(session, today=day)
             # ★ 先自愈：db 里已有的分析必须落到 public 真源（否则 --check 永远红）
             report.analyses_written += sync_analyses(session, settings)
             candidates, skipped = _select(
@@ -458,6 +473,10 @@ async def run_deep_analysis(
                 if week_calls >= weekly_limit:
                     report.blocked = len(candidates) - i
                     report.degraded["quota"] = f"周配额已满（{weekly_limit} 篇）"
+                    break
+                if day_calls >= daily_limit:
+                    report.blocked = len(candidates) - i
+                    report.degraded["daily_quota"] = f"日配额已满（{daily_limit} 篇）"
                     break
 
                 fulltext = None
@@ -513,6 +532,7 @@ async def run_deep_analysis(
 
                 calls += 1
                 week_calls += 1
+                day_calls += 1
                 if dry_run:
                     report.analyzed += 1
                     report.llm_calls += 1

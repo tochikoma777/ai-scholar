@@ -544,7 +544,7 @@ def analyze(
 ) -> None:
     """深度分析（strong）：三句半 + 六段 + 背景透镜。
 
-    ★ 通道 A（意图触发，不看 Tier）+ B（Tier1 补读）；周配额 5 篇。
+    ★ 通道 A（意图触发，不看 Tier）+ B（Tier1 补读）；日配额 1 篇 / 周配额 5 篇（削峰）。
     ★ D 排序：通道 A 的「当日 Top N」= 热度 / 经典**交替**（§5.5 v1.11）。
     ★ 完成后置 `selected=1`（export 默认只导 selected）+ 产物写 public 真源
       `data/analyses/{id}.md`（db 只是可丢弃缓存）。

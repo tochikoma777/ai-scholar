@@ -228,7 +228,7 @@ groups:
 uv run ai-scholar want arXiv:2610.32770
 ```
 
-**④ 深度分析一篇**（strong 档，最贵的操作，周配额 5 篇）
+**④ 深度分析一篇**（strong 档，最贵的操作，日配额 1 篇 / 周配额 5 篇）
 
 ```bash
 uv run ai-scholar analyze --ids arXiv:2610.30132
@@ -284,6 +284,7 @@ vault/
 | `collect.arxiv_max_results` | 600 | 单日实测 465 条，留余量 |
 | `sources.arxiv.lookback_days` | 7 | arXiv 索引滞后 3–7 天，只看当天会系统性漏采 |
 | `grade.default_limit` | 8 | 日成本天天乘 365，这个值直接决定年成本 |
+| `deep_analysis.daily_limit` | 1 | 每日最多 1 篇 strong 分析（**削峰**：避免周一一次跑满整周额度、单日费用尖峰）；超限进队列 |
 | `deep_analysis.weekly_limit` | 5 | 每周最多 5 篇 strong 分析；超限进队列，**不降单篇质量** |
 
 ---
@@ -298,7 +299,7 @@ migrate → collect → collect --classics → enrich → signals → relate
 → Cost guard → site --out _site → upload-pages-artifact → commit → deploy-pages
 ```
 
-- LLM 环节只有三个：`enhance`（fast, 20）· `grade`（fast, 8）· `analyze`（strong，周 5 篇上限）。
+- LLM 环节只有三个：`enhance`（fast, 20）· `grade`（fast, 8）· `analyze`（strong，日 1 篇 / 周 5 篇上限）。
 - 末尾只 commit 五类 public 真源：`data/first_seen.jsonl`、`data/signals/`、`data/reports/`、
   `data/predictions/`、`data/analyses/`。**db 不入库**（Actions 走缓存，本地那份被 gitignore）。
 - 站点在 daily job 内构建 —— 它要读 db 元数据，而 db 只在 Actions 缓存里。
@@ -314,7 +315,7 @@ migrate → collect → collect --classics → enrich → signals → relate
 |---|---|---|
 | `off` | 跳过所有 LLM 环节，其余照跑 | **恒 ¥0** |
 | `fast` | 增强 + 定级 | 见下 |
-| `strong` | 追加深度分析（周 5 篇上限） | 见下 |
+| `strong` | 追加深度分析（日 1 篇 / 周 5 篇上限） | 见下 |
 
 稳态实测（2026-10-26，Actions 开 LLM）：
 

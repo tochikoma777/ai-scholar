@@ -9,7 +9,7 @@ from pathlib import Path
 from sqlmodel import Session, SQLModel, select
 
 from ai_scholar.budget import BudgetSettings
-from ai_scholar.config import LLMSettings, Settings
+from ai_scholar.config import DeepAnalysisSettings, LLMSettings, Settings
 from ai_scholar.llm import LLMResponse
 from ai_scholar.models import WatchlistConfig, WatchlistGroup
 from ai_scholar.pipeline.deep_analysis import analysis_path, run_deep_analysis
@@ -46,6 +46,8 @@ def strong_settings(data_dir: str | None = None, **budget_overrides: object) -> 
     # ★ 测试必须把 data_dir 指到 tmp_path：否则深度分析产物会写进**仓库**的 data/analyses/
     if data_dir is not None:
         settings.app.data_dir = data_dir
+    # ★ 通用用例不测削峰：日配额放宽，避免影响既有多篇断言；削峰由专门用例显式设 1
+    settings.deep_analysis.daily_limit = 5
     return settings
 
 
@@ -215,6 +217,33 @@ async def test_weekly_quota_blocks(tmp_path: Path) -> None:
     assert report.blocked == 1
     assert report.llm_calls == 0
     assert "quota" in report.degraded
+
+
+def test_daily_quota_default_is_one() -> None:
+    """★ L9-E：生产默认「每天 1 篇」，与 `成本预算.md` §9.4 稳态表口径一致。"""
+    assert DeepAnalysisSettings().daily_limit == 1
+
+
+async def test_daily_quota_smooths_peak(tmp_path: Path) -> None:
+    """★ 回归（2026-11-02 周一 ¥0.3108）：单次 run 最多 daily_limit 篇。
+
+    根因：周配额只管总量，`default_limit=5` 允许一次 run 把整周额度跑完 ⇒ 周一尖峰。
+    日配额把 5 篇摊到至少 5 天，超出部分进队列不丢弃。
+    """
+    db = tmp_path / "d.db"
+    seed(db, [make_paper(f"arXiv:A{i}") for i in range(3)])
+    settings = strong_settings(str(tmp_path))
+    settings.deep_analysis.daily_limit = 1
+    report = await run_deep_analysis(
+        settings=settings,
+        db_path=db,
+        client=FakeDeepLLM(),
+        watchlist=WATCHLIST,
+        today=DAY,
+    )
+    assert report.analyzed == 1
+    assert report.blocked == 2
+    assert "daily_quota" in report.degraded
 
 
 async def test_failed_calls_do_not_burn_weekly_quota(tmp_path: Path) -> None:
