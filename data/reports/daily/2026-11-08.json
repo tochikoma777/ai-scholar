@@ -1,0 +1,42 @@
+{
+  "date": "2026-11-08",
+  "schema_version": 1,
+  "total_papers": 7260,
+  "new_today": 0,
+  "watchlist_hits": [],
+  "deep_analyzed": [],
+  "new_graded": [
+    {
+      "id": "arXiv:2610.42106",
+      "title": "Hard Constraint Projection in a Physics Informed Neural Network (Burgers)",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "9bda620174af",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1795,
+      "new": 0,
+      "degraded": []
+    },
+    {
+      "run_id": "4a58e5e5257d",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.0346,
+  "cost_anomalies": []
+}
