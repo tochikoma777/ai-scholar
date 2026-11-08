@@ -1,0 +1,52 @@
+{
+  "date": "2026-11-09",
+  "schema_version": 1,
+  "total_papers": 7260,
+  "new_today": 0,
+  "watchlist_hits": [],
+  "deep_analyzed": [
+    {
+      "id": "arXiv:2611.07541",
+      "title": "CST-Bench: Benchmarking Counterfactual Spatial Transition Reasoning with Causal Transition On-Policy Self-Distillation",
+      "score": 0.0,
+      "groups": [],
+      "tier": null
+    }
+  ],
+  "new_graded": [
+    {
+      "id": "arXiv:2611.07843",
+      "title": "Enhanced MRI brain tumor detection using deep learning in conjunction with explainable AI SHAP based diverse and multi feature analysis",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "369cb7045cdb",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1310,
+      "new": 0,
+      "degraded": []
+    },
+    {
+      "run_id": "e2aed29bc0f8",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.1464,
+  "cost_anomalies": [
+    "今日 ¥0.1464 > 近 7 日中位数 ¥0.0316 × 3（相对突增）"
+  ]
+}
