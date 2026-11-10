@@ -1,0 +1,159 @@
+{
+  "date": "2026-11-10",
+  "schema_version": 1,
+  "total_papers": 7639,
+  "new_today": 379,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2611.09722",
+      "title": "FOSCAR: Accelerating Decode Attention over 2- and 4-Bit KV Caches through Affine Folding",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.09528",
+      "title": "StockASkill: A Local-First AgentSkill for Intelligent Stock Selection",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.09496",
+      "title": "Mosaic:montage-agnostic self-distilled graph learning for subject-independent ieeg seizure detection",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.09327",
+      "title": "Robust Deep Prototype Classifiers via Lipschitz Training",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.09326",
+      "title": "ABHBench: Evaluating Moral Decision-Making of Foundation Models from an Agentic Perspective",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.09240",
+      "title": "MM-DyGraph: A Dataset, Benchmark, and Model for Multimodal Dynamic Graphs",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.09154",
+      "title": "Learning When to Think: Dual-Reference Offline Optimization for Adaptive VLM Reasoning",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.09036",
+      "title": "ToolDex: An Ego-Exo Human Demonstration Dataset for Creative Physical Tool Use",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.08914",
+      "title": "HomeLoop: A Simulation Framework and Benchmark for Robot-IoT Coordination in Everyday Domestic Assistance and Safety",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.09892",
+      "title": "On Agentic Manipulation Policies",
+      "score": 1.0,
+      "groups": [
+        "multimodal"
+      ],
+      "tier": null
+    }
+  ],
+  "deep_analyzed": [
+    {
+      "id": "arXiv:2611.07392",
+      "title": "WeLM-Image: A Unified Image Generation Model towards Visual Intelligence",
+      "score": 0.0,
+      "groups": [],
+      "tier": null
+    }
+  ],
+  "new_graded": [
+    {
+      "id": "arXiv:2611.09075",
+      "title": "Large Language Model Deployment on Resource-Constrained Edge Devices: A Practitioners Survey",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3
+    },
+    {
+      "id": "arXiv:2611.09048",
+      "title": "LeanDojo-v2: A Comprehensive Library for AI-Assisted Theorem Proving in Lean",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "e884556f486e",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1247,
+      "new": 379,
+      "degraded": []
+    },
+    {
+      "run_id": "c68d2d0a9254",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.1778,
+  "cost_anomalies": [
+    "今日 ¥0.1778 > 近 7 日中位数 ¥0.0316 × 3（相对突增）"
+  ]
+}
