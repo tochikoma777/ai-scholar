@@ -45,7 +45,7 @@ AI Scholar 做的是第三件事：**采集 → 关联 → 推演 → 沉淀**�
 | 产物 | 落点 | 谁生成 | 公开？ |
 |---|---|---|---|
 | **Obsidian 知识库** | `~/projects/ai-scholar-vault`（独立 private 仓库） | 本地 `export` | ❌ 你的私人笔记 |
-| **每日报告** | `data/reports/YYYY-MM-DD.md` + `.json` | Actions 每天跑 | ✅ |
+| **每日报告** | `data/reports/daily/YYYY-MM-DD.md` + `.json` | Actions 每天跑 | ✅ |
 | **静态看板** | `~/projects/ai-scholar-site/index.html`（单文件） | `site` 命令 | ✅（内容只取 public 数据） |
 | **深度分析** | `data/analyses/{paper_id}.md` | `analyze`（strong 档） | ✅ |
 | **记分板** | `data/predictions/scoreboard.jsonl` | `predict`（零 LLM） | ✅ |
@@ -366,7 +366,7 @@ migrate → collect → collect --classics → enrich → signals → relate
 
 ```bash
 uv run pytest                        # 全量（含 2 个 @pytest.mark.live 联网冒烟；其余 respx mock）
-uv run pytest -m "not live"          # 离线全量（无网环境用这条；基线 407 passed）
+uv run pytest -m "not live"          # 离线全量（无网环境用这条；基线 412 passed）
 uv run ruff check . && uv run ruff format --check .
 uv run mypy src/ai_scholar           # strict
 uv run python scripts/probe_sources.py   # 数据源探测（需联网，产出 docs/数据源手册.md）

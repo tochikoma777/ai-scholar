@@ -43,7 +43,7 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 > ★ 观察期怎么"看"：`L10-草稿.md` §5 有每周巡检命令 + 记录表；启用当天照 §6 逐步执行
 > （先 `git mv` 改名再改本指针，顺序反了门禁必红）。
 > ★ 本次会话收尾（2026-11-05）：CODEBUDDY 自审 4 项 + L9-E 日配额削峰 + 11/2 费用归因，
-> 已推送 `6ffa3b4`；基线 409 collected / 407 离线，门禁 9 绿。详见 `L9-开工.md` §6.7。
+> 已推送 `6ffa3b4`；基线 414 collected / 412 离线，门禁 9 绿。详见 `L9-开工.md` §6.7。
 > ★ **已修复（2026-11-05）**：`recap.yml` 11/01、11/02 两次 schedule 全失败，两处根因 ——
 > ① `config/default.yaml` 的 `mode` 插值未加引号，`off` 被 YAML 1.1 解析成布尔 `False`；
 > ② `git add` 对不存在的 `weekly|monthly` 目录 pathspec fatal。现 `mode` 加引号 +
@@ -252,6 +252,31 @@ migrate → collect → collect --classics → enrich → signals → relate →
 - watchlist 合并：`watchlist.local.yaml` 的**同名组整组覆盖** `watchlist.yaml`，不做逐字段合并。
 - LLM 凭据只走环境变量：`AI_SCHOLAR_LLM__BASE_URL` / `AI_SCHOLAR_LLM__API_KEY`（前缀 + `__` 嵌套）。
   未配 key ⇒ 自动降级 `off`，**不得报错退出**。
+
+### 关键配置默认值（速查）
+
+★ 真源 = `config/default.yaml`（算法阈值留字面量，环境开关一律 `${ENV}` 占位符）；
+本表只是速查，改值后同步 `README.md` §配置 与本表。带 `${...}` 的可用环境变量覆盖
+（前缀 `AI_SCHOLAR_`，嵌套用 `__`，见上文 `load_settings()`）。
+
+| 配置键 | 默认值 | 要点 |
+|---|---|---|
+| `mode` | `fast`（缺 key 自动降级 `off`） | `off/fast/strong` 三档；值域含 `off/on/yes/no` 必须加引号 |
+| `budget.{daily,weekly,monthly,yearly}_limit_cny` | 2 / 10 / 40 / 200 ¥ | 四层金额闸门，调用前拦截、只降级不报错 |
+| `budget.max_calls_per_run` | 100 | 单次 run 调用次数上限 |
+| `llm.max_tokens_fast` / `max_tokens_strong` | 8000 / 16000 | 推理会吃满输出 token，调低会让答案被截断（实测踩过两次） |
+| `collect.arxiv_max_results` | 600 | 单日实测 465 条，留余量 |
+| `collect.arxiv_read_timeout_s` | 60 | 全局 http 20s 不够，整日 ReadTimeout 后单独抬高 |
+| `sources.arxiv.lookback_days` | 7 | arXiv 索引滞后 3–7 天，只看当天会系统性漏采 |
+| `enhance.default_limit` | 20 | fast 增强篇数（daily 的 LLM 环节之一） |
+| `grade.default_limit` | 8 | 日成本天天 ×365，这个值直接决定年成本 |
+| `deep_analysis.daily_limit` / `weekly_limit` | 1 / 5 | L9-E 日削峰；超限进队列，总成本不变 |
+| `deep_analysis.max_fulltext_chars` / `min_fulltext_chars` | 100000 / 2000 | 正文超限中间省略；过短视为占位页丢弃 |
+| `export.default_limit` | 20 | 默认只导 `selected=1`，非全量 |
+| `export.site_days` / `site_max_papers` | 7 / 50 | 站点趋势天数 / 单页论文上限 |
+| `signals.min_citations` / `pending_days` / `maturity_days` | 3 / 90 / 180 | dormant 复活唯一条件不含 age |
+| `prescreen.retain_ratio` | 0.2 | 淘汰集抽样留存率（不是总体放行率） |
+| `predictions.max_new_per_run` | 10 | 防推演通胀，到期后自动验证 |
 
 ---
 
@@ -626,10 +651,10 @@ gh run list --workflow=recap.yml --limit 3        # 最近三次周报/月报是
 - 除 `test_live_arxiv_parse` / `test_live_hf_parse_may_skip` 外，网络一律 respx 拦截；
   这两个联网冒烟在连接失败、非 200 或无数据时 skip，但解析断言失败仍会让测试红。
 - 断言要落在**实际收到的值**上（如 `settings.llm.base_url`），不是"加载成功"。
-- 基线（tag `l8a` + L9 文档/报告审计 + L9-A/B/C/D，2026-11-05 复核）：
-  `uv run pytest --collect-only -o addopts=""` = **409 collected**，其中
-  `uv run pytest -m "not live"` = **407 passed**（另 2 个 `@pytest.mark.live` 联网冒烟被 deselect；
-  拿不到真实响应时 skip，故全量常见 408 passed + 1 skipped —— 与 `L9-开工.md` 的口径一致）。
+- 基线（tag `l8a` + L9 文档/报告审计 + L9-A/B/C/D + L9-E recap 修复 + 周报真源路径回归，
+  2026-11-10 复核）：`uv run pytest --collect-only -o addopts=""` = **414 collected**，其中
+  `uv run pytest -m "not live"` = **412 passed**（另 2 个 `@pytest.mark.live` 联网冒烟被 deselect；
+  拿不到真实响应时 skip，故全量常见 413 passed + 1 skipped）。
   ★ 别把绝对数字写死：每加一个用例都会漂，一律以 `--collect-only` 实时核对为准。
   ★ 核对口径：`uv run pytest --collect-only -o addopts="" | tail -2`（避免 `-qq` 吞掉汇总行）。
   ★ `-q` 叠加 `pyproject` 里的 `addopts = "-q"` 会变成 `-qq`，**pytest 不再打印
