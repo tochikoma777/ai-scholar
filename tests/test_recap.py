@@ -1,7 +1,7 @@
 """周报 / 月报测试（L9-A）。
 
 ★ 判据对齐项目红线：
-- 只从 `data/reports/YYYY-MM-DD.json` 真源重算，不读 db / vault；
+- 只从 `data/reports/daily/YYYY-MM-DD.json` 真源重算，不读 db / vault；
 - **不含生成时间** ⇒ 连续两次产出逐字节一致；
 - 坏 JSON / 非法文件名 / 缺字段 ⇒ 显式进 `notes`，绝不补 0 冒充。
 """
@@ -157,6 +157,16 @@ def test_rendered_markdown_has_all_sections_and_no_timestamp(tmp_path: Path) -> 
         assert section in md, section
     assert "生成时间" not in md
     assert "- `arXiv:1` — 命中论文（命中 1 天 · multimodal）" in md
+
+
+def test_rendered_markdown_points_to_daily_truth_source(tmp_path: Path) -> None:
+    """★ L9-D 后真源在 daily/ 子目录，派生产物的出处说明不能指回旧平铺路径。"""
+    _write(tmp_path, "2026-10-26", DailyReport(date="2026-10-26"))
+    md = write_recap(
+        build_recap(tmp_path, window=week_window(date(2026, 10, 26))), tmp_path
+    ).md_path.read_text(encoding="utf-8")
+    assert "data/reports/daily/YYYY-MM-DD.json" in md
+    assert "`data/reports/YYYY-MM-DD.json`" not in md
 
 
 def test_previous_period_returns_finished_week_and_month() -> None:

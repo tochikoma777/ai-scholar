@@ -1,6 +1,6 @@
 """周报 / 月报（L9-A，设计方案 §6.6「加新报告类型新增渲染器」）。
 
-★ 纯派生：只读 `data/reports/YYYY-MM-DD.json`（public 真源）重算，**零 LLM、零网络**。
+★ 纯派生：只读 `data/reports/daily/YYYY-MM-DD.json`（public 真源）重算，**零 LLM、零网络**。
   不读 db、不读 vault —— 累计口径与 `pipeline/cost.py` 一致（报告才是可审计的真源）。
 
 ★ 幂等：**不含生成时间**，同一份输入连续两次产出逐字节一致（与 `site` 同口径，红线 7）。

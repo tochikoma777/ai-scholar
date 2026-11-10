@@ -1248,10 +1248,10 @@ def report(
 ) -> None:
     """生成报告快照（★ 只读，不写库；零 LLM）。
 
-    - 默认：`data/reports/YYYY-MM-DD.md` + `.json`
+    - 默认：`data/reports/daily/YYYY-MM-DD.md` + `.json`
     - `--weekly`：`weekly-YYYY-Www.{md,json}`；`--monthly`：`monthly-YYYY-MM.{md,json}`
 
-    ★ 周报/月报是**派生产物**：只读 `data/reports/*.json` 真源重算，不读 db、不读 vault，
+    ★ 周报/月报是**派生产物**：只读 `data/reports/daily/*.json` 真源重算，不读 db、不读 vault，
       不含生成时间 ⇒ 同一份输入重跑逐字节一致。
     ★ 每日报告聚合「概览 / ★命中 Top10 / 深度分析 / ★今日定级 / 今日推演 / 想读 /
       运行状态 / 成本」。
