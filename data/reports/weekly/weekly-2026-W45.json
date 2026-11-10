@@ -1,0 +1,122 @@
+{
+  "period": "week",
+  "slug": "weekly-2026-W45",
+  "start": "2026-11-02",
+  "end": "2026-11-08",
+  "days_covered": 7,
+  "days_expected": 7,
+  "missing_days": [],
+  "new_papers": 2672,
+  "runs_total": 14,
+  "top_hits": [
+    {
+      "id": "arXiv:2610.35850",
+      "title": "OSWAM: An Effective World Action Model with One-Step Action Generation",
+      "days": 1,
+      "groups": [
+        "efficient-inference",
+        "multimodal"
+      ]
+    },
+    {
+      "id": "arXiv:2610.41037",
+      "title": "WebOverlay: High-Throughput Vision-Only Distillation for Extreme Aspect-Ratio Web Overlay Detection",
+      "days": 1,
+      "groups": [
+        "efficient-inference",
+        "multimodal"
+      ]
+    },
+    {
+      "id": "arXiv:2610.41162",
+      "title": "FrontierMat: Benchmarking Language Models at the Frontier of Materials R&D",
+      "days": 1,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark",
+        "multimodal"
+      ]
+    },
+    {
+      "id": "arXiv:2610.41177",
+      "title": "TraceSpec: Understanding and Improving Speculative Decoding for LLM Agents",
+      "days": 1,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.41307",
+      "title": "Erase the Injected Region: Multimodal Prompt-Injection Defense with On-Policy Self-Distillation",
+      "days": 1,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark",
+        "multimodal"
+      ]
+    },
+    {
+      "id": "arXiv:2610.41358",
+      "title": "Do Transaction Prices Reflect Visual Preference? A Diagnostic Study with Multimodal Language Models",
+      "days": 1,
+      "groups": [
+        "eval-benchmark",
+        "multimodal"
+      ]
+    },
+    {
+      "id": "arXiv:2610.41366",
+      "title": "What We Keep of What We Forget: Replacement Operators and Routing Semantics in Training-Free MoE Expert Pruning",
+      "days": 1,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2610.41399",
+      "title": "scAnyOmics: Foundation-Model Distillation for Any-to-Any Completion of Multi-omics Virtual Cells",
+      "days": 1,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark",
+        "multimodal"
+      ]
+    },
+    {
+      "id": "arXiv:2610.41408",
+      "title": "SACQ: Structure-Aware Codebook Quantization for Ultra-Low-Bit Vision-Language-Action Models",
+      "days": 1,
+      "groups": [
+        "efficient-inference",
+        "multimodal"
+      ]
+    },
+    {
+      "id": "arXiv:2610.42112",
+      "title": "Subquadratic Attention with a Hierarchical Tree-Structured Indexer",
+      "days": 1,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ]
+    }
+  ],
+  "graded_total": 3,
+  "graded_by_tier": {
+    "Tier 3": 3
+  },
+  "deep_analyzed_total": 5,
+  "cost_total": 0.4972,
+  "cost_days": 7,
+  "cost_peak_day": "2026-11-02",
+  "cost_peak_cny": 0.3108,
+  "anomaly_days": [
+    "2026-11-02"
+  ],
+  "predictions_hit": 0,
+  "predictions_miss": 0,
+  "degraded_days": {},
+  "notes": []
+}
