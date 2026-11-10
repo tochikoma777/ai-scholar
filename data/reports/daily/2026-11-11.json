@@ -1,0 +1,153 @@
+{
+  "date": "2026-11-11",
+  "schema_version": 1,
+  "total_papers": 8526,
+  "new_today": 887,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2611.12426",
+      "title": "dNaViT: Discrete Codes are General-Purpose Visual Representations",
+      "score": 2.9,
+      "groups": [
+        "multimodal",
+        "efficient-inference",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.10423",
+      "title": "Mental Imagery That Matters: Curing Latent Collapse in Multimodal Reasoning",
+      "score": 2.9,
+      "groups": [
+        "multimodal",
+        "efficient-inference",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.11949",
+      "title": "Watching Itself Watch: Self-Auditing Visual Reliance for Video Reasoning",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.11913",
+      "title": "CHORD: Multi-resolution Compression for Multimodal Time Series",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.11894",
+      "title": "Distilling Instructions into Weights: Closed-Form Edits Fix a Robot Policy's Misreading",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.11371",
+      "title": "D3Tree: Learning to Prune Block-Diffusion Draft Trees for Efficient Verification",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.10734",
+      "title": "Tiny Evidence Region Localization with Selective Contrastive On-Policy Self-Distillation",
+      "score": 2.0,
+      "groups": [
+        "multimodal",
+        "efficient-inference"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.12878",
+      "title": "Adaptive Quantization Preserves Fast Rates for TD Learning over Rate-Limited Channels",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.12557",
+      "title": "WanderBench: Can World Models Explore Dynamic Worlds from Video?",
+      "score": 1.9,
+      "groups": [
+        "multimodal",
+        "eval-benchmark"
+      ],
+      "tier": null
+    },
+    {
+      "id": "arXiv:2611.12527",
+      "title": "WaveGen: Truly End-to-End Waveform Generation via Internal Spectral Trajectory Learning",
+      "score": 1.9,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ],
+      "tier": null
+    }
+  ],
+  "deep_analyzed": [
+    {
+      "id": "arXiv:2611.12426",
+      "title": "dNaViT: Discrete Codes are General-Purpose Visual Representations",
+      "score": 0.0,
+      "groups": [],
+      "tier": null
+    }
+  ],
+  "new_graded": [
+    {
+      "id": "arXiv:2501.08686",
+      "title": "Knowledge Graph-based Retrieval-Augmented Generation for Schema Matching",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "f2a098ba75cb",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1745,
+      "new": 887,
+      "degraded": []
+    },
+    {
+      "run_id": "8cdd69c01a4e",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.092,
+  "cost_anomalies": []
+}
