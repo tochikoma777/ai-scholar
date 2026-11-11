@@ -184,7 +184,10 @@ def doctor(
     has_key = bool(settings.llm.api_key.strip())
     has_base = bool(settings.llm.base_url.strip())
     if has_key and has_base:
-        llm_state, llm_note = "[green]OK[/]", f"档位 {mode.value}（fast={settings.llm.fast_model}）"
+        llm_state = "[green]OK[/]"
+        llm_note = (
+            f"档位 {mode.value}（fast={settings.llm.fast_model}｜deep={settings.llm.strong_model}）"
+        )
     else:
         missing = " / ".join(
             [n for n, ok in (("api_key", has_key), ("base_url", has_base)) if not ok]
@@ -542,7 +545,10 @@ def analyze(
         help="★ 只核对 public 真源 data/analyses/ 是否齐备（零 LLM；缺/过期 ⇒ 退出码 1）",
     ),
 ) -> None:
-    """深度分析（strong）：三句半 + 六段 + 背景透镜。
+    """深度分析（strong 档）：三句半 + 六段 + 背景透镜。
+
+    ★ 2026-11-11 成本优先定案：strong 档默认走 `deepseek-v4-flash`；
+      设 `AI_SCHOLAR_LLM__STRONG_MODEL=deepseek-v4-pro` 可切回推理档做 A/B。
 
     ★ 通道 A（意图触发，不看 Tier）+ B（Tier1 补读）；日配额 1 篇 / 周配额 5 篇（削峰）。
     ★ D 排序：通道 A 的「当日 Top N」= 热度 / 经典**交替**（§5.5 v1.11）。

@@ -101,7 +101,8 @@ AI_SCHOLAR_LLM__BASE_URL=https://api.deepseek.com
 AI_SCHOLAR_LLM__API_KEY=sk-...
 ```
 
-运行档位三档：`off`（零花费）/ `fast`（`deepseek-v4-flash`）/ `strong`（`deepseek-v4-pro`）。
+运行档位三档：`off`（零花费）/ `fast`（`deepseek-v4-flash`）/ `strong`（默认 `deepseek-v4-flash`，2026-11-11 成本优先定案）。
+深度分析走 strong 档；想切回推理档做 A/B，设 `AI_SCHOLAR_LLM__STRONG_MODEL=deepseek-v4-pro`（价格表两档都有单价，不改代码）。
 
 ---
 
@@ -278,7 +279,7 @@ vault/
 | 项 | 默认 | 说明 |
 |---|---|---|
 | `mode` | `fast` | 三档 `off` / `fast` / `strong`；**缺 key 自动降级 `off` 且不报错** |
-| `llm.fast_model` / `strong_model` | `deepseek-v4-flash` / `deepseek-v4-pro` | 换供应商 = 改 `base_url` + 加一行价格，不改代码 |
+| `llm.fast_model` / `strong_model` | `deepseek-v4-flash` / `deepseek-v4-flash` | strong 档默认 flash（成本优先）；设 `AI_SCHOLAR_LLM__STRONG_MODEL=deepseek-v4-pro` 可切回推理档做 A/B。换供应商 = 改 `base_url` + 加一行价格，不改代码 |
 | `budget.daily/weekly/monthly/yearly_limit_cny` | 2 / 10 / 40 / 200 | 四层金额闸门，调用前拦截，**只降级不报错** |
 | `budget.max_calls_per_run` | 100 | 单次 run 的调用次数上限 |
 | `collect.arxiv_max_results` | 600 | 单日实测 465 条，留余量 |
@@ -366,7 +367,7 @@ migrate → collect → collect --classics → enrich → signals → relate
 
 ```bash
 uv run pytest                        # 全量（含 2 个 @pytest.mark.live 联网冒烟；其余 respx mock）
-uv run pytest -m "not live"          # 离线全量（无网环境用这条；基线 412 passed）
+uv run pytest -m "not live"          # 离线全量（无网环境用这条；基线 421 passed）
 uv run ruff check . && uv run ruff format --check .
 uv run mypy src/ai_scholar           # strict
 uv run python scripts/probe_sources.py   # 数据源探测（需联网，产出 docs/数据源手册.md）

@@ -23,7 +23,11 @@ llm:
   base_url: ${AI_SCHOLAR_LLM__BASE_URL}
   api_key: ${AI_SCHOLAR_LLM__API_KEY}
   fast_model: ${AI_SCHOLAR_LLM__FAST_MODEL:-deepseek-v4-flash}
-  strong_model: ${AI_SCHOLAR_LLM__STRONG_MODEL:-deepseek-v4-pro}
+  # ★ 2026-11-11 负责人定案：深度分析默认改用 flash（成本优先，质量观察几天再说）。
+  #   A/B 对比：设 AI_SCHOLAR_LLM__STRONG_MODEL=deepseek-v4-pro 即切回推理档，
+  #   无需改代码（价格表两档都有单价）；daily.yml 用同名的 repository variable 注入。
+  #   ★ strong 档的 max_tokens/timeout 仍是按推理档留的余量，flash 也吃推理，保持不变。
+  strong_model: ${AI_SCHOLAR_LLM__STRONG_MODEL:-deepseek-v4-flash}
   temperature: 0.3
   # strong 档走思维链，比 fast 慢得多，故分开设超时
   timeout_s: ${AI_SCHOLAR_LLM__TIMEOUT_S:-120}

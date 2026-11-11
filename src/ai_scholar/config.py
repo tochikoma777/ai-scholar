@@ -84,7 +84,7 @@ class LLMSettings(BaseModel):
     base_url: str = ""
     api_key: str = ""
     fast_model: str = "deepseek-v4-flash"
-    strong_model: str = "deepseek-v4-pro"
+    strong_model: str = "deepseek-v4-flash"
     temperature: float = 0.3
     timeout_s: int = 120
     # strong 档走思维链，比 fast 慢得多，分开设（否则读超时会打断）

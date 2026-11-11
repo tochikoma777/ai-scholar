@@ -192,10 +192,27 @@ def test_repo_default_settings_load_without_env(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_default_models_migrated_to_v4() -> None:
-    """★ 模型名已迁到 deepseek-v4-*（旧名 2026-07-24 弃用，见成本预算 §1）。"""
+    """★ 模型名已迁到 deepseek-v4-*（旧名 2026-07-24 弃用，见成本预算 §1）。
+
+    ★ 2026-11-11 负责人定案：深度分析（strong 档）默认改用 flash，成本优先。
+    """
     settings = load_settings()
     assert settings.llm.fast_model == "deepseek-v4-flash"
+    assert settings.llm.strong_model == "deepseek-v4-flash"
+
+
+def test_strong_model_switchable_for_ab(monkeypatch: pytest.MonkeyPatch) -> None:
+    """★ A/B（2026-11-11）：env 切回推理档无需改代码；两档单价都必须在价格表里。
+
+    断言落在**实际值**与**可算价**上，不是"配置加载成功"。
+    """
+    monkeypatch.setenv("AI_SCHOLAR_LLM__STRONG_MODEL", "deepseek-v4-pro")
+    settings = load_settings()
     assert settings.llm.strong_model == "deepseek-v4-pro"
+    pro = settings.budget.price_for("deepseek", "deepseek-v4-pro")
+    flash = settings.budget.price_for("deepseek", "deepseek-v4-flash")
+    assert pro.output_cny_per_1m > flash.output_cny_per_1m
+    assert pro.input_miss_cny_per_1m > flash.input_miss_cny_per_1m
 
 
 def test_default_yaml_has_v4_model_names() -> None:
