@@ -699,3 +699,126 @@ async def test_consecutive_failures_abort_run(tmp_path: Path) -> None:
     assert report.blocked == 1
     assert "llm_abort" in report.degraded
     assert report.analyzed == 0
+
+
+# ── 2026-11-11：selection_reason 审计（public 真源 frontmatter）───────────
+async def test_selection_reason_written_to_frontmatter(tmp_path: Path) -> None:
+    """通道 A① / B 的理由必须落 public 真源，且带组/分/Tier/模型/正文。"""
+    from ai_scholar.export.obsidian import parse_frontmatter
+
+    db = tmp_path / "d.db"
+    seed(
+        db,
+        [
+            make_paper("arXiv:A", title="RAG Paper"),
+            make_paper("arXiv:B", title="Tier One", abstract="unrelated", tier=1),
+        ],
+    )
+    settings = strong_settings(str(tmp_path))
+    await run_deep_analysis(
+        settings=settings,
+        db_path=db,
+        client=FakeDeepLLM(),
+        watchlist=WATCHLIST,
+        today=DAY,
+    )
+
+    a_fields, _ = parse_frontmatter(analysis_path(settings, "arXiv:A").read_text(encoding="utf-8"))
+    b_fields, _ = parse_frontmatter(analysis_path(settings, "arXiv:B").read_text(encoding="utf-8"))
+    assert a_fields["selection_channel"] == "A1_watchlist"
+    assert a_fields["selection_groups"] == ["agents"]
+    assert a_fields["selection_score"] == 1.0
+    assert a_fields["selection_model"] == settings.llm.strong_model
+    assert a_fields["selection_fulltext"] is False
+    assert b_fields["selection_channel"] == "B_tier1"
+    assert b_fields["selection_tier"] == 1
+
+
+async def test_selection_reason_survives_sync_analyses(tmp_path: Path) -> None:
+    """`sync_analyses` 从 db 重建 frontmatter 时必须保留已有理由（不能被抹掉）。"""
+    from ai_scholar.pipeline.deep_analysis import sync_analyses
+
+    db = tmp_path / "d.db"
+    seed(db, [make_paper("arXiv:A", title="RAG Paper")])
+    settings = strong_settings(str(tmp_path))
+    await run_deep_analysis(
+        settings=settings,
+        db_path=db,
+        client=FakeDeepLLM(),
+        watchlist=WATCHLIST,
+        today=DAY,
+    )
+    path = analysis_path(settings, "arXiv:A")
+    before = path.read_text(encoding="utf-8")
+    assert "selection_channel" in before
+
+    engine = engine_for(db)
+    with Session(engine) as session:
+        sync_analyses(session, settings)
+        session.commit()
+    assert path.read_text(encoding="utf-8") == before
+
+
+def test_historical_analysis_without_reason_is_not_backfilled(tmp_path: Path) -> None:
+    """历史产物（只有 6 个基础键）不能被补 `selection_*` —— 不伪造理由、保持零 diff。"""
+    from ai_scholar.pipeline.deep_analysis import sync_analyses, write_analysis
+
+    db = tmp_path / "d.db"
+    paper = make_paper("arXiv:OLD", title="legacy")
+    paper.deep_analysis_md = "## 六段\n旧分析"
+    paper.deep_content_hash = paper.content_hash
+    paper.deep_analyzed_at = DAY.isoformat()
+    paper.deep_status = "done"
+    settings = strong_settings(str(tmp_path))
+    # ★ 先写文件再 seed（seed 的 commit 会 expire 属性，detached 后再读会报错）
+    assert write_analysis(settings, paper) is True
+    seed(db, [paper])
+
+    path = analysis_path(settings, "arXiv:OLD")
+    before = path.read_text(encoding="utf-8")
+    assert "selection_channel" not in before
+
+    engine = engine_for(db)
+    with Session(engine) as session:
+        sync_analyses(session, settings)
+        session.commit()
+    assert path.read_text(encoding="utf-8") == before
+
+
+async def test_daily_report_carries_selection_reason(tmp_path: Path) -> None:
+    """日报从 public 真源读理由；缺失时显示「理由未记录」（历史产物）。"""
+    from ai_scholar.pipeline.report import render_markdown
+
+    db = tmp_path / "d.db"
+    seed(db, [make_paper("arXiv:A", title="RAG Paper")])
+    settings = strong_settings(str(tmp_path))
+    await run_deep_analysis(
+        settings=settings,
+        db_path=db,
+        client=FakeDeepLLM(),
+        watchlist=WATCHLIST,
+        today=DAY,
+    )
+    engine = engine_for(db)
+    with Session(engine) as session:
+        report = build_daily_report(session, today=DAY, watchlist=WATCHLIST, data_dir=tmp_path)
+    hit = next(item for item in report.deep_analyzed if item.id == "arXiv:A")
+    assert hit.selection_reason is not None
+    assert hit.selection_reason.channel == "A1_watchlist"
+    assert "通道 A① watchlist" in hit.selection_reason.text
+    assert "通道 A① watchlist" in render_markdown(report)
+
+
+def test_daily_report_reason_none_when_missing(tmp_path: Path) -> None:
+    """db 有分析记录但 public 真源没有理由 ⇒ None，模板写「理由未记录」。"""
+    from ai_scholar.pipeline.report import render_markdown
+
+    db = tmp_path / "d.db"
+    paper = make_paper("arXiv:X", title="no reason")
+    paper.deep_analyzed_at = DAY.isoformat()
+    seed(db, [paper])
+    engine = engine_for(db)
+    with Session(engine) as session:
+        report = build_daily_report(session, today=DAY, watchlist=WATCHLIST, data_dir=tmp_path)
+    assert report.deep_analyzed[0].selection_reason is None
+    assert "入选理由未记录" in render_markdown(report)

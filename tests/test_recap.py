@@ -12,6 +12,7 @@ import json
 from datetime import date
 from pathlib import Path
 
+from ai_scholar.models import SelectionReason
 from ai_scholar.pipeline.recap import (
     RecapReport,
     build_recap,
@@ -182,3 +183,41 @@ def test_previous_period_returns_finished_week_and_month() -> None:
     last_month = previous_period(this_month)
     assert (last_month.start, last_month.end) == (date(2026, 9, 1), date(2026, 9, 30))
     assert last_month.slug == "monthly-2026-09"
+
+
+def test_recap_collects_selection_reason(tmp_path: Path) -> None:
+    """周报/月报的「深度分析」要带逐篇理由，不只给计数（2026-11-11）。"""
+    reason = SelectionReason(
+        channel="A1_watchlist",
+        groups=["agents"],
+        score=1.0,
+        model="deepseek-v4-flash",
+        fulltext=True,
+    )
+    _write(
+        tmp_path,
+        "2026-10-26",
+        DailyReport(
+            date="2026-10-26",
+            deep_analyzed=[ReportHit(id="arXiv:1", title="命中论文", selection_reason=reason)],
+        ),
+    )
+    recap = build_recap(tmp_path, window=week_window(date(2026, 10, 26)))
+    assert recap.deep_analyzed_total == 1
+    assert recap.deep_analyses[0].reason is not None
+    md = write_recap(recap, tmp_path).md_path.read_text(encoding="utf-8")
+    assert "组 agents" in md
+    assert "通道 A① watchlist" in md
+
+
+def test_recap_marks_missing_reason(tmp_path: Path) -> None:
+    """旧日报没有 selection_reason ⇒ 明确写「理由未记录」，不伪造。"""
+    _write(
+        tmp_path,
+        "2026-10-26",
+        DailyReport(date="2026-10-26", deep_analyzed=[ReportHit(id="arXiv:2", title="旧产物")]),
+    )
+    recap = build_recap(tmp_path, window=week_window(date(2026, 10, 26)))
+    assert recap.deep_analyses[0].reason is None
+    md = write_recap(recap, tmp_path).md_path.read_text(encoding="utf-8")
+    assert "理由未记录" in md

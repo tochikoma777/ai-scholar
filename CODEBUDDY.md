@@ -43,7 +43,7 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 > ★ 观察期怎么"看"：`L10-草稿.md` §5 有每周巡检命令 + 记录表；启用当天照 §6 逐步执行
 > （先 `git mv` 改名再改本指针，顺序反了门禁必红）。
 > ★ 本次会话收尾（2026-11-05）：CODEBUDDY 自审 4 项 + L9-E 日配额削峰 + 11/2 费用归因，
-> 已推送 `6ffa3b4`；基线 423 collected / 421 离线，门禁 9 绿。详见 `L9-开工.md` §6.7。
+> 已推送 `6ffa3b4`；基线 440 collected / 438 离线，门禁 9 绿。详见 `L9-开工.md` §6.7。
 > ★ **已修复（2026-11-05）**：`recap.yml` 11/01、11/02 两次 schedule 全失败，两处根因 ——
 > ① `config/default.yaml` 的 `mode` 插值未加引号，`off` 被 YAML 1.1 解析成布尔 `False`；
 > ② `git add` 对不存在的 `weekly|monthly` 目录 pathspec fatal。现 `mode` 加引号 +
@@ -207,7 +207,7 @@ migrate → collect → collect --classics → enrich → signals → relate →
 | `pipeline/enrich.py` | 引用补齐：S2 → 出边 + 队列状态机 | ★ 方向语义固定为 src 引用 dst；入库前先写方向单测 |
 | `pipeline/enhance.py` | LLM 增强 + 强相似边关联解读 | watchlist Top N；预算闸门；幂等 `enhance_content_hash` |
 | `pipeline/grade.py` | 定级：Tier 1/2/3 + 原始证据 | 延迟定级；幂等 `grade_content_hash`；解析失败不写指纹 |
-| `pipeline/deep_analysis.py` | 深度分析（strong 档，**默认模型 `deepseek-v4-flash`**）+ 通道 A/B | 日配额 1 / 周配额 5（L9-E 削峰）；档位由 `llm.strong_model` 配置，可切 `deepseek-v4-pro` 做 A/B；正文临时抓取；幂等 `deep_content_hash`；**D 排序**（热度/经典交替）；完成即置 `selected=1`；产物落 `data/analyses/`（`--check` 核对；`sync_analyses` 自愈补写） |
+| `pipeline/deep_analysis.py` | 深度分析（strong 档，**默认模型 `deepseek-v4-flash`**）+ 通道 A/B | 日配额 1 / 周配额 5（L9-E 削峰）；档位由 `llm.strong_model` 配置，可切 `deepseek-v4-pro` 做 A/B；**`selection_reason`**（通道/命中组/分/Tier/模型/正文）写进 frontmatter；正文临时抓取；幂等 `deep_content_hash`；**D 排序**（热度/经典交替）；完成即置 `selected=1`；产物落 `data/analyses/`（`--check` 核对；`sync_analyses` 自愈补写、不覆盖已有理由） |
 | `pipeline/predict.py` | L4 推演生成（★ 零 LLM） | 3 类判据；同目标 open 则跳过；观点另存 |
 | `pipeline/stats.py` | 到期验证 / 记分板 / 校准 / 影响分析 | ★ `insufficient` 不进命中率分母；样本不足不下结论；★ 记分板坏行进 `ScoreboardSummary.bad_lines`（不静默，否则分母被悄悄改变）；★ `--calibration`/`--impact` 是**人工按需**（读 db，不进 daily/recap） |
 | `pipeline/score.py` | 热度 / 跨源 / 主题三分量 | ★ 无 `total` 字段，不做加权求和（红线 11） |
@@ -219,7 +219,7 @@ migrate → collect → collect --classics → enrich → signals → relate →
 | `pipeline/signals.py` | 采样状态机 + signals 写入 + 月度 JSONL | ★ 状态持久化；两套时钟不可混用；JSONL 是**跨运行幂等去重**的真源（★ `rebuild` 命令**未实现** —— db 丢失后靠重采恢复，别把它当"一键重建"；见设计方案 §6.2） |
 | `pipeline/relate.py` | 文献耦合（倒排）+ TF-IDF 相似（增量） | ★ 禁止全库两两比较；对称边只存一条 |
 | `pipeline/cost.py` | L8-F 成本汇总 | ★ 累计真源 = `data/reports/*.json`；db 只用于**分项**（缓存）；异常只标注不阻断；`live_anomalies()` 供报告实时判定 |
-| `pipeline/report.py` | `DailyReport` + Jinja 渲染 + 原子写 | 只读 DB；当天重跑无生成时间 diff |
+| `pipeline/report.py` | `DailyReport` + Jinja 渲染 + 原子写 | 只读 DB；**从 `data/analyses/*.md` 读 `selection_reason`**（历史产物→「理由未记录」）；当天重跑无生成时间 diff |
 | `report_paths.py` | 报告目录布局的唯一真源（`daily/` / `weekly/` / `monthly/`） | ★ `daily/` 优先、旧平铺路径兼容、**非日报文件名不误扫**；消费方四处：`cost.py` / `site.py` / `recap.py` / `cli.py`（L9-D） |
 | `pipeline/recap.py` | 周报 / 月报重算（L9-A） | ★ 只读 `data/reports/*.json` 真源、**零 LLM 不读 db**；`--previous` = 上一周期；不含生成时间 ⇒ 幂等；坏 JSON / 缺目录显式上报 |
 | `templates/report/recap.md.j2` | 周报 / 月报模板 | ★ Python 侧预拼字符串，模板行尾不放块标签（`trim_blocks` 换行坑） |
@@ -234,6 +234,7 @@ migrate → collect → collect --classics → enrich → signals → relate →
 | `utils/http.py` | 限速 / 重试 / 代理 / UA | 只重试 408/425/429/5xx 与超时 |
 | `utils/errors.py` | 异常层级：`ConfigError` / `SourceError` / `UnsafeOutputPath` / `StoreError` / `LLMError` | CLI 退出码映射依据；单源异常在 pipeline 转 `degraded` |
 | `utils/logging.py` | structlog 配置与 `get_logger` | 日志出口唯一，不在模块内各自 print |
+| `utils/peak_hours.py` | DeepSeek 高峰守卫（UTC 工作日 01–04/06–10 ±15min） | daily 的 `Peak-hour guard`；高峰 → `AI_SCHOLAR_MODE=off`（零调用）；见成本预算 §13 |
 | `utils/timeutil.py` | UTC 工具 + 三态时间语义 | 代码内取"现在"只用 `utcnow()` |
 
 ### 配置与路径解析
@@ -272,6 +273,7 @@ migrate → collect → collect --classics → enrich → signals → relate →
 | `grade.default_limit` | 8 | 日成本天天 ×365，这个值直接决定年成本 |
 | `deep_analysis.daily_limit` / `weekly_limit` | 1 / 5 | L9-E 日削峰；超限进队列，总成本不变 |
 | `llm.strong_model` | `deepseek-v4-flash` | 深度分析档位（2026-11-11 成本优先定案）；`AI_SCHOLAR_LLM__STRONG_MODEL=deepseek-v4-pro` 切回推理档做 A/B |
+| 调用时段守卫 | 工作日 UTC 01–04 / 06–10 降级 off | `utils/peak_hours.py`（北京 9–12/14–18 为 DeepSeek 高峰，空闲半价）；cron 未改；见成本预算 §13 |
 | `deep_analysis.max_fulltext_chars` / `min_fulltext_chars` | 100000 / 2000 | 正文超限中间省略；过短视为占位页丢弃 |
 | `export.default_limit` | 20 | 默认只导 `selected=1`，非全量 |
 | `export.site_days` / `site_max_papers` | 7 / 50 | 站点趋势天数 / 单页论文上限 |
@@ -653,10 +655,10 @@ gh run list --workflow=recap.yml --limit 3        # 最近三次周报/月报是
   这两个联网冒烟在连接失败、非 200 或无数据时 skip，但解析断言失败仍会让测试红。
 - 断言要落在**实际收到的值**上（如 `settings.llm.base_url`），不是"加载成功"。
 - 基线（tag `l8a` + L9 文档/报告审计 + L9-A/B/C/D + L9-E recap 修复 + 周报真源路径回归
-  + 工作流接线门禁 + 档位 A/B 配置用例，2026-11-11 复核）：
-  `uv run pytest --collect-only -o addopts=""` = **423 collected**，其中
-  `uv run pytest -m "not live"` = **421 passed**（另 2 个 `@pytest.mark.live` 联网冒烟被 deselect；
-  全量按网络可达性为 421 passed + 1~2 skipped，本次 2 skipped）。
+  + 工作流接线门禁 + 档位 A/B + selection_reason + watchlist + 高峰守卫，2026-11-11 复核）：
+  `uv run pytest --collect-only -o addopts=""` = **440 collected**，其中
+  `uv run pytest -m "not live"` = **438 passed**（另 2 个 `@pytest.mark.live` 联网冒烟被 deselect；
+  全量按网络可达性为 439 passed + 1~2 skipped，本次 1 skipped）。
   ★ 别把绝对数字写死：每加一个用例都会漂，一律以 `--collect-only` 实时核对为准。
   ★ 核对口径：`uv run pytest --collect-only -o addopts="" | tail -2`（避免 `-qq` 吞掉汇总行）。
   ★ `-q` 叠加 `pyproject` 里的 `addopts = "-q"` 会变成 `-qq`，**pytest 不再打印
@@ -679,6 +681,8 @@ gh run list --workflow=recap.yml --limit 3        # 最近三次周报/月报是
   （YAML 1.1 会把裸 `off/on/yes/no` 吃成布尔，2026-11-01/11-02 两次 recap 失败的根因）；
   ③ recap 的 `git add` 必须有 `if [ -d ... ]` 守卫 + daily/recap 共用 concurrency 组（G5）。
   每个 checker 都有反向验证。**改 `.github/workflows/` 后必须跑它**（docs 门禁不覆盖工作流）。
+- `tests/test_peak_hours.py`：DeepSeek 分时定价守卫（UTC 工作日 01–04/06–10 ±15min → 降级 off）。
+  `tests/test_workflows.py` 还断言该守卫存在于 daily 且位于 Enhance/Grade/Analyze **之前**。
 ### CI（.github/workflows/ci.yml）
 
 | job | 触发 | 做什么 | 本地等价命令 |

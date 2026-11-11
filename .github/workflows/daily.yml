@@ -84,6 +84,14 @@ jobs:
       - name: Relate
         run: uv run ai-scholar relate
 
+      # ★ 2026-11-11 成本守卫：DeepSeek 高峰 = 北京工作日 9:00-12:00 / 14:00-18:00
+      #   （UTC 01:00-04:00 / 06:00-10:00，空闲价 = 高峰价一半）。
+      #   cron 是 UTC 16:30（北京 00:30，本已在空闲），但 GitHub 排队延迟 4-8h，
+      #   实测曾落到北京 08:22（距高峰 38 分钟）⇒ 落进高峰就降级 off，
+      #   enhance / grade / analyze 零调用，其余零 LLM 步骤照跑，次日空闲补跑。
+      - name: Peak-hour guard
+        run: uv run python -m ai_scholar.utils.peak_hours
+
       - name: Enhance
         run: uv run ai-scholar enhance
 

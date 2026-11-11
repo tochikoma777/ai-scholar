@@ -111,6 +111,79 @@ class WatchlistHit(BaseModel):
     groups: list[str] = Field(default_factory=list)
 
 
+class SelectionReason(BaseModel):
+    """深度分析「为什么选它」的审计记录（2026-11-11）。
+
+    ★ 载体是 public 真源 `data/analyses/{id}.md` 的 frontmatter（不建 db 列）：
+      每篇都能回答「通道 / 命中组 / 分 / 选篇时 Tier / 实际模型 / 是否抓到正文」，
+      用来核对「好钢用在刀刃上、别把预算花在水货文章上」。
+    """
+
+    # A1_watchlist | A2_heat | A2_classic | B_tier1 | explicit_ids
+    channel: str
+    groups: list[str] = Field(default_factory=list)
+    score: float = 0.0
+    tier: int | None = None
+    model: str | None = None  # 实际调用的模型（flash/pro，A/B 归因）
+    fulltext: bool | None = None
+
+    @property
+    def text(self) -> str:
+        """一行人类可读说明（模板与报告共用，别各写一套）。"""
+        parts = [_CHANNEL_TEXT.get(self.channel, self.channel)]
+        if self.groups:
+            parts.append("组 " + "/".join(self.groups))
+        if self.score:
+            parts.append(f"分 {self.score:g}")
+        if self.tier is not None:
+            parts.append(f"Tier {self.tier}")
+        if self.model:
+            parts.append(self.model)
+        if self.fulltext is not None:
+            parts.append("有正文" if self.fulltext else "仅摘要")
+        return " · ".join(parts)
+
+    def to_frontmatter(self) -> dict[str, object]:
+        """平铺成 frontmatter 键（★ 不用嵌套 dict：dict 内 list 会被字符串化）。"""
+        return {
+            "selection_channel": self.channel,
+            "selection_groups": list(self.groups),
+            "selection_score": self.score,
+            "selection_tier": self.tier,
+            "selection_model": self.model,
+            "selection_fulltext": self.fulltext,
+        }
+
+    @classmethod
+    def from_frontmatter(cls, fields: dict[str, object]) -> SelectionReason | None:
+        """从 frontmatter 还原；没有 `selection_channel` ⇒ None（历史产物，不伪造理由）。"""
+        channel = fields.get("selection_channel")
+        if not isinstance(channel, str) or not channel:
+            return None
+        groups = fields.get("selection_groups")
+        score = fields.get("selection_score")
+        tier = fields.get("selection_tier")
+        fulltext = fields.get("selection_fulltext")
+        model = fields.get("selection_model")
+        return cls(
+            channel=channel,
+            groups=[str(g) for g in groups] if isinstance(groups, list) else [],
+            score=float(score) if isinstance(score, (int, float)) else 0.0,
+            tier=int(tier) if isinstance(tier, int) else None,
+            model=str(model) if model else None,
+            fulltext=bool(fulltext) if isinstance(fulltext, bool) else None,
+        )
+
+
+_CHANNEL_TEXT = {
+    "A1_watchlist": "通道 A① watchlist",
+    "A2_heat": "通道 A② 热度",
+    "A2_classic": "通道 A② 经典",
+    "B_tier1": "通道 B Tier1",
+    "explicit_ids": "显式 --ids",
+}
+
+
 class SourceProbeResult(BaseModel):
     """数据源探测结果（`scripts/probe_sources.py` 产出，写进 `docs/数据源手册.md`）。"""
 

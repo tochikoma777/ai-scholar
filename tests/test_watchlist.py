@@ -89,11 +89,46 @@ def test_both_missing_returns_empty(tmp_path: Path) -> None:
 
 
 def test_repo_default_watchlist_matches_expected_shape() -> None:
-    """仓库里那份 watchlist.yaml 必须是中性示例且阈值 0.9（任一命中即触发）。"""
+    """仓库默认主题（2026-11-11 定案）：5 个关注方向 1.0 + 多模态/AI 安全降权 0.2。
+
+    ★ 降权组必须**低于 threshold(0.9)**：单独命中不触发，只作辅助排序。
+    """
     wl = load_watchlist()
+    weights = {group.name: group.weight for group in wl.groups}
     assert wl.default_threshold == 0.9
-    assert "multimodal" in wl.group_names()
-    assert wl.total_keywords() >= 15
+    for name in (
+        "llm-inference",
+        "ai-infra",
+        "model-architecture",
+        "training-alignment",
+        "agent",
+    ):
+        assert weights.get(name) == 1.0
+    assert weights.get("multimodal") == 0.2
+    assert weights.get("ai-safety") == 0.2
+    assert "eval-benchmark" not in weights
+    assert "efficient-inference" not in weights
+    assert wl.total_keywords() >= 60
+
+
+def test_deweighted_group_alone_does_not_trigger() -> None:
+    """多模态/AI 安全单独命中不触发深度分析（用户 2026-11-11：这两块不太关注）。"""
+    wl = load_watchlist()
+    hit = match_watchlist(wl, "a study of video understanding", "")
+    assert hit.groups == ["multimodal"]
+    assert hit.matched is False
+
+
+def test_high_weight_groups_trigger() -> None:
+    wl = load_watchlist()
+    for title in (
+        "KV cache offloading for speculative decoding",
+        "RDMA interconnect for distributed training",
+        "mixture-of-experts with linear attention",
+        "RLHF and preference optimization",
+        "agentic tool use with function calling",
+    ):
+        assert match_watchlist(wl, title, "").matched is True, title
 
 
 def test_match_is_word_boundary_and_case_insensitive() -> None:

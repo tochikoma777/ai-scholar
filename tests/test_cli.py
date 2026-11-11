@@ -101,7 +101,7 @@ def test_doctor_reports_watchlist_counts(
     monkeypatch.setenv("AI_SCHOLAR_ROOT", str(tmp_path))
     result = runner.invoke(app, ["doctor", "--skip-healthcheck"], env={"COLUMNS": "200"})
     assert result.exit_code == 0
-    assert "5 组" in result.output  # 4 个示例组 + 1 个自己的组
+    assert "8 组" in result.output  # 7 个默认组 + 1 个自己的组
 
 
 # ── export / list 冒烟（真实建库 + 真实导出到 tmp vault）───────────────

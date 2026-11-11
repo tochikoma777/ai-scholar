@@ -20,12 +20,13 @@ from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import yaml
 from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel, Field
 from sqlmodel import Session, col, func, select
 
 from ai_scholar.config import BudgetSettings, match_watchlist
-from ai_scholar.models import WatchlistConfig
+from ai_scholar.models import SelectionReason, WatchlistConfig
 from ai_scholar.store.models import LLMUsage, Paper, Run
 from ai_scholar.store.scoreboard import (
     load_latest,
@@ -53,6 +54,8 @@ class ReportHit(BaseModel):
     groups: list[str] = Field(default_factory=list)
     # ★ L3b-1 定级结果（只在「今日定级」段有值；未定级 None）
     tier: int | None = None
+    # ★ 2026-11-11：深度分析入选理由（从 public 真源 frontmatter 还原；历史产物 None）
+    selection_reason: SelectionReason | None = None
 
     @property
     def want_cmd(self) -> str:
@@ -167,6 +170,29 @@ def _daily_cost(session: Session, *, today: date, timezone: str = DEFAULT_TZ) ->
     return round(float(total or 0.0), 4)
 
 
+def load_selection_reasons(analyses_dir: Path) -> dict[str, SelectionReason]:
+    """从 public 真源 `data/analyses/*.md` 读入选理由（★ 不读 db：db 是可丢弃缓存）。
+
+    ★ 历史产物没有 `selection_*` 键 ⇒ `from_frontmatter` 返回 None ⇒ 报告显示「理由未记录」，
+      绝不伪造。坏文件跳过（`analyze --check` 才是完整性门禁）。
+    """
+    from ai_scholar.export.obsidian import parse_frontmatter
+
+    found: dict[str, SelectionReason] = {}
+    if not analyses_dir.is_dir():
+        return found
+    for path in sorted(analyses_dir.glob("*.md")):
+        try:
+            fields, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError):
+            continue
+        paper_id = fields.get("id")
+        reason = SelectionReason.from_frontmatter(fields)
+        if reason is not None and isinstance(paper_id, str):
+            found[paper_id] = reason
+    return found
+
+
 def build_daily_report(
     session: Session,
     *,
@@ -243,8 +269,16 @@ def build_daily_report(
     analyzed_today = list(
         session.exec(select(Paper).where(col(Paper.deep_analyzed_at) == day)).all()
     )
+    selection_reasons = load_selection_reasons(data_dir / "analyses") if data_dir else {}
     deep_analyzed = [
-        ReportHit(id=p.id, title=p.title, score=0.0, groups=[]) for p in analyzed_today
+        ReportHit(
+            id=p.id,
+            title=p.title,
+            score=0.0,
+            groups=[],
+            selection_reason=selection_reasons.get(p.id),
+        )
+        for p in analyzed_today
     ]
 
     verified, due, new, opinions = _prediction_briefs(data_dir, today=today)

@@ -31,7 +31,7 @@ schema_version: {{ report.schema_version }}
 
 {% if report.deep_analyzed -%}
 {% for hit in report.deep_analyzed %}
-- `{{ hit.id }}` — {{ hit.title }}
+- `{{ hit.id }}` — {{ hit.title }}（{{ hit.selection_reason.text if hit.selection_reason else "入选理由未记录（历史产物）" }}）
 {% endfor -%}
 {%- else -%}
 - 今日无新增深度分析（已有产物见 `data/analyses/`）

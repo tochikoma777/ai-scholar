@@ -43,6 +43,11 @@ _COMMIT_STEP = re.compile(
     r"- name: Commit and push[ \t]*\n[ \t]*run: \|[ \t]*\n"
     r"(?P<body>(?:[ \t]+.*\n|[ \t]*\n)+)"
 )
+# ★ 2026-11-11：DeepSeek 高峰守卫必须在 LLM 步骤之前（防排队延迟把调用拖进高峰）
+_GUARD = re.compile(
+    r"- name: Peak-hour guard[ \t]*\n[ \t]*run: uv run python -m ai_scholar\.utils\.peak_hours"
+)
+_LLM_STEPS = ("- name: Enhance", "- name: Grade", "- name: Analyze")
 
 
 # ── 纯 checker（供正向断言与反向验证共用）──────────────────────────────
@@ -104,6 +109,19 @@ def group_errors(groups: dict[str, str | None]) -> list[str]:
     return []
 
 
+def guard_errors(text: str) -> list[str]:
+    """daily.yml 必须有高峰守卫，且位于 Enhance / Grade / Analyze 之前。"""
+    match = _GUARD.search(text)
+    if match is None:
+        return ["daily.yml 缺少 Peak-hour guard（LLM 调用可能落入 DeepSeek 高峰时段）"]
+    errors: list[str] = []
+    for step in _LLM_STEPS:
+        position = text.find(step)
+        if position != -1 and position < match.start():
+            errors.append(f"{step} 在 Peak-hour guard 之前，守卫无效")
+    return errors
+
+
 def _read_workflows() -> dict[str, str]:
     return {name: (WORKFLOWS / name).read_text(encoding="utf-8") for name in _WORKFLOW_FILES}
 
@@ -144,6 +162,20 @@ def test_push_workflows_share_concurrency_group() -> None:
     assert not group_errors(groups), groups
 
 
+def test_daily_has_peak_hour_guard_before_llm_steps() -> None:
+    """★ 2026-11-11：DeepSeek 分时定价 —— 高峰前必须降级 off（见 utils/peak_hours.py）。"""
+    text = (WORKFLOWS / "daily.yml").read_text(encoding="utf-8")
+    assert not guard_errors(text), guard_errors(text)
+
+
+def test_peak_guard_constants_match_official_definition() -> None:
+    """窗口常量必须与官方一致：UTC 01:00–04:00 / 06:00–10:00，前后各 15 分钟余量。"""
+    from ai_scholar.utils.peak_hours import MARGIN_MIN, PEAK_WINDOWS_UTC
+
+    assert PEAK_WINDOWS_UTC == ((60, 240), (360, 600))
+    assert MARGIN_MIN == 15
+
+
 # ── 反向验证（门禁不能是假的）──────────────────────────────────────────
 
 
@@ -173,3 +205,13 @@ def test_checker_detects_divergent_concurrency_groups() -> None:
     assert group_errors({"daily.yml": "a", "recap.yml": "b"})
     assert group_errors({"daily.yml": None, "recap.yml": "a"})
     assert not group_errors({"daily.yml": "ai-scholar-daily", "recap.yml": "ai-scholar-daily"})
+
+
+def test_checker_detects_missing_or_misordered_peak_guard() -> None:
+    guard = (
+        "      - name: Peak-hour guard\n        run: uv run python -m ai_scholar.utils.peak_hours\n"
+    )
+    assert guard_errors("      - name: Enhance\n        run: uv run ai-scholar enhance\n")
+    assert guard_errors("      - name: Enhance\n        run: uv run ai-scholar enhance\n" + guard)
+    good = guard + "      - name: Enhance\n        run: uv run ai-scholar enhance\n"
+    assert not guard_errors(good)

@@ -17,6 +17,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from ai_scholar.models import SelectionReason
 from ai_scholar.pipeline.report import DailyReport, atomic_write, render_recap
 from ai_scholar.report_paths import iter_daily_jsons
 
@@ -89,6 +90,15 @@ class RecapHit(BaseModel):
     groups: list[str] = Field(default_factory=list)
 
 
+class RecapAnalysis(BaseModel):
+    """一条深度分析明细（含入选理由；历史日报没有该字段 ⇒ reason=None）。"""
+
+    id: str
+    title: str
+    date: str
+    reason: SelectionReason | None = None
+
+
 class RecapReport(BaseModel):
     """周报 / 月报快照（md 与 json 同源）。"""
 
@@ -108,6 +118,8 @@ class RecapReport(BaseModel):
     graded_total: int = 0
     graded_by_tier: dict[str, int] = Field(default_factory=dict)
     deep_analyzed_total: int = 0
+    # ★ 2026-11-11：逐篇明细（含入选理由），不只给计数
+    deep_analyses: list[RecapAnalysis] = Field(default_factory=list)
     # 成本（真源 = 各日报的 cost_cny）
     cost_total: float = 0.0
     cost_days: int = 0  # 有成本数字的天数（cost_cny 非 null）
@@ -142,6 +154,18 @@ class RecapReport(BaseModel):
     def graded_by_tier_text(self) -> str:
         parts = [f"{key} {value} 篇" for key, value in self.graded_by_tier.items()]
         return f"（{' / '.join(parts)}）" if parts else ""
+
+    @property
+    def deep_analysis_text(self) -> str:
+        """逐篇明细（★ 预拼字符串：jinja 开了 trim_blocks，行尾放块标签会吃掉换行）。"""
+        if not self.deep_analyses:
+            return ""
+        lines = [
+            f"  - `{item.id}`（{item.date}）· "
+            + (item.reason.text if item.reason else "理由未记录（历史产物）")
+            for item in self.deep_analyses
+        ]
+        return "\n" + "\n".join(lines)
 
     @property
     def anomaly_days_text(self) -> str:
@@ -225,6 +249,15 @@ def build_recap(reports_dir: Path, *, window: PeriodWindow, top_n: int = 10) -> 
             key = f"Tier {graded.tier}" if graded.tier is not None else "无 Tier 记录"
             graded_by_tier[key] = graded_by_tier.get(key, 0) + 1
         report.deep_analyzed_total += len(report_day.deep_analyzed)
+        for analysis in report_day.deep_analyzed:
+            report.deep_analyses.append(
+                RecapAnalysis(
+                    id=analysis.id,
+                    title=analysis.title,
+                    date=report_day.date,
+                    reason=analysis.selection_reason,
+                )
+            )
 
         if report_day.cost_cny is not None:
             report.cost_total += report_day.cost_cny

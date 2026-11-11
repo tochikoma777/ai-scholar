@@ -36,7 +36,7 @@ from ai_scholar.config import (
 )
 from ai_scholar.export.obsidian import dump_frontmatter, parse_frontmatter
 from ai_scholar.llm import LLMClient, NullLLM, build_client
-from ai_scholar.models import WatchlistConfig
+from ai_scholar.models import SelectionReason, WatchlistConfig
 from ai_scholar.pipeline.llm_support import (
     actual_cost,
     authors_text,
@@ -187,20 +187,26 @@ def _select(
     force: bool,
     today: date,
     settings: Settings,
-) -> tuple[list[Paper], int]:
+) -> tuple[list[Paper], int, dict[str, SelectionReason]]:
     """选篇：显式 `--ids` > 通道 A（D 方案交替）> 通道 B（Tier 1 补读）。
 
     ★ D 方案去重：**已读**（`deep_analysis_md` 非空且 hash 未变）与**已收藏**
       （`selected=1`，用户已点名要读）都不占用每周 5 篇的注意力预算。
+
+    ★ 同时返回逐篇 `SelectionReason`（通道/命中组/分/Tier），供 public 真源审计
+      「这篇为什么值得花预算」—— 写入 `data/analyses/{id}.md` frontmatter。
     """
     papers = list(session.exec(select(Paper)).all())
     by_id = {p.id: p for p in papers}
+    reasons: dict[str, SelectionReason] = {}
 
     if ids:
         chosen = [by_id[i] for i in ids if i in by_id]
         eligible = list(chosen)
         chosen = [p for p in chosen if _needs_analysis(p, force=force)]
-        return chosen[:limit], len(eligible) - len(chosen)
+        for paper in chosen[:limit]:
+            reasons[paper.id] = SelectionReason(channel="explicit_ids", tier=paper.tier)
+        return chosen[:limit], len(eligible) - len(chosen), reasons
 
     # ★ 入场资格（2026-10-29 负责人定案）：**只看 watchlist 命中或 Tier 1**。
     #   非命中且未定级的论文不进池子 ⇒ 也进不了下面的当日 Top N。
@@ -217,10 +223,17 @@ def _select(
 
     # ── 通道 A（意图驱动，从入场池里立刻执行）────────────────────────────
     #   ① watchlist 命中：按命中分降序，最多 a_cap 篇（用户点名的兴趣优先）
-    watched = [(p, match_watchlist(watchlist, p.title, p.abstract or "").score) for p in candidates]
-    watched = [item for item in watched if _watched(item[0], watchlist)]
-    watched.sort(key=lambda t: (t[1], t[0].first_seen_at or ""), reverse=True)
+    watched = [(p, match_watchlist(watchlist, p.title, p.abstract or "")) for p in candidates]
+    watched = [item for item in watched if item[1].matched]
+    watched.sort(key=lambda t: (t[1].score, t[0].first_seen_at or ""), reverse=True)
     chosen = [p for p, _ in watched[:a_cap]]
+    for paper, hit in watched[:a_cap]:
+        reasons[paper.id] = SelectionReason(
+            channel="A1_watchlist",
+            groups=list(hit.groups),
+            score=hit.score,
+            tier=paper.tier,
+        )
 
     #   ② 当日 Top N（**D 方案**：热度 / 经典交替）：补"兴趣外的重要工作"
     #      —— 只按 watchlist 排会漏掉它们（方案 B 的缺陷）
@@ -239,15 +252,25 @@ def _select(
             classic_ids=set(load_classics().ids()),
             leaders=_citation_leaders(session, settings.deep_analysis.citation_leaders),
         )
-        chosen += _alternate(heat, classic, a_cap - len(chosen))
+        added = _alternate(heat, classic, a_cap - len(chosen))
+        heat_ids = {p.id for p in heat}
+        for paper in added:
+            reasons[paper.id] = SelectionReason(
+                channel="A2_heat" if paper.id in heat_ids else "A2_classic",
+                tier=paper.tier,
+            )
+        chosen += added
 
     # ── 通道 B：Tier 1 补读（填满 limit）─────────────────────────────────
     if len(chosen) < limit:
         chosen_ids = {p.id for p in chosen}
         backlog = [p for p in candidates if p.tier == 1 and p.id not in chosen_ids]
         backlog.sort(key=lambda p: ((p.citation_count or 0), p.first_seen_at or ""), reverse=True)
-        chosen.extend(backlog[: limit - len(chosen)])
-    return chosen, skipped
+        picked = backlog[: limit - len(chosen)]
+        for paper in picked:
+            reasons[paper.id] = SelectionReason(channel="B_tier1", tier=paper.tier)
+        chosen.extend(picked)
+    return chosen, skipped, reasons
 
 
 def validate_output(
@@ -324,11 +347,12 @@ def analysis_path(settings: Settings, paper_id: str) -> Path:
     return analyses_dir(settings) / f"{safe}.md"
 
 
-def render_analysis_md(paper: Paper) -> str:
+def render_analysis_md(paper: Paper, *, extra: dict[str, object] | None = None) -> str:
     """分析产物的完整文本：frontmatter（可审计）+ 正文。
 
     ★ 幂等：字段只取**内容级**信息（分析日期取 `deep_analyzed_at`，不是"今天"），
       同内容 ⇒ 同字节 ⇒ `--check` 可断言。**绝不读 vault**（public 产物不含私有内容）。
+    ★ `extra` 只放**选篇时**的事实（`selection_*`）；历史产物没有这些键 ⇒ 不传 ⇒ 零 diff。
     """
     fields: dict[str, object] = {
         "id": paper.id,
@@ -338,13 +362,30 @@ def render_analysis_md(paper: Paper) -> str:
         "content_hash": paper.deep_content_hash,
         "schema_version": ANALYSES_SCHEMA_VERSION,
     }
+    if extra:
+        fields.update(extra)
     return f"{dump_frontmatter(fields)}\n{(paper.deep_analysis_md or '').strip()}\n"
 
 
-def write_analysis(settings: Settings, paper: Paper) -> bool:
-    """原子写 `data/analyses/{id}.md`；返回是否**真的写了**（内容相同 ⇒ 不写）。"""
+def write_analysis(
+    settings: Settings, paper: Paper, *, reason: SelectionReason | None = None
+) -> bool:
+    """原子写 `data/analyses/{id}.md`；返回是否**真的写了**（内容相同 ⇒ 不写）。
+
+    ★ 入选理由的保留规则（防 `sync_analyses` 把已有理由抹掉）：
+      `reason` 非空（新分析 / `--force`）⇒ 用新理由；否则读旧 frontmatter，**已有理由优先**；
+      旧文件没有 `selection_*` 键（历史 17 篇）⇒ 不加键、保持零字节变化。
+    """
     path = analysis_path(settings, paper.id)
-    content = render_analysis_md(paper)
+    extra: dict[str, object] | None = None
+    if reason is not None:
+        extra = reason.to_frontmatter()
+    elif path.exists():
+        existing, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
+        kept = SelectionReason.from_frontmatter(existing)
+        if kept is not None:
+            extra = kept.to_frontmatter()
+    content = render_analysis_md(paper, extra=extra)
     if path.exists() and path.read_text(encoding="utf-8") == content:
         return False
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -456,7 +497,7 @@ async def run_deep_analysis(
             day_calls = _daily_analyzed(session, today=day)
             # ★ 先自愈：db 里已有的分析必须落到 public 真源（否则 --check 永远红）
             report.analyses_written += sync_analyses(session, settings)
-            candidates, skipped = _select(
+            candidates, skipped, reasons = _select(
                 session,
                 ids=ids,
                 watchlist=wl,
@@ -492,6 +533,12 @@ async def run_deep_analysis(
                 elif not dry_run and paper.arxiv_id:
                     # ★ 失败不再静默：正文缺失 ⇒ 只能按摘要分析（质量下降），必须进 degraded
                     report.fulltext_misses += 1
+
+                # ★ 补全入选理由的运行时事实（模型档位 / 是否抓到正文），供 public 真源审计
+                selection_reason = reasons.get(paper.id)
+                if selection_reason is not None:
+                    selection_reason.model = model
+                    selection_reason.fulltext = fulltext is not None
 
                 days_since = age_days_since(paper.published_at, day)
                 prompt = render_prompt(
@@ -596,7 +643,7 @@ async def run_deep_analysis(
                 paper.selected = True
                 report.analyzed += 1
                 # ★ L7-4：产物落 public 真源（db 是可丢弃缓存，真源才能跨机恢复）
-                if write_analysis(settings, paper):
+                if write_analysis(settings, paper, reason=reasons.get(paper.id)):
                     report.analyses_written += 1
 
             if report.fulltext_misses:

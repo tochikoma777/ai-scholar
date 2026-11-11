@@ -1,24 +1,38 @@
-# watchlist —— 通用示例，只含中立主题，**入仓**。
+# watchlist —— 默认主题（面向 LLM 系统方向），**入仓**。
 #
 # 匹配：title 或 abstract，word-boundary，大小写不敏感
 # 命中【布尔】→ 决定是否触发；命中【分】= Σ(命中组权重)，同组多次命中只计一次 → 仅用于排序
 # default_threshold: 0.9 = 任一命中即触发
 #
+# ★ 2026-11-11 负责人定案：关注方向 = 大模型推理（inference 系统/加速）/ AI Infra /
+#   先进模型架构 / 训练和对齐 / Agent；多模态与 AI 安全降权（0.2，单独命中不触发，
+#   只作辅助排序）；评测类（benchmark/evaluation）泛词已删除。
+#   ★ 降权到 0.9 以下 ⇒ 该组单独命中不再触发；与高权重组同命中才加分。
+#
 # ★ 想填自己的方向：复制本文件为 `watchlist.local.yaml`（`ai-scholar init` 会自动做），
-#   改那份。local 深合并覆盖本文件（同名组整体覆盖），且**不会入仓**（.gitignore 已排除）。
+#   改那份。local 深合并覆盖本文件（同名组整体覆盖、新组追加），且**不会入仓**（.gitignore 已排除）。
 
 default_threshold: 0.9
 
 groups:
+  - name: llm-inference
+    weight: 1.0
+    keywords: [KV cache, speculative decoding, continuous batching, quantization, distillation, vLLM, PagedAttention, inference serving, prefill, tensor parallelism, on-device, edge inference, KV cache offloading, inference latency, inference throughput, decoding throughput]
+  - name: ai-infra
+    weight: 1.0
+    keywords: [GPU cluster, distributed training, RDMA, NVLink, interconnect, cluster scheduling, fault tolerance, checkpointing, collective communication, memory bandwidth, kernel fusion, CUDA, pipeline parallelism, memory management]
+  - name: model-architecture
+    weight: 1.0
+    keywords: [mixture-of-experts, mixture of experts, MoE, state space model, Mamba, linear attention, sparse attention, transformer architecture, RWKV, diffusion language model, long context, rotary embedding, attention mechanism, normalization layer]
+  - name: training-alignment
+    weight: 1.0
+    keywords: [RLHF, DPO, GRPO, constitutional AI, preference optimization, reward model, supervised fine-tuning, SFT, alignment, post-training, pretraining, curriculum learning, data mixture, instruction tuning]
+  - name: agent
+    weight: 1.0
+    keywords: [LLM agent, agentic, multi-agent, tool use, function calling, computer use, web agent, tool-augmented, agent memory, agent, agents]
   - name: multimodal
-    weight: 1.0
+    weight: 0.2
     keywords: [multimodal, video understanding, spatial reasoning, vision-language-action, embodied]
-  - name: efficient-inference
-    weight: 1.0
-    keywords: [on-device, edge inference, quantization, distillation, speculative decoding, KV cache]
   - name: ai-safety
-    weight: 1.0
+    weight: 0.2
     keywords: [reward hacking, sandbagging, scalable oversight, deceptive alignment]
-  - name: eval-benchmark
-    weight: 0.9
-    keywords: [benchmark, evaluation]

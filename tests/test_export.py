@@ -523,7 +523,8 @@ def test_watchlist_hit_starred_but_does_not_filter(tmp_path: Path) -> None:
     _seed_db(
         db_path,
         [
-            make_paper("arXiv:1", "A multimodal paper about embodied agents"),
+            # ★ 2026-11-11：multimodal 已降权 0.2（单独命中不触发），改用高权重组
+            make_paper("arXiv:1", "KV cache offloading for speculative decoding"),
             make_paper("arXiv:2", "A paper about something else entirely"),
         ],
     )
@@ -531,8 +532,8 @@ def test_watchlist_hit_starred_but_does_not_filter(tmp_path: Path) -> None:
     report = run_export(settings=_settings(tmp_path), db_path=db_path, out=vault)
     assert report.exported == 2  # ★ 未命中也要导出
     texts = [p.read_text(encoding="utf-8") for p in (vault / "10-文献").rglob("*.md")]
-    assert any("★ multimodal" in t for t in texts)
-    assert sum("★ multimodal" in t for t in texts) == 1
+    assert any("★ llm-inference" in t for t in texts)
+    assert sum("★ llm-inference" in t for t in texts) == 1
 
 
 def test_exporter_abstract_exists() -> None:

@@ -80,10 +80,10 @@ uv run ai-scholar export      # 导出到 vault
 ┃ 检查项          ┃ 状态    ┃ 说明                                         ┃
 ┡━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
 │ Python 版本     │ OK      │ 3.11.17（要求 ≥ 3.11）                       │
-│ LLM 配置        │ OK      │ 档位 fast（fast=deepseek-v4-flash）          │
+│ LLM 配置        │ OK      │ 档位 fast（fast=flash｜deep=flash）           │
 │ 代理            │ 未设置  │ 直连                                         │
 │ 数据目录        │ OK      │ ~/projects/ai-scholar/data · 可用 928.1 GB   │
-│ watchlist       │ OK      │ watchlist.local.yaml · 4 组 / 17 关键词      │
+│ watchlist       │ OK      │ watchlist.local.yaml · 7 组 / 78 关键词      │
 │ vault           │ OK      │ ~/projects/ai-scholar-vault · remote: origin │
 │ 数据源 arxiv    │ OK      │ HTTP 200 · 3583 B                            │
 │ 数据源 hf_daily │ warning │ 不可达（ConnectTimeout）                     │
@@ -204,9 +204,9 @@ cp config/watchlist.yaml config/watchlist.local.yaml   # 或直接 ai-scholar in
 ```yaml
 default_threshold: 0.9
 groups:
-  - name: multimodal        # 与示例同名 → 整组覆盖（weight + keywords 一起换）
+  - name: llm-inference     # 与示例同名 → 整组覆盖（weight + keywords 一起换）
     weight: 2.0
-    keywords: [video understanding, spatial reasoning]
+    keywords: [serving, prefill, decode]
   - name: my-own-topic      # 新组，追加
     weight: 1.2
     keywords: [speculative decoding, KV cache]
@@ -218,6 +218,8 @@ groups:
 - 命中【布尔】：`score ≥ threshold` ⇒ 触发（决定要不要它）。
 - 命中【分】：`Σ(命中组权重)`，**同组多次命中只计一次** ⇒ **只用于排序**。
   ★ 分是排序权重，**不是门槛**，也不是"更值得收录多少"的判据。
+- ★ **组权重低于 `default_threshold`（0.9）时，该组单独命中不触发**（只作辅助排序）；
+  默认配置里 `multimodal` / `ai-safety` 就是 0.2（负责人 2026-11-11：这两块降权）。
 - ★ **watchlist 永远不决定论文是否入库**（入库看领域过滤 `cs.AI/CL/LG`）。
 - ★ 为什么 `watchlist.local.yaml` 不入库：别人 clone 下来不该带着你的兴趣清单
   （已被 `.gitignore` 排除，且有单测断言 `git ls-files` 不含它）。
@@ -367,7 +369,7 @@ migrate → collect → collect --classics → enrich → signals → relate
 
 ```bash
 uv run pytest                        # 全量（含 2 个 @pytest.mark.live 联网冒烟；其余 respx mock）
-uv run pytest -m "not live"          # 离线全量（无网环境用这条；基线 421 passed）
+uv run pytest -m "not live"          # 离线全量（无网环境用这条；基线 438 passed）
 uv run ruff check . && uv run ruff format --check .
 uv run mypy src/ai_scholar           # strict
 uv run python scripts/probe_sources.py   # 数据源探测（需联网，产出 docs/数据源手册.md）
