@@ -1,0 +1,198 @@
+{
+  "date": "2026-11-12",
+  "schema_version": 1,
+  "total_papers": 8981,
+  "new_today": 455,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2611.14009",
+      "title": "Coding Agent Memory Post-Training II: Unlocking the Memory Potential of Pre-trained File Operations for Long-Horizon Tasks via On-Policy Distillation",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null
+    },
+    {
+      "id": "arXiv:2611.13975",
+      "title": "Understanding Mixture-of-Experts Language Models Beyond Expert Boundaries",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "model-architecture",
+        "training-alignment"
+      ],
+      "tier": null,
+      "selection_reason": null
+    },
+    {
+      "id": "arXiv:2611.13578",
+      "title": "POEM: Output-Relative Block-Sparse Attention for Long-Context Prefilling",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "model-architecture",
+        "training-alignment"
+      ],
+      "tier": null,
+      "selection_reason": null
+    },
+    {
+      "id": "arXiv:2611.13413",
+      "title": "Placing LLM Lookup Tables by Per-Layer Prefetch Deadlines",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "ai-infra",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null
+    },
+    {
+      "id": "arXiv:2611.13188",
+      "title": "One-Sided Expert-Parallel All-to-All for Mixture-of-Experts Inference over NVLink",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "ai-infra",
+        "model-architecture"
+      ],
+      "tier": null,
+      "selection_reason": null
+    },
+    {
+      "id": "arXiv:2611.13135",
+      "title": "Which Successes Make Good References? Action-Sequence Alignment for Multi-Turn On-Policy Distillation",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null
+    },
+    {
+      "id": "arXiv:2611.10015",
+      "title": "Micius-Flash: Lightweight Agentic Intelligence for Engineering",
+      "score": 2.2,
+      "groups": [
+        "llm-inference",
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null
+    },
+    {
+      "id": "arXiv:2611.14511",
+      "title": "Pyrite: Building and Benchmarking Protein-Ligand Pose Ranking Agents",
+      "score": 2.0,
+      "groups": [
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null
+    },
+    {
+      "id": "arXiv:2611.14356",
+      "title": "EngineAgent: Agentizing On-Device LLM Inference Engines with Inference Stack Hierarchy Awareness and Hardware Abilities",
+      "score": 2.0,
+      "groups": [
+        "llm-inference",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null
+    },
+    {
+      "id": "arXiv:2611.14312",
+      "title": "PSL-RGHA: Parallel Split Learning with Reference Gradient Half-Space Alignment for Mitigating Gradient Divergence",
+      "score": 2.0,
+      "groups": [
+        "llm-inference",
+        "training-alignment"
+      ],
+      "tier": null,
+      "selection_reason": null
+    }
+  ],
+  "deep_analyzed": [
+    {
+      "id": "arXiv:2611.11533",
+      "title": "Ostinato: Fast CPU-GPU MoE Inference for Local Agents via Resident Experts in Every Forward Pass",
+      "score": 0.0,
+      "groups": [],
+      "tier": null,
+      "selection_reason": {
+        "channel": "A1_watchlist",
+        "groups": [
+          "llm-inference",
+          "ai-infra",
+          "model-architecture",
+          "agent"
+        ],
+        "score": 4.0,
+        "tier": null,
+        "model": "deepseek-v4-flash",
+        "fulltext": true
+      }
+    }
+  ],
+  "new_graded": [
+    {
+      "id": "arXiv:2611.02620",
+      "title": "Adaptive Localization of Knowledge Negation for Continual LLM Unlearning",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3,
+      "selection_reason": null
+    },
+    {
+      "id": "arXiv:2611.02271",
+      "title": "Current state of LLMs for Arabic dialectal machine translation",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3,
+      "selection_reason": null
+    },
+    {
+      "id": "arXiv:2611.13369",
+      "title": "Enforcing Axioms for AI Alignment under Loss-Based Rules",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3,
+      "selection_reason": null
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "cf58b97d0ca6",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1771,
+      "new": 455,
+      "degraded": []
+    },
+    {
+      "run_id": "47e509aea183",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.0935,
+  "cost_anomalies": []
+}
