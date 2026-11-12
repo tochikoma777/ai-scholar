@@ -130,6 +130,8 @@ def test_write_recap_idempotent_and_json_roundtrip(tmp_path: Path) -> None:
     window = week_window(date(2026, 10, 26))
     first = write_recap(build_recap(tmp_path, window=window), tmp_path)
     second = write_recap(build_recap(tmp_path, window=window), tmp_path)
+    # ★ 2026-11-12 起按年归档：weekly-2026-W44.json → 2026/
+    assert first.md_path.parent.name == "2026"
     assert first.md_path.read_text(encoding="utf-8") == second.md_path.read_text(encoding="utf-8")
     assert first.json_path.read_text(encoding="utf-8") == second.json_path.read_text(
         encoding="utf-8"

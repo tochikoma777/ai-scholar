@@ -43,7 +43,7 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 > ★ 观察期怎么"看"：`L10-草稿.md` §5 有每周巡检命令 + 记录表；启用当天照 §6 逐步执行
 > （先 `git mv` 改名再改本指针，顺序反了门禁必红）。
 > ★ 本次会话收尾（2026-11-05）：CODEBUDDY 自审 4 项 + L9-E 日配额削峰 + 11/2 费用归因，
-> 已推送 `6ffa3b4`；基线 440 collected / 438 离线，门禁 9 绿。详见 `L9-开工.md` §6.7。
+> 已推送 `6ffa3b4`；基线 451 collected / 449 离线，门禁 9 绿。详见 `L9-开工.md` §6.7。
 > ★ **已修复（2026-11-05）**：`recap.yml` 11/01、11/02 两次 schedule 全失败，两处根因 ——
 > ① `config/default.yaml` 的 `mode` 插值未加引号，`off` 被 YAML 1.1 解析成布尔 `False`；
 > ② `git add` 对不存在的 `weekly|monthly` 目录 pathspec fatal。现 `mode` 加引号 +
@@ -74,7 +74,7 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 | 导出物形态 | **合成文档** = 条目元信息 + why + 我的笔记（**不是条目列表**） |
 | 许可证 | MIT |
 | 仓库 | GitHub **public** |
-| LLM 默认 | DeepSeek：fast / strong **均为** `deepseek-v4-flash`（2026-11-11 成本优先定案）；strong 档可设 `AI_SCHOLAR_LLM__STRONG_MODEL=deepseek-v4-pro` 切回推理档做 A/B |
+| LLM 默认 | DeepSeek：fast / strong **均为** `deepseek-flash`（官方 canonical 名；`deepseek-v4-flash` 同价兼容）；strong 档可设 `AI_SCHOLAR_LLM__STRONG_MODEL=deepseek-v4-pro` 切回推理档做 A/B |
 | 运行模式 | 三档 `off` / `fast` / `strong`；**未配 key 自动降级 off 且不报错** |
 | 本地路径 | `~/projects/ai-scholar`（WSL2 原生 ext4，**不要放 `/mnt/c/`**） |
 
@@ -103,7 +103,7 @@ cli.py (typer)
 ├─ relate ─→ pipeline/relate.py ─→ paper_links（文献耦合 / TF-IDF 相似）
 ├─ export ─→ pipeline/export.py ─→ export/obsidian.py（db → Markdown，写私有 vault）
 ├─ site ─→ pipeline/site.py ─→ export/html.py（只读 public 数据 → 单文件 HTML）
-├─ analyze ─→ pipeline/deep_analysis.py ─→ data/analyses/{id}.md（★ L7 #4 已接线：
+├─ analyze ─→ pipeline/deep_analysis.py ─→ data/analyses/YYYY/MM/{id}.md（★ L7 #4 已接线：
 │              产物是 public 真源；`export` 反向回填 db，再物化进 vault）
 ├─ classics ─→ collectors/arxiv.py `id_list` 直采（config/classics.yaml，L7 #5）
 ├─ report ─→ pipeline/report.py ─→ templates/report/ ─→ data/reports/
@@ -207,7 +207,7 @@ migrate → collect → collect --classics → enrich → signals → relate →
 | `pipeline/enrich.py` | 引用补齐：S2 → 出边 + 队列状态机 | ★ 方向语义固定为 src 引用 dst；入库前先写方向单测 |
 | `pipeline/enhance.py` | LLM 增强 + 强相似边关联解读 | watchlist Top N；预算闸门；幂等 `enhance_content_hash` |
 | `pipeline/grade.py` | 定级：Tier 1/2/3 + 原始证据 | 延迟定级；幂等 `grade_content_hash`；解析失败不写指纹 |
-| `pipeline/deep_analysis.py` | 深度分析（strong 档，**默认模型 `deepseek-v4-flash`**）+ 通道 A/B | 日配额 1 / 周配额 5（L9-E 削峰）；档位由 `llm.strong_model` 配置，可切 `deepseek-v4-pro` 做 A/B；**`selection_reason`**（通道/命中组/分/Tier/模型/正文）写进 frontmatter；正文临时抓取；幂等 `deep_content_hash`；**D 排序**（热度/经典交替）；完成即置 `selected=1`；产物落 `data/analyses/`（`--check` 核对；`sync_analyses` 自愈补写、不覆盖已有理由） |
+| `pipeline/deep_analysis.py` | 深度分析（strong 档，**默认模型 `deepseek-flash`**）+ 通道 A/B | 日配额 1 / 周配额 5；**周内通道配额 3:1:1 + 日级缺口轮转**（`channel_quota`，仅自动运行生效；不改槽位/总成本）；档位由 `llm.strong_model` 配置，可切 `deepseek-v4-pro` 做 A/B；**`selection_reason`**（通道/命中组/分/Tier/模型/正文）写进 frontmatter；正文临时抓取；幂等 `deep_content_hash`；**D 排序**；完成即置 `selected=1`；产物落 `data/analyses/YYYY/MM/`（`--check` 核对；`sync_analyses` 自愈补写、不覆盖已有理由） |
 | `pipeline/predict.py` | L4 推演生成（★ 零 LLM） | 3 类判据；同目标 open 则跳过；观点另存 |
 | `pipeline/stats.py` | 到期验证 / 记分板 / 校准 / 影响分析 | ★ `insufficient` 不进命中率分母；样本不足不下结论；★ 记分板坏行进 `ScoreboardSummary.bad_lines`（不静默，否则分母被悄悄改变）；★ `--calibration`/`--impact` 是**人工按需**（读 db，不进 daily/recap） |
 | `pipeline/score.py` | 热度 / 跨源 / 主题三分量 | ★ 无 `total` 字段，不做加权求和（红线 11） |
@@ -273,7 +273,8 @@ migrate → collect → collect --classics → enrich → signals → relate →
 | `enhance.default_limit` | 20 | fast 增强篇数（daily 的 LLM 环节之一） |
 | `grade.default_limit` | 8 | 日成本天天 ×365，这个值直接决定年成本 |
 | `deep_analysis.daily_limit` / `weekly_limit` | 1 / 5 | L9-E 日削峰；超限进队列，总成本不变 |
-| `llm.strong_model` | `deepseek-v4-flash` | 深度分析档位（2026-11-11 成本优先定案）；`AI_SCHOLAR_LLM__STRONG_MODEL=deepseek-v4-pro` 切回推理档做 A/B |
+| `llm.strong_model` | `deepseek-flash` | 官方 canonical 名（`deepseek-v4-flash` 同价别名）；2026-11-11 成本优先定案；`AI_SCHOLAR_LLM__STRONG_MODEL=deepseek-v4-pro` 切回推理档做 A/B |
+| `deep_analysis.channel_quota` | `{A1_watchlist:3, A2:1, B_tier1:1}` | 周内通道配额，和为 `weekly_limit`；仅自动运行（无 `--limit/--ids`）生效，配额用尽回退 A① |
 | 调用时段守卫 | 工作日 UTC 01–04 / 06–10 降级 off | `utils/peak_hours.py`（北京 9–12/14–18 为 DeepSeek 高峰，空闲半价）；cron 未改；见成本预算 §13 |
 | `deep_analysis.max_fulltext_chars` / `min_fulltext_chars` | 100000 / 2000 | 正文超限中间省略；过短视为占位页丢弃 |
 | `export.default_limit` | 20 | 默认只导 `selected=1`，非全量 |
@@ -306,12 +307,12 @@ migrate → collect → collect --classics → enrich → signals → relate →
 | 论文元数据、关联边、引用列表 | ✅ 重采即回 | `data/ai_scholar.db`（**可丢弃缓存**） | ✗ |
 | **`first_seen_at`**（首次见到它的日期） | ❌ | `data/first_seen.jsonl` | **✓ public** |
 | **signals 时序快照**（被引增长曲线） | ❌ | `data/signals/YYYY-MM.jsonl` | **✓ public** |
-| 每日报告 md + json | ✅ | `data/reports/daily/YYYY-MM-DD.{md,json}`（旧平铺路径仍兼容） | **✓ public** |
-| 周报 / 月报（L9-A，L9-D 自动化） | ✅（可由日报重算） | `data/reports/weekly/weekly-YYYY-Www.{md,json}` · `data/reports/monthly/monthly-YYYY-MM.{md,json}` | **✓ public**（`recap.yml` 周一/1 号提交） |
+| 每日报告 md + json | ✅ | `data/reports/daily/YYYY/MM/YYYY-MM-DD.{md,json}`（读取兼容旧平铺） | **✓ public** |
+| 周报 / 月报（L9-A，L9-D 自动化） | ✅（可由日报重算） | `data/reports/weekly/YYYY/weekly-YYYY-Www.{md,json}` · `data/reports/monthly/YYYY/monthly-YYYY-MM.{md,json}` | **✓ public**（`recap.yml` 周一/1 号提交） |
 | **推演记分板**（可验证判断快照） | ❌ | `data/predictions/scoreboard.jsonl` | **✓ public** |
 | **想读队列**（报告/站点点读，L7-6） | ❌ | `data/wanted.jsonl`（append-only；`export` 消费后置 `selected=1`） | **✓ public** |
 | **长期观点**（不可证伪） | ❌ | `data/predictions/opinions.jsonl` | **✓ public**（但不进统计） |
-| **深度分析产物**（六段 / 三句半 / 透镜） | ❌（重跑要花钱） | `data/analyses/{id}.md`（**L7 #4 已接线**；db 只是缓存，`export` 会反向回填） | **✓ public** |
+| **深度分析产物**（六段 / 三句半 / 透镜） | ❌（重跑要花钱） | `data/analyses/YYYY/MM/{id}.md`（**L7 #4 已接线**；db 只是缓存，`export` 会反向回填） | **✓ public** |
 | 用户笔记 | ❌ | **独立 private vault 仓库**：`~/projects/ai-scholar-vault/` | ✗（不进本仓库） |
 | **主题 MOC**（L9-B，按 watchlist 分组） | ✅（可由 db 重算） | vault `20-主题/{组}.md`（只链**已有笔记**；`export` 生成，未命中组不生成） | ✗（vault 是 private） |
 | 论文正文 / 全文 | — | **永不入库**（临时抓取、抓完即弃） | ❌ 绝对禁止 |
@@ -568,7 +569,7 @@ uv run python scripts/probe_prescreen.py     # 预筛通过率 p + SQLite 行字
 uv run ai-scholar list [--limit N] [--since DATE] [--watchlist-only]
                                  # ★ = watchlist 命中（只做展示筛选）
 uv run ai-scholar report [--date YYYY-MM-DD] [--out DIR]
-                                 # 每日报告（只读 DB，写 data/reports/daily/YYYY-MM-DD.{md,json}）
+                                 # 每日报告（只读 DB，写 data/reports/daily/YYYY/MM/YYYY-MM-DD.{md,json}）
 uv run ai-scholar report --weekly [--date YYYY-MM-DD] [--previous] [--out DIR]
                                  # 周报（自然周）：{weekly/}weekly-YYYY-Www.{md,json}
                                  # ★ --previous = 上一周期（自动化在周一用，当期还没数据）
@@ -656,10 +657,11 @@ gh run list --workflow=recap.yml --limit 3        # 最近三次周报/月报是
   这两个联网冒烟在连接失败、非 200 或无数据时 skip，但解析断言失败仍会让测试红。
 - 断言要落在**实际收到的值**上（如 `settings.llm.base_url`），不是"加载成功"。
 - 基线（tag `l8a` + L9 文档/报告审计 + L9-A/B/C/D + L9-E recap 修复 + 周报真源路径回归
-  + 工作流接线门禁 + 档位 A/B + selection_reason + watchlist + 高峰守卫，2026-11-11 复核）：
-  `uv run pytest --collect-only -o addopts=""` = **440 collected**，其中
-  `uv run pytest -m "not live"` = **438 passed**（另 2 个 `@pytest.mark.live` 联网冒烟被 deselect；
-  全量按网络可达性为 439 passed + 1~2 skipped，本次 1 skipped）。
+  + 工作流接线门禁 + 档位 A/B + selection_reason + watchlist + 高峰守卫 + 通道轮转
+  + S2 校验 + grade_reason + 产物归档，2026-11-12 复核）：
+  `uv run pytest --collect-only -o addopts=""` = **451 collected**，其中
+  `uv run pytest -m "not live"` = **449 passed**（另 2 个 `@pytest.mark.live` 联网冒烟被 deselect；
+  全量按网络可达性为 450 passed + 1~2 skipped，本次 1 skipped）。
   ★ 别把绝对数字写死：每加一个用例都会漂，一律以 `--collect-only` 实时核对为准。
   ★ 核对口径：`uv run pytest --collect-only -o addopts="" | tail -2`（避免 `-qq` 吞掉汇总行）。
   ★ `-q` 叠加 `pyproject` 里的 `addopts = "-q"` 会变成 `-qq`，**pytest 不再打印

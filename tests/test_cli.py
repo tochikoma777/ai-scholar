@@ -342,7 +342,7 @@ def test_budget_cli_estimates_and_allows() -> None:
         env={"COLUMNS": "200"},
     )
     assert result.exit_code == 0, result.output
-    assert "deepseek-v4-flash" in result.output
+    assert "deepseek-flash" in result.output
     assert "放行" in result.output
 
 

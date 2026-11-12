@@ -35,7 +35,7 @@ jobs:
       #   A/B：仓库 Settings → Variables 设同名变量为 deepseek-v4-pro 即切回推理档，
       #   不改代码/工作流。★ `||` 必须给非空默认 —— config.py 的 interpolate_env 用
       #   os.getenv，变量「已设置但为空」不会回落 `:-` 默认，空模型名会让 price_for 抛错。
-      AI_SCHOLAR_LLM__STRONG_MODEL: ${{ vars.AI_SCHOLAR_LLM__STRONG_MODEL || 'deepseek-v4-flash' }}
+      AI_SCHOLAR_LLM__STRONG_MODEL: ${{ vars.AI_SCHOLAR_LLM__STRONG_MODEL || 'deepseek-flash' }}
     steps:
       - uses: actions/checkout@v5
 

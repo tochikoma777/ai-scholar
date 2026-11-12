@@ -26,7 +26,7 @@ from pathlib import Path
 from sqlalchemy import desc
 from sqlmodel import Session, SQLModel, col, create_engine, select
 
-from ai_scholar.collectors.s2 import S2Record, S2Reference, fetch_s2_papers
+from ai_scholar.collectors.s2 import S2Record, S2Reference, fetch_s2_papers, matches_requested
 from ai_scholar.config import Settings, load_settings
 from ai_scholar.store.db import default_db_path
 from ai_scholar.store.hash import (
@@ -218,6 +218,15 @@ async def run_enrich(
             in_library = 0
             new_links = 0
             resolved = False
+            mismatch = False
+            if record is not None and not matches_requested(record, s2_id, paper_title=paper.title):
+                # ★ 2026-11-12：S2 可能把 arXiv id 串到另一篇（实测新文 citationCount=26）。
+                #   不校验就会把错误引用数/引用边写进库，并误触发定级。
+                mismatch = True
+                report.degraded[f"{S2_SOURCE_NAME}:{paper.id}"] = (
+                    "S2 记录与请求 id/标题不一致（疑似错配，已跳过本次写入）"
+                )
+                record = None
             if record is not None and record.paper_id:
                 resolved = True
                 report.fetched += 1
@@ -254,7 +263,9 @@ async def run_enrich(
                 report.done += 1
             else:
                 paper.enrich_attempts += 1
-                if resolved:
+                if mismatch:
+                    reason = "S2 记录与请求不一致（疑似错配）"
+                elif resolved:
                     reason = "S2 已索引但 references 为空"
                 elif by_id:
                     reason = "S2 未索引该 id"

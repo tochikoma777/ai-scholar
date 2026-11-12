@@ -177,6 +177,83 @@ def _alternate(heat: list[Paper], classic: list[Paper], limit: int) -> list[Pape
     return chosen
 
 
+_CHANNEL_ORDER = ("A1_watchlist", "A2", "B_tier1")
+
+
+def _norm_channel(raw: str) -> str | None:
+    """把产物里的通道名归一到配额键（A2_heat / A2_classic → A2）。"""
+    if raw.startswith("A1"):
+        return "A1_watchlist"
+    if raw.startswith("A2"):
+        return "A2"
+    if raw.startswith("B_"):
+        return "B_tier1"
+    return None
+
+
+def _week_channel_usage(settings: Settings, day: date) -> dict[str, int]:
+    """本周各通道已分析的篇数（读 public 真源 frontmatter，不读 db）。
+
+    ★ 用 `analyzed_at` 落在本周（周一–周日）+ `selection_channel` 统计；
+      历史产物没有通道字段 ⇒ 不计入（宁可少算配额，也不虚构归属）。
+    """
+    root = analyses_dir(settings)
+    used: Counter[str] = Counter()
+    if not root.is_dir():
+        return {}
+    start = day - timedelta(days=day.weekday())
+    end = start + timedelta(days=6)
+    for path in sorted(root.rglob("*.md")):
+        try:
+            fields, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        analyzed_at = fields.get("analyzed_at")
+        channel = _norm_channel(str(fields.get("selection_channel") or ""))
+        if not isinstance(analyzed_at, str) or channel is None:
+            continue
+        try:
+            analyzed = date.fromisoformat(analyzed_at[:10])
+        except ValueError:
+            continue
+        if start <= analyzed <= end:
+            used[channel] += 1
+    return dict(used)
+
+
+def _quota_remaining(quota: dict[str, int], used: dict[str, int]) -> dict[str, int]:
+    return {
+        channel: max(0, int(quota.get(channel, 0)) - int(used.get(channel, 0)))
+        for channel in _CHANNEL_ORDER
+    }
+
+
+def _channel_order(quota: dict[str, int], used: dict[str, int]) -> list[str]:
+    """剩余配额大的通道优先；相同则按 A① > A② > B 固定序。"""
+    if not quota:
+        return list(_CHANNEL_ORDER)
+    remaining = _quota_remaining(quota, used)
+    rank = {channel: index for index, channel in enumerate(_CHANNEL_ORDER)}
+    return sorted(_CHANNEL_ORDER, key=lambda channel: (-remaining[channel], rank[channel]))
+
+
+def _channel_cap(
+    channel: str,
+    *,
+    taken: int,
+    limit: int,
+    a_cap: int,
+    remaining: dict[str, int],
+    rotating: bool,
+) -> int:
+    """本次 run 里该通道最多还能贡献几篇。"""
+    if rotating and remaining:
+        return max(0, min(remaining.get(channel, 0), limit - taken))
+    if channel in ("A1_watchlist", "A2"):
+        return max(0, a_cap - taken)
+    return max(0, limit - taken)
+
+
 def _select(
     session: Session,
     *,
@@ -187,11 +264,18 @@ def _select(
     force: bool,
     today: date,
     settings: Settings,
+    rotating: bool = False,
+    quota: dict[str, int] | None = None,
+    used: dict[str, int] | None = None,
 ) -> tuple[list[Paper], int, dict[str, SelectionReason]]:
-    """选篇：显式 `--ids` > 通道 A（D 方案交替）> 通道 B（Tier 1 补读）。
+    """选篇：显式 `--ids` > 按通道配额轮转（A①/A②/B）> 旧「A①→A②→B」顺序。
 
     ★ D 方案去重：**已读**（`deep_analysis_md` 非空且 hash 未变）与**已收藏**
       （`selected=1`，用户已点名要读）都不占用每周 5 篇的注意力预算。
+
+    ★ 2026-11-12 通道轮转：自动运行时按「本周剩余配额」决定今日首顺位，
+      解决 `daily_limit=1` 下 A① 恒占唯一槽位、A②/B 名存实亡的问题；
+      不改槽位数与总篇数 ⇒ 总成本不变。`--limit`/`--ids` 手跑不轮转。
 
     ★ 同时返回逐篇 `SelectionReason`（通道/命中组/分/Tier），供 public 真源审计
       「这篇为什么值得花预算」—— 写入 `data/analyses/{id}.md` frontmatter。
@@ -221,56 +305,80 @@ def _select(
     # ★ 已收藏（`selected=1`）不占自动配额；但 `--force` 是用户显式要求重做 ⇒ 优先
     candidates = [p for p in pool if _needs_analysis(p, force=force) and (force or not p.selected)]
 
-    # ── 通道 A（意图驱动，从入场池里立刻执行）────────────────────────────
-    #   ① watchlist 命中：按命中分降序，最多 a_cap 篇（用户点名的兴趣优先）
+    # ── 三路候选（各自独立排序，再由配额决定拼接顺序）────────────────────
+    #   ① watchlist 命中：按命中分降序（用户点名的兴趣优先）
     watched = [(p, match_watchlist(watchlist, p.title, p.abstract or "")) for p in candidates]
     watched = [item for item in watched if item[1].matched]
     watched.sort(key=lambda t: (t[1].score, t[0].first_seen_at or ""), reverse=True)
-    chosen = [p for p, _ in watched[:a_cap]]
-    for paper, hit in watched[:a_cap]:
-        reasons[paper.id] = SelectionReason(
-            channel="A1_watchlist",
-            groups=list(hit.groups),
-            score=hit.score,
-            tier=paper.tier,
-        )
+    a1 = [p for p, _ in watched]
+    a1_hits = {p.id: hit for p, hit in watched}
 
     #   ② 当日 Top N（**D 方案**：热度 / 经典交替）：补"兴趣外的重要工作"
-    #      —— 只按 watchlist 排会漏掉它们（方案 B 的缺陷）
-    if len(chosen) < a_cap:
-        rest = [p for p in candidates if p.id not in {c.id for c in chosen}]
-        heat = _heat_side(
-            rest,
-            day=today,
-            lookback_days=settings.deep_analysis.trending_lookback_days,
-        )
-        classic = _classic_side(
-            rest,
-            day=today,
-            maturity_days=settings.signals.maturity_days,
-            min_citations=settings.signals.min_citations,
-            classic_ids=set(load_classics().ids()),
-            leaders=_citation_leaders(session, settings.deep_analysis.citation_leaders),
-        )
-        added = _alternate(heat, classic, a_cap - len(chosen))
-        heat_ids = {p.id for p in heat}
-        for paper in added:
-            reasons[paper.id] = SelectionReason(
-                channel="A2_heat" if paper.id in heat_ids else "A2_classic",
-                tier=paper.tier,
-            )
-        chosen += added
+    heat = _heat_side(
+        candidates,
+        day=today,
+        lookback_days=settings.deep_analysis.trending_lookback_days,
+    )
+    classic = _classic_side(
+        candidates,
+        day=today,
+        maturity_days=settings.signals.maturity_days,
+        min_citations=settings.signals.min_citations,
+        classic_ids=set(load_classics().ids()),
+        leaders=_citation_leaders(session, settings.deep_analysis.citation_leaders),
+    )
+    a2 = _alternate(heat, classic, len(candidates))
+    heat_ids = {p.id for p in heat}
 
-    # ── 通道 B：Tier 1 补读（填满 limit）─────────────────────────────────
-    if len(chosen) < limit:
-        chosen_ids = {p.id for p in chosen}
-        backlog = [p for p in candidates if p.tier == 1 and p.id not in chosen_ids]
-        backlog.sort(key=lambda p: ((p.citation_count or 0), p.first_seen_at or ""), reverse=True)
-        picked = backlog[: limit - len(chosen)]
-        for paper in picked:
-            reasons[paper.id] = SelectionReason(channel="B_tier1", tier=paper.tier)
-        chosen.extend(picked)
-    return chosen, skipped, reasons
+    #   B：Tier 1 补读（引用数优先）
+    b = [p for p in candidates if p.tier == 1]
+    b.sort(key=lambda p: ((p.citation_count or 0), p.first_seen_at or ""), reverse=True)
+
+    lists = {"A1_watchlist": a1, "A2": a2, "B_tier1": b}
+    if rotating and quota:
+        remaining = _quota_remaining(quota, used or {})
+        order = _channel_order(quota, used or {})
+        if not any(remaining.values()):
+            # ★ 配额用尽但周额度还有余（配额和 < weekly_limit）⇒ 回退旧顺序，绝不空转
+            remaining, order = {}, list(_CHANNEL_ORDER)
+    else:
+        remaining, order = {}, list(_CHANNEL_ORDER)
+
+    picked: list[Paper] = []
+    seen: set[str] = set()
+    for channel in order:
+        cap = _channel_cap(
+            channel,
+            taken=len(picked),
+            limit=limit,
+            a_cap=a_cap,
+            remaining=remaining,
+            rotating=rotating,
+        )
+        for paper in lists[channel]:
+            if cap <= 0 or len(picked) >= limit:
+                break
+            if paper.id in seen:
+                continue
+            picked.append(paper)
+            seen.add(paper.id)
+            cap -= 1
+            if channel == "A1_watchlist":
+                hit = a1_hits[paper.id]
+                reasons[paper.id] = SelectionReason(
+                    channel="A1_watchlist",
+                    groups=list(hit.groups),
+                    score=hit.score,
+                    tier=paper.tier,
+                )
+            elif channel == "A2":
+                reasons[paper.id] = SelectionReason(
+                    channel="A2_heat" if paper.id in heat_ids else "A2_classic",
+                    tier=paper.tier,
+                )
+            else:
+                reasons[paper.id] = SelectionReason(channel="B_tier1", tier=paper.tier)
+    return picked, skipped, reasons
 
 
 def validate_output(
@@ -342,9 +450,39 @@ def analyses_dir(settings: Settings) -> Path:
     return settings.data_dir() / "analyses"
 
 
-def analysis_path(settings: Settings, paper_id: str) -> Path:
+def analysis_write_path(settings: Settings, paper_id: str, analyzed_at: str | None = None) -> Path:
+    """产物**写入**路径：有分析日期 ⇒ `analyses/YYYY/MM/{id}.md`；否则旧平铺。"""
     safe = paper_id.replace(":", "-").replace("/", "-")
-    return analyses_dir(settings) / f"{safe}.md"
+    day = str(analyzed_at)[:10] if analyzed_at else ""
+    root = analyses_dir(settings)
+    if len(day) == 10 and day[4] == "-" and day[7] == "-":
+        return root / day[:4] / day[5:7] / f"{safe}.md"
+    return root / f"{safe}.md"
+
+
+def analysis_path(settings: Settings, paper_id: str, analyzed_at: str | None = None) -> Path:
+    """产物路径（读取友好）：优先归档位置，再 rglob 找旧平铺/其它月份。
+
+    ★ 写入请用 `analysis_write_path` —— 它不会因为"旧文件还在平铺"而写回平铺。
+    """
+    path = analysis_write_path(settings, paper_id, analyzed_at)
+    if path.exists():
+        return path
+    root = analyses_dir(settings)
+    if root.is_dir():
+        safe = paper_id.replace(":", "-").replace("/", "-")
+        hits = sorted(root.rglob(f"{safe}.md"))
+        if hits:
+            return hits[-1]
+    return path
+
+
+def existing_analysis_path(
+    settings: Settings, paper_id: str, analyzed_at: str | None = None
+) -> Path | None:
+    """产物**读取**路径；不存在返回 None。"""
+    path = analysis_path(settings, paper_id, analyzed_at)
+    return path if path.exists() else None
 
 
 def render_analysis_md(paper: Paper, *, extra: dict[str, object] | None = None) -> str:
@@ -376,12 +514,13 @@ def write_analysis(
       `reason` 非空（新分析 / `--force`）⇒ 用新理由；否则读旧 frontmatter，**已有理由优先**；
       旧文件没有 `selection_*` 键（历史 17 篇）⇒ 不加键、保持零字节变化。
     """
-    path = analysis_path(settings, paper.id)
+    path = analysis_write_path(settings, paper.id, paper.deep_analyzed_at)
+    previous = existing_analysis_path(settings, paper.id, paper.deep_analyzed_at)
     extra: dict[str, object] | None = None
     if reason is not None:
         extra = reason.to_frontmatter()
-    elif path.exists():
-        existing, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
+    elif previous is not None:
+        existing, _ = parse_frontmatter(previous.read_text(encoding="utf-8"))
         kept = SelectionReason.from_frontmatter(existing)
         if kept is not None:
             extra = kept.to_frontmatter()
@@ -420,8 +559,8 @@ def analysis_is_current(settings: Settings, paper: Paper) -> bool:
     ★ 用 `parse_frontmatter` 解析，**不做字符串包含匹配** —— 引号 / 转义会让
       `f"content_hash: {hash}" in text` 这类断言恒假（本项目已三次踩中，红线 18）。
     """
-    path = analysis_path(settings, paper.id)
-    if not path.exists() or not paper.deep_analysis_md:
+    path = existing_analysis_path(settings, paper.id, paper.deep_analyzed_at)
+    if path is None or not paper.deep_analysis_md:
         return False
     fields, _body = parse_frontmatter(path.read_text(encoding="utf-8"))
     return fields.get("content_hash") == paper.content_hash
@@ -497,6 +636,10 @@ async def run_deep_analysis(
             day_calls = _daily_analyzed(session, today=day)
             # ★ 先自愈：db 里已有的分析必须落到 public 真源（否则 --check 永远红）
             report.analyses_written += sync_analyses(session, settings)
+            # ★ 通道轮转只在自动运行生效：手跑 `--limit` / `--ids` 不抢配额
+            rotating = limit is None and not ids
+            quota = settings.deep_analysis.channel_quota if rotating else {}
+            used = _week_channel_usage(settings, day) if (rotating and quota) else {}
             candidates, skipped, reasons = _select(
                 session,
                 ids=ids,
@@ -506,6 +649,9 @@ async def run_deep_analysis(
                 force=force,
                 today=day,
                 settings=settings,
+                rotating=rotating,
+                quota=quota,
+                used=used,
             )
             report.requested = len(candidates)
             report.skipped = skipped

@@ -191,14 +191,14 @@ def test_repo_default_settings_load_without_env(monkeypatch: pytest.MonkeyPatch)
     assert settings.app.log_level == "INFO"
 
 
-def test_default_models_migrated_to_v4() -> None:
-    """★ 模型名已迁到 deepseek-v4-*（旧名 2026-07-24 弃用，见成本预算 §1）。
+def test_default_models_use_official_names() -> None:
+    """★ 模型名已迁到官方 canonical 名（2026-11-12：`deepseek-flash`）。
 
     ★ 2026-11-11 负责人定案：深度分析（strong 档）默认改用 flash，成本优先。
     """
     settings = load_settings()
-    assert settings.llm.fast_model == "deepseek-v4-flash"
-    assert settings.llm.strong_model == "deepseek-v4-flash"
+    assert settings.llm.fast_model == "deepseek-flash"
+    assert settings.llm.strong_model == "deepseek-flash"
 
 
 def test_strong_model_switchable_for_ab(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -210,15 +210,15 @@ def test_strong_model_switchable_for_ab(monkeypatch: pytest.MonkeyPatch) -> None
     settings = load_settings()
     assert settings.llm.strong_model == "deepseek-v4-pro"
     pro = settings.budget.price_for("deepseek", "deepseek-v4-pro")
-    flash = settings.budget.price_for("deepseek", "deepseek-v4-flash")
+    flash = settings.budget.price_for("deepseek", "deepseek-flash")
     assert pro.output_cny_per_1m > flash.output_cny_per_1m
     assert pro.input_miss_cny_per_1m > flash.input_miss_cny_per_1m
 
 
-def test_default_yaml_has_v4_model_names() -> None:
-    """仓库那份 default.yaml 的模型名也必须是新名（防止只改代码漏改配置）。"""
+def test_default_yaml_has_official_model_names() -> None:
+    """仓库那份 default.yaml 的模型名也必须是官方名（防止只改代码漏改配置）。"""
     raw = (project_root() / "config" / "default.yaml").read_text(encoding="utf-8")
     assert "deepseek-chat" not in raw
     assert "deepseek-reasoner" not in raw
-    assert "deepseek-v4-flash" in raw
+    assert "deepseek-flash" in raw
     assert "deepseek-v4-pro" in raw

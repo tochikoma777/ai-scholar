@@ -135,6 +135,8 @@ def test_write_report_idempotent(tmp_path: Path) -> None:
     out_dir = tmp_path / "reports"
     first = write_report(report, out_dir)
     second = write_report(report, out_dir)
+    # ★ 2026-11-12 起按年月归档：reports/YYYY/MM/YYYY-MM-DD.md
+    assert first.md_path == out_dir / "2026" / "10" / "2026-10-24.md"
     assert first.md_path.read_text(encoding="utf-8") == second.md_path.read_text(encoding="utf-8")
     assert first.json_path.read_text(encoding="utf-8") == second.json_path.read_text(
         encoding="utf-8"

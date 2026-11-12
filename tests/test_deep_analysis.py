@@ -32,7 +32,7 @@ def strong_settings(data_dir: str | None = None, **budget_overrides: object) -> 
                 "input_miss_cny_per_1m": 3.0,
                 "output_cny_per_1m": 6.0,
             },
-            "deepseek-v4-flash": {
+            "deepseek-flash": {
                 "input_cached_cny_per_1m": 0.02,
                 "input_miss_cny_per_1m": 1.0,
                 "output_cny_per_1m": 2.0,
@@ -560,7 +560,9 @@ async def test_analysis_written_to_public_source(tmp_path: Path) -> None:
     assert report.analyses_written == 1
 
     path = analysis_path(settings, "arXiv:A")
-    assert path.exists() and path.parent.name == "analyses"
+    assert path.exists()
+    # ★ 2026-11-12 起按年月归档：analyses/YYYY/MM/{id}.md
+    assert path.parent.name == "10" and path.parent.parent.name == "2026"
     text = path.read_text(encoding="utf-8")
     assert "arXiv:A" in text and "## 六段" in text
     # ★ 幂等：重跑（force）同内容 ⇒ 不再写盘，且字节不变
@@ -822,3 +824,96 @@ def test_daily_report_reason_none_when_missing(tmp_path: Path) -> None:
         report = build_daily_report(session, today=DAY, watchlist=WATCHLIST, data_dir=tmp_path)
     assert report.deep_analyzed[0].selection_reason is None
     assert "入选理由未记录" in render_markdown(report)
+
+
+def test_channel_order_prefers_largest_remaining() -> None:
+    """★ 通道轮转：剩余配额大的优先，用尽后按 A① > A② > B 固定序。"""
+    from ai_scholar.pipeline.deep_analysis import _channel_order
+
+    quota = {"A1_watchlist": 3, "A2": 1, "B_tier1": 1}
+    assert _channel_order(quota, {})[0] == "A1_watchlist"
+    assert _channel_order(quota, {"A1_watchlist": 3})[0] == "A2"
+    assert _channel_order(quota, {"A1_watchlist": 3, "A2": 1})[0] == "B_tier1"
+    assert _channel_order({}, {}) == ["A1_watchlist", "A2", "B_tier1"]
+
+
+def test_select_rotates_to_tier1_when_a1_quota_exhausted(tmp_path: Path) -> None:
+    """★ A① 配额用尽后，唯一槽位让给 B（Tier1），而不是继续挑 watchlist 命中。"""
+    from ai_scholar.pipeline.deep_analysis import _select
+
+    db = tmp_path / "d.db"
+    hit = make_paper("arXiv:HIT", title="retrieval paper")
+    tier1 = make_paper("arXiv:T1", title="unrelated", abstract="something else", tier=1)
+    seed(db, [hit, tier1])
+    settings = strong_settings(str(tmp_path))
+
+    with Session(engine_for(db)) as session:
+        chosen, _skipped, reasons = _select(
+            session,
+            ids=None,
+            watchlist=WATCHLIST,
+            limit=5,
+            a_cap=5,
+            force=False,
+            today=DAY,
+            settings=settings,
+            rotating=True,
+            quota={"A1_watchlist": 3, "A2": 1, "B_tier1": 1},
+            used={"A1_watchlist": 3, "A2": 1},
+        )
+
+    assert chosen[0].id == "arXiv:T1"
+    assert reasons["arXiv:T1"].channel == "B_tier1"
+
+
+def test_select_keeps_a1_first_when_not_rotating(tmp_path: Path) -> None:
+    """★ 手跑（--limit/--ids）不轮转：A① 仍排第一，避免手动补读被配额挤走。"""
+    from ai_scholar.pipeline.deep_analysis import _select
+
+    db = tmp_path / "d.db"
+    hit = make_paper("arXiv:HIT", title="retrieval paper")
+    tier1 = make_paper("arXiv:T1", title="unrelated", abstract="something else", tier=1)
+    seed(db, [hit, tier1])
+    settings = strong_settings(str(tmp_path))
+
+    with Session(engine_for(db)) as session:
+        chosen, _skipped, _reasons = _select(
+            session,
+            ids=None,
+            watchlist=WATCHLIST,
+            limit=5,
+            a_cap=5,
+            force=False,
+            today=DAY,
+            settings=settings,
+            rotating=False,
+        )
+
+    assert chosen[0].id == "arXiv:HIT"
+
+
+def test_week_channel_usage_counts_only_current_week(tmp_path: Path) -> None:
+    """★ 只统计本周（周一–周日）且带 selection_channel 的产物；历史无通道不计。"""
+    from ai_scholar.pipeline.deep_analysis import _week_channel_usage
+
+    settings = strong_settings(str(tmp_path))
+    root = tmp_path / "analyses"
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "a.md").write_text(
+        '---\nid: "arXiv:A"\nanalyzed_at: "2026-10-22"\n'
+        'selection_channel: "A1_watchlist"\n---\nbody\n',
+        encoding="utf-8",
+    )
+    (root / "b.md").write_text(
+        '---\nid: "arXiv:B"\nanalyzed_at: "2026-10-20"\nselection_channel: "B_tier1"\n---\nbody\n',
+        encoding="utf-8",
+    )
+    (root / "c.md").write_text(
+        '---\nid: "arXiv:C"\nanalyzed_at: "2026-10-12"\n'
+        'selection_channel: "A1_watchlist"\n---\nbody\n',
+        encoding="utf-8",
+    )
+
+    used = _week_channel_usage(settings, DAY)
+
+    assert used == {"A1_watchlist": 1, "B_tier1": 1}

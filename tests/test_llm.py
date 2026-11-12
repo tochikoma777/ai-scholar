@@ -57,7 +57,7 @@ def test_build_client_fast_returns_llm_client() -> None:
     settings = Settings(llm=LLMSettings(api_key="k", base_url="https://api.deepseek.com"))
     client = build_client(settings)
     assert isinstance(client, LLMClient)
-    assert client.model == "deepseek-v4-flash"
+    assert client.model == "deepseek-flash"
 
 
 @respx.mock

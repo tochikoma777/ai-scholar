@@ -43,7 +43,8 @@ schema_version: {{ report.schema_version }}
 {% for hit in report.new_graded %}
 {#- ★ 行尾必须落在变量标签上：jinja 开了 trim_blocks，块标签后的换行会被吃掉，多条会挤成一行 -#}
 {% set tier_txt = "（Tier " ~ hit.tier ~ "）" if hit.tier is not none else "（定级中）" %}
-- `{{ hit.id }}` — {{ hit.title }}{{ tier_txt }}
+{% set reason_txt = " · " ~ hit.grade_reason if hit.grade_reason else "" %}
+- `{{ hit.id }}` — {{ hit.title }}{{ tier_txt }}{{ reason_txt }}
 {% endfor -%}
 {%- else -%}
 - 今日无新增定级

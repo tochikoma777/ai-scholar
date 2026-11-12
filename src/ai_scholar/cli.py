@@ -547,7 +547,7 @@ def analyze(
 ) -> None:
     """深度分析（strong 档）：三句半 + 六段 + 背景透镜。
 
-    ★ 2026-11-11 成本优先定案：strong 档默认走 `deepseek-v4-flash`；
+    ★ 2026-11-11 成本优先定案：strong 档默认走 `deepseek-flash`；
       设 `AI_SCHOLAR_LLM__STRONG_MODEL=deepseek-v4-pro` 可切回推理档做 A/B。
 
     ★ 通道 A（意图触发，不看 Tier）+ B（Tier1 补读）；日配额 1 篇 / 周配额 5 篇（削峰）。
@@ -1329,6 +1329,7 @@ def report(
             watchlist=watchlist,
             data_dir=settings.data_dir(),
             timezone=settings.app.timezone,
+            signals=settings.signals,
         )
 
     daily_outcome = write_report(daily, out_dir)

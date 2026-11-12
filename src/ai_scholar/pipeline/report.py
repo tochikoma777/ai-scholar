@@ -25,7 +25,7 @@ from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel, Field
 from sqlmodel import Session, col, func, select
 
-from ai_scholar.config import BudgetSettings, match_watchlist
+from ai_scholar.config import BudgetSettings, SignalsSettings, match_watchlist
 from ai_scholar.models import SelectionReason, WatchlistConfig
 from ai_scholar.store.models import LLMUsage, Paper, Run
 from ai_scholar.store.scoreboard import (
@@ -56,6 +56,8 @@ class ReportHit(BaseModel):
     tier: int | None = None
     # ★ 2026-11-11：深度分析入选理由（从 public 真源 frontmatter 还原；历史产物 None）
     selection_reason: SelectionReason | None = None
+    # ★ 2026-11-12：定级触发原因（成熟 / 被引达标），只对「今日定级」有值
+    grade_reason: str | None = None
 
     @property
     def want_cmd(self) -> str:
@@ -181,7 +183,7 @@ def load_selection_reasons(analyses_dir: Path) -> dict[str, SelectionReason]:
     found: dict[str, SelectionReason] = {}
     if not analyses_dir.is_dir():
         return found
-    for path in sorted(analyses_dir.glob("*.md")):
+    for path in sorted(analyses_dir.rglob("*.md")):
         try:
             fields, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
         except (OSError, yaml.YAMLError):
@@ -193,6 +195,24 @@ def load_selection_reasons(analyses_dir: Path) -> dict[str, SelectionReason]:
     return found
 
 
+def _grade_reason(paper: Paper, day: date, signals: SignalsSettings) -> str:
+    """定级触发原因（★ 只依据**当时写入的字段**，不猜模型内部状态）。
+
+    `grade.py::_trigger_met` 是「成熟 OR 引用达标」两条并列；两者都不满足仍被定级，
+    只可能是内容变更后的幂等重算（`grade_content_hash != content_hash`）。
+    """
+    parts: list[str] = []
+    published = parse_iso_date(paper.published_at)
+    if published is not None:
+        age = (day - published).days
+        if age >= signals.maturity_days:
+            parts.append(f"成熟（{age} 天 ≥ {signals.maturity_days}）")
+    citations = paper.citation_count or 0
+    if citations >= signals.min_citations:
+        parts.append(f"被引 {citations} ≥ {signals.min_citations}")
+    return " · ".join(parts) if parts else "内容变更重定级"
+
+
 def build_daily_report(
     session: Session,
     *,
@@ -202,6 +222,7 @@ def build_daily_report(
     data_dir: Path | None = None,
     timezone: str = DEFAULT_TZ,
     budget: BudgetSettings | None = None,
+    signals: SignalsSettings | None = None,
 ) -> DailyReport:
     """聚合库内现状，生成当日报告快照（★ 只读，不写库）。"""
     day = today.isoformat()
@@ -262,8 +283,17 @@ def build_daily_report(
 
     graded_today = list(session.exec(select(Paper).where(col(Paper.graded_at) == day)).all())
     graded_today.sort(key=lambda p: (p.tier or 9, p.title))
+    signals_cfg = signals or SignalsSettings()
     new_graded = [
-        ReportHit(id=p.id, title=p.title, score=0.0, groups=[], tier=p.tier) for p in graded_today
+        ReportHit(
+            id=p.id,
+            title=p.title,
+            score=0.0,
+            groups=[],
+            tier=p.tier,
+            grade_reason=_grade_reason(p, today, signals_cfg),
+        )
+        for p in graded_today
     ]
 
     analyzed_today = list(
@@ -343,9 +373,12 @@ def atomic_write(path: Path, content: str) -> None:
 
 
 def write_report(report: DailyReport, out_dir: Path) -> ReportOutcome:
-    """写 `YYYY-MM-DD.md` + `.json`（★ json 给机器/AI 工具看，顺带兑现核心判据）。"""
-    md_path = out_dir / f"{report.date}.md"
-    json_path = out_dir / f"{report.date}.json"
+    """写 `YYYY/MM/YYYY-MM-DD.md` + `.json`（★ 按年月归档，json 给机器/AI 工具看）。"""
+    from ai_scholar.report_paths import archived_subdir
+
+    target = archived_subdir(Path(out_dir), report.date)
+    md_path = target / f"{report.date}.md"
+    json_path = target / f"{report.date}.json"
     atomic_write(md_path, render_markdown(report))
     atomic_write(json_path, report.model_dump_json(indent=2) + "\n")
     return ReportOutcome(report=report, md_path=md_path, json_path=json_path)

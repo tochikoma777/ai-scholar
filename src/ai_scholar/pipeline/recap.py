@@ -299,9 +299,12 @@ class RecapOutcome:
 
 
 def write_recap(recap: RecapReport, out_dir: Path) -> RecapOutcome:
-    """写 `{slug}.md` + `.json`（★ 与 `write_report` 同机制：原子写 + 无生成时间）。"""
-    md_path = Path(out_dir) / f"{recap.slug}.md"
-    json_path = Path(out_dir) / f"{recap.slug}.json"
+    """写 `YYYY/{slug}.md` + `.json`（★ 与 `write_report` 同机制：原子写 + 无生成时间）。"""
+    from ai_scholar.report_paths import recap_subdir
+
+    target = recap_subdir(Path(out_dir), recap.slug)
+    md_path = target / f"{recap.slug}.md"
+    json_path = target / f"{recap.slug}.json"
     atomic_write(md_path, render_recap(recap))
     atomic_write(json_path, recap.model_dump_json(indent=2) + "\n")
     return RecapOutcome(recap=recap, md_path=md_path, json_path=json_path)

@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -66,6 +67,56 @@ def _external_ids(raw: Any) -> tuple[str | None, str | None]:
     arxiv = raw.get("ArXiv") or raw.get("arXiv")
     doi = raw.get("DOI")
     return (str(arxiv) if arxiv else None), (str(doi) if doi else None)
+
+
+_ARXIV_VERSION = re.compile(r"v\d+$", re.IGNORECASE)
+
+
+def _norm_arxiv(value: str | None) -> str | None:
+    if not value:
+        return None
+    return _ARXIV_VERSION.sub("", value.strip().lower())
+
+
+def _norm_title(value: str | None) -> set[str]:
+    text = re.sub(r"[^0-9a-z\u4e00-\u9fff]+", " ", (value or "").lower())
+    return {token for token in text.split() if len(token) > 1}
+
+
+def matches_requested(
+    record: S2Record,
+    requested_id: str,
+    *,
+    paper_title: str | None = None,
+    min_title_overlap: float = 0.5,
+) -> bool:
+    """校验 S2 记录与请求的 id 是同一篇（防 id 映射串台 / 同名错配）。
+
+    ★ 背景（2026-11-12 实测）：一篇 `first_seen` 仅 8 天的新文，S2 返回
+      `citationCount=26`（同日 481 篇新文中位数 0、次高 2），并把定级误触发。
+      ⇒ 写入 `citation_count` / 引用边之前必须验明身份。
+
+    判定顺序：
+    1. 请求 `ARXIV:x` 且记录带 `externalIds.ArXiv` ⇒ 归一化（去 `vN`）后必须相等；
+    2. 请求 `DOI:x` 且记录带 DOI ⇒ 必须相等；
+    3. 记录没带对外 id ⇒ 退回标题 token 重合度（默认 ≥0.5），避免把无关论文算进来。
+    """
+    kind, _, value = requested_id.partition(":")
+    kind = kind.upper()
+    if kind == "ARXIV":
+        want, got = _norm_arxiv(value), _norm_arxiv(record.arxiv_id)
+        if want and got:
+            return want == got
+    elif kind == "DOI":
+        want, got = value.strip().lower(), (record.doi or "").strip().lower()
+        if want and got:
+            return want == got
+
+    want_tokens = _norm_title(paper_title)
+    got_tokens = _norm_title(record.title)
+    if want_tokens and got_tokens:
+        return len(want_tokens & got_tokens) / len(want_tokens | got_tokens) >= min_title_overlap
+    return True
 
 
 def parse_record(raw: Any) -> S2Record | None:

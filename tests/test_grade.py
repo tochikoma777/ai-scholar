@@ -26,7 +26,7 @@ DAY = date(2026, 10, 24)
 def fast_settings(**budget_overrides: object) -> Settings:
     prices = {
         "deepseek": {
-            "deepseek-v4-flash": {
+            "deepseek-flash": {
                 "input_cached_cny_per_1m": 0.02,
                 "input_miss_cny_per_1m": 1.0,
                 "output_cny_per_1m": 2.0,
@@ -278,3 +278,19 @@ async def test_report_new_graded_filled(tmp_path: Path) -> None:
     with Session(engine) as session:
         report = build_daily_report(session, today=DAY, watchlist=WatchlistConfig())
     assert any(hit.id == "arXiv:A" for hit in report.new_graded)
+
+
+def test_grade_reason_explains_trigger() -> None:
+    """★ 定级原因可审计：成熟 / 被引达标 / 内容变更重定级（三条互斥来源）。"""
+    from ai_scholar.config import SignalsSettings
+    from ai_scholar.pipeline.report import _grade_reason
+
+    signals = SignalsSettings()
+    old = make_paper("arXiv:A", published="2025-01-01T00:00:00Z")
+    assert "成熟" in _grade_reason(old, DAY, signals)
+
+    cited = make_paper("arXiv:B", published="2026-10-20T00:00:00Z", citations=26)
+    assert "被引 26" in _grade_reason(cited, DAY, signals)
+
+    neither = make_paper("arXiv:C", published="2026-10-20T00:00:00Z", citations=0)
+    assert _grade_reason(neither, DAY, signals) == "内容变更重定级"

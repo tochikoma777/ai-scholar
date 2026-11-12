@@ -28,7 +28,7 @@ WATCHLIST = WatchlistConfig(
 def fast_settings(**budget_overrides: object) -> Settings:
     prices = {
         "deepseek": {
-            "deepseek-v4-flash": {
+            "deepseek-flash": {
                 "input_cached_cny_per_1m": 0.02,
                 "input_miss_cny_per_1m": 1.0,
                 "output_cny_per_1m": 2.0,

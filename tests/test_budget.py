@@ -19,7 +19,7 @@ def _budget() -> BudgetSettings:
 
 def test_flash_estimate_matches_cost_model() -> None:
     """条目增强（flash）：30k in / 4k out → ¥0.0552（成本预算 §1 采用价）。"""
-    est = estimate_cost(_budget(), "deepseek", "deepseek-v4-flash", 30000, 4000)
+    est = estimate_cost(_budget(), "deepseek", "deepseek-flash", 30000, 4000)
     assert est.cost_cny == pytest.approx(0.0552, abs=1e-9)
 
 
@@ -32,8 +32,8 @@ def test_pro_estimate_matches_cost_model() -> None:
 def test_cached_input_is_cheaper_than_miss() -> None:
     """★ 三档单价：缓存命中 0.024/M 远低于未命中 1.2/M，预估默认按未命中（保守）。"""
     b = _budget()
-    miss = estimate_cost(b, "deepseek", "deepseek-v4-flash", 1_000_000, 0)
-    hit = estimate_cost(b, "deepseek", "deepseek-v4-flash", 1_000_000, 0, input_cached=True)
+    miss = estimate_cost(b, "deepseek", "deepseek-flash", 1_000_000, 0)
+    hit = estimate_cost(b, "deepseek", "deepseek-flash", 1_000_000, 0, input_cached=True)
     assert miss.cost_cny == pytest.approx(1.2)
     assert hit.cost_cny == pytest.approx(0.024)
     assert hit.cost_cny < miss.cost_cny
@@ -55,7 +55,7 @@ def test_price_for_missing_key_raises() -> None:
 def test_repo_default_prices_loaded() -> None:
     """仓库默认价格表的三档单价必须与成本预算 §1 一致（断言实际值）。"""
     b = _budget()
-    flash = b.price_for("deepseek", "deepseek-v4-flash")
+    flash = b.price_for("deepseek", "deepseek-flash")
     pro = b.price_for("deepseek", "deepseek-v4-pro")
     assert (
         flash.input_cached_cny_per_1m,
@@ -67,6 +67,14 @@ def test_repo_default_prices_loaded() -> None:
         pro.input_miss_cny_per_1m,
         pro.output_cny_per_1m,
     ) == (0.18, 5.4, 16.2)
+
+
+def test_legacy_model_alias_has_same_price() -> None:
+    """★ 旧名 `deepseek-v4-flash` 是官方兼容别名，必须与 canonical 同价。"""
+    b = _budget()
+    canonical = b.price_for("deepseek", "deepseek-flash")
+    legacy = b.price_for("deepseek", "deepseek-v4-flash")
+    assert canonical == legacy
 
 
 def test_repo_default_limits() -> None:
@@ -82,13 +90,13 @@ def test_repo_default_limits() -> None:
 
 def test_check_budget_allows_within_limits() -> None:
     b = _budget()
-    est = estimate_cost(b, "deepseek", "deepseek-v4-flash", 30000, 4000)
+    est = estimate_cost(b, "deepseek", "deepseek-flash", 30000, 4000)
     assert check_budget(b, BudgetState(), est).allowed
 
 
 def test_check_budget_blocks_daily_overflow() -> None:
     b = _budget()
-    est = estimate_cost(b, "deepseek", "deepseek-v4-flash", 30000, 4000)
+    est = estimate_cost(b, "deepseek", "deepseek-flash", 30000, 4000)
     decision = check_budget(b, BudgetState(spent_daily=b.daily_limit_cny), est)
     assert not decision.allowed
     assert "日额度超限" in decision.reason
@@ -96,7 +104,7 @@ def test_check_budget_blocks_daily_overflow() -> None:
 
 def test_check_budget_blocks_weekly_overflow() -> None:
     b = _budget()
-    est = estimate_cost(b, "deepseek", "deepseek-v4-flash", 30000, 4000)
+    est = estimate_cost(b, "deepseek", "deepseek-flash", 30000, 4000)
     decision = check_budget(b, BudgetState(spent_weekly=b.weekly_limit_cny), est)
     assert not decision.allowed
     assert "周额度超限" in decision.reason
@@ -104,7 +112,7 @@ def test_check_budget_blocks_weekly_overflow() -> None:
 
 def test_check_budget_blocks_monthly_overflow() -> None:
     b = _budget()
-    est = estimate_cost(b, "deepseek", "deepseek-v4-flash", 30000, 4000)
+    est = estimate_cost(b, "deepseek", "deepseek-flash", 30000, 4000)
     decision = check_budget(b, BudgetState(spent_monthly=b.monthly_limit_cny), est)
     assert not decision.allowed
     assert "月额度超限" in decision.reason
@@ -112,7 +120,7 @@ def test_check_budget_blocks_monthly_overflow() -> None:
 
 def test_check_budget_blocks_yearly_overflow() -> None:
     b = _budget()
-    est = estimate_cost(b, "deepseek", "deepseek-v4-flash", 30000, 4000)
+    est = estimate_cost(b, "deepseek", "deepseek-flash", 30000, 4000)
     decision = check_budget(b, BudgetState(spent_yearly=b.yearly_limit_cny), est)
     assert not decision.allowed
     assert "年额度超限" in decision.reason
@@ -120,7 +128,7 @@ def test_check_budget_blocks_yearly_overflow() -> None:
 
 def test_check_budget_blocks_call_count() -> None:
     b = _budget()
-    est = estimate_cost(b, "deepseek", "deepseek-v4-flash", 30000, 4000)
+    est = estimate_cost(b, "deepseek", "deepseek-flash", 30000, 4000)
     decision = check_budget(b, BudgetState(calls_this_run=b.max_calls_per_run), est)
     assert not decision.allowed
     assert "调用次数" in decision.reason

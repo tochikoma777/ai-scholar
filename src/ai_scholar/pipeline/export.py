@@ -242,13 +242,13 @@ def backfill_analyses(session: Session, settings: Settings) -> int:
     ★ 幂等：db 已有就不覆盖（真源只是补漏，不是权威覆盖）。
     """
     from ai_scholar.export.obsidian import parse_frontmatter
-    from ai_scholar.pipeline.deep_analysis import analysis_path
+    from ai_scholar.pipeline.deep_analysis import existing_analysis_path
 
     filled = 0
     rows = list(session.exec(select(Paper).where(col(Paper.deep_analysis_md).is_(None))).all())
     for paper in rows:
-        path = analysis_path(settings, paper.id)
-        if not path.exists():
+        path = existing_analysis_path(settings, paper.id, paper.deep_analyzed_at)
+        if path is None:
             continue
         fields, body = parse_frontmatter(path.read_text(encoding="utf-8"))
         content = body.strip()
@@ -747,6 +747,7 @@ def run_export(
             watchlist=watchlist,
             data_dir=settings.data_dir(),
             timezone=settings.app.timezone,
+            signals=settings.signals,
         )
         note_lines = _daily_note_lines(
             session,

@@ -22,12 +22,14 @@ llm:
   provider: deepseek
   base_url: ${AI_SCHOLAR_LLM__BASE_URL}
   api_key: ${AI_SCHOLAR_LLM__API_KEY}
-  fast_model: ${AI_SCHOLAR_LLM__FAST_MODEL:-deepseek-v4-flash}
+  fast_model: ${AI_SCHOLAR_LLM__FAST_MODEL:-deepseek-flash}
   # ★ 2026-11-11 负责人定案：深度分析默认改用 flash（成本优先，质量观察几天再说）。
   #   A/B 对比：设 AI_SCHOLAR_LLM__STRONG_MODEL=deepseek-v4-pro 即切回推理档，
   #   无需改代码（价格表两档都有单价）；daily.yml 用同名的 repository variable 注入。
   #   ★ strong 档的 max_tokens/timeout 仍是按推理档留的余量，flash 也吃推理，保持不变。
-  strong_model: ${AI_SCHOLAR_LLM__STRONG_MODEL:-deepseek-v4-flash}
+  # ★ 2026-11-12 模型名迁移：官方 canonical 名 = `deepseek-flash`（旧名 `deepseek-v4-flash`
+  #   仍可调用、同价，保留为价格表别名；见成本预算 §1）。
+  strong_model: ${AI_SCHOLAR_LLM__STRONG_MODEL:-deepseek-flash}
   temperature: 0.3
   # strong 档走思维链，比 fast 慢得多，故分开设超时
   timeout_s: ${AI_SCHOLAR_LLM__TIMEOUT_S:-120}
@@ -59,6 +61,13 @@ budget:
   #   ★ 改价必须先改 docs/成本预算.md §1，再改这里；换供应商 = 加一行价格，不改代码。
   prices:
     deepseek:
+      # ★ 官方 canonical 名（2026-11-12 起）
+      deepseek-flash:
+        input_cached_cny_per_1m: 0.024
+        input_miss_cny_per_1m: 1.2
+        output_cny_per_1m: 4.8
+      # 兼容别名：官方称旧名仍可调用、按 Flash 计费；保留以免历史配置/历史
+      # `llm_usage.model` 聚合断裂。两行必须同价。
       deepseek-v4-flash:
         input_cached_cny_per_1m: 0.024
         input_miss_cny_per_1m: 1.2
@@ -195,6 +204,14 @@ deep_analysis:
   weekly_limit: 5
   daily_limit: 1
   default_limit: 5
+  # ★ 周内通道配额（2026-11-12 定案）：A① watchlist 3 / A② 热度·经典 1 / B Tier1 1。
+  #   仅在自动运行（不传 --limit/--ids）时生效；按「本周已用 vs 配额」选每日首顺位，
+  #   解决 `daily_limit=1` 下 A① 恒占唯一槽位、A②/B 名存实亡的问题。
+  #   ★ 不改槽位、不改总篇数 ⇒ 成本不变；和应等于 `weekly_limit`（不等时配额用尽即回退 A①）。
+  channel_quota:
+    A1_watchlist: 3
+    A2: 1
+    B_tier1: 1
   # ★ 正文上限：实测 arXiv 正文 38k–184k 字符；超限**中间省略**（保开头与实验/结论段）
   max_fulltext_chars: 100000
   # ★ 正文下限：短于此视为元数据/占位页（ar5iv 实测只给约 5k 的 abs 页），丢弃

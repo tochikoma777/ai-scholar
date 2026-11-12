@@ -31,7 +31,7 @@ from typing import Any, cast
 from sqlalchemy import func
 from sqlmodel import Session, SQLModel, col, create_engine, select
 
-from ai_scholar.collectors.s2 import S2Record, fetch_s2_papers
+from ai_scholar.collectors.s2 import S2Record, fetch_s2_papers, matches_requested
 from ai_scholar.config import Settings, SignalsSettings, load_settings
 from ai_scholar.pipeline.prescreen import apply_prescreen
 from ai_scholar.store.db import default_db_path
@@ -307,6 +307,12 @@ async def run_signals(
         for s2_id in ordered_ids:
             paper = id_to_paper[s2_id]
             record = records_by_id.get(s2_id)
+            if record is not None and not matches_requested(record, s2_id, paper_title=paper.title):
+                # ★ 与 enrich 同一道守卫：错配记录既不写 signals，也不覆盖 citation_count
+                report.degraded[f"semantic_scholar:{paper.id}"] = (
+                    "S2 记录与请求 id/标题不一致（疑似错配，已跳过）"
+                )
+                record = None
             citation = getattr(record, "citation_count", None) if record is not None else None
             refs = getattr(record, "reference_count", None) if record is not None else None
             if record is not None:
