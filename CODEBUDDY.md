@@ -42,8 +42,11 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 > 草稿不匹配该模式）。
 > ★ 观察期怎么"看"：`L10-草稿.md` §5 有每周巡检命令 + 记录表；启用当天照 §6 逐步执行
 > （先 `git mv` 改名再改本指针，顺序反了门禁必红）。
-> ★ 本次会话收尾（2026-11-05）：CODEBUDDY 自审 4 项 + L9-E 日配额削峰 + 11/2 费用归因，
-> 已推送 `6ffa3b4`；基线 451 collected / 449 离线，门禁 9 绿。详见 `L9-开工.md` §6.7。
+> ★ 2026-11-05 会话收尾（历史）：CODEBUDDY 自审 4 项 + L9-E 日配额削峰 + 11/2 费用归因，
+> 已推送 `6ffa3b4`。详见 `L9-开工.md` §6.7。
+> ★ **当前指针（2026-11-12）**：已推送 `9aa98da`（通道配额轮转 / 模型名 `deepseek-flash` /
+> S2 身份校验 + `grade_reason` / 产物年月归档；设计方案 v1.16）；基线 **451 collected / 449 离线**
+> （全量 450 passed + 1 skipped），docs 门禁 9 绿。L10 仍未启用，等负责人核对后决定。
 > ★ **已修复（2026-11-05）**：`recap.yml` 11/01、11/02 两次 schedule 全失败，两处根因 ——
 > ① `config/default.yaml` 的 `mode` 插值未加引号，`off` 被 YAML 1.1 解析成布尔 `False`；
 > ② `git add` 对不存在的 `weekly|monthly` 目录 pathspec fatal。现 `mode` 加引号 +
