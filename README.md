@@ -320,7 +320,7 @@ migrate → collect → collect --classics → enrich → signals → relate
 | `fast` | 增强 + 定级 | 见下 |
 | `strong` | 追加深度分析（日 1 篇 / 周 5 篇上限） | 见下 |
 
-稳态实测（2026-10-26，Actions 开 LLM）：
+稳态实测（2026-10-26，Actions 开 LLM；**旧价口径**）：
 
 | 项 | 日 | 月 | 年 |
 |---|---|---|---|
@@ -330,6 +330,8 @@ migrate → collect → collect --classics → enrich → signals → relate
 | **合计** | **≈¥0.14** | **≈¥4.3** | **≈¥52** |
 
 - 查账：`uv run ai-scholar cost --days 14`（零 LLM）。
+- 上表是**旧价口径**；2026-11-12 价格表改为「官方空闲价 × 1.2」（偏低不可接受、略高可作保守估计），
+  新口径金额更高，依据与重算见 `docs/成本预算.md` §1/§13.4。
 - 动手改"每天必跑"的 LLM 参数前，先算 `日 × 365`：**日差 ¥0.1 = 年差 ≈¥36**。
 - 成本异常会同时出现在四处（**只标注，绝不中断流水线**）：报告 md 顶部 ⚠️、
   报告 json 的 `cost_anomalies`、站点「成本」板块、Actions 的 `::warning::`。

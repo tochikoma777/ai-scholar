@@ -49,17 +49,24 @@ budget:
   yearly_limit_cny: ${AI_SCHOLAR_BUDGET__YEARLY_LIMIT_CNY:-200.0}
   max_calls_per_run: 100           # 单次 run 调用次数上限（§3.3）
   # ★ 三档单价（元/百万 token），按 provider → model 键控。
-  #   来源：DeepSeek 定价页（核对 2026-10-24）；换供应商 = 加一行价格，不改代码。
+  #   来源：DeepSeek 官方定价页（核对 2026-11-12）。官方为分时定价
+  #   （北京时间工作日 9–12 / 14–18 为高峰，其余为空闲；空闲 = 高峰一半）。
+  #   本项目**一律按「官方空闲价 × 1.2」**计入，理由：
+  #     ① daily.yml 的高峰守卫保证自动调用落在空闲时段（peak_hours.py）；
+  #     ② 1.2 = 按墙钟时长加权的空闲/高峰混合价（79% 空闲 + 21% 高峰），
+  #        属保守估计 —— 略高于真实空闲账单，但绝不低于它；
+  #     ③ 历史上曾用「远低于官方」的单一平价，导致成本系统性低估（成本预算 §13.4）。
+  #   ★ 改价必须先改 docs/成本预算.md §1，再改这里；换供应商 = 加一行价格，不改代码。
   prices:
     deepseek:
       deepseek-v4-flash:
-        input_cached_cny_per_1m: 0.02
-        input_miss_cny_per_1m: 1.0
-        output_cny_per_1m: 2.0
+        input_cached_cny_per_1m: 0.024
+        input_miss_cny_per_1m: 1.2
+        output_cny_per_1m: 4.8
       deepseek-v4-pro:
-        input_cached_cny_per_1m: 0.025
-        input_miss_cny_per_1m: 3.0
-        output_cny_per_1m: 6.0
+        input_cached_cny_per_1m: 0.18
+        input_miss_cny_per_1m: 5.4
+        output_cny_per_1m: 16.2
 
 http:
   timeout_connect_s: 5.0

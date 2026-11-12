@@ -18,32 +18,32 @@ def _budget() -> BudgetSettings:
 
 
 def test_flash_estimate_matches_cost_model() -> None:
-    """每日报告（flash）：30k in / 4k out → ¥0.038（成本预算 §2）。"""
+    """条目增强（flash）：30k in / 4k out → ¥0.0552（成本预算 §1 采用价）。"""
     est = estimate_cost(_budget(), "deepseek", "deepseek-v4-flash", 30000, 4000)
-    assert est.cost_cny == pytest.approx(0.038, abs=1e-9)
+    assert est.cost_cny == pytest.approx(0.0552, abs=1e-9)
 
 
 def test_pro_estimate_matches_cost_model() -> None:
-    """深度分析（pro）：60k in / 8k out → ¥0.228（成本预算 §2）。"""
+    """深度分析（pro）：60k in / 8k out → ¥0.4536（成本预算 §1 采用价）。"""
     est = estimate_cost(_budget(), "deepseek", "deepseek-v4-pro", 60000, 8000)
-    assert est.cost_cny == pytest.approx(0.228, abs=1e-9)
+    assert est.cost_cny == pytest.approx(0.4536, abs=1e-9)
 
 
 def test_cached_input_is_cheaper_than_miss() -> None:
-    """★ 三档单价：缓存命中 0.02/M 远低于未命中 1.0/M，预估默认按未命中（保守）。"""
+    """★ 三档单价：缓存命中 0.024/M 远低于未命中 1.2/M，预估默认按未命中（保守）。"""
     b = _budget()
     miss = estimate_cost(b, "deepseek", "deepseek-v4-flash", 1_000_000, 0)
     hit = estimate_cost(b, "deepseek", "deepseek-v4-flash", 1_000_000, 0, input_cached=True)
-    assert miss.cost_cny == pytest.approx(1.0)
-    assert hit.cost_cny == pytest.approx(0.02)
+    assert miss.cost_cny == pytest.approx(1.2)
+    assert hit.cost_cny == pytest.approx(0.024)
     assert hit.cost_cny < miss.cost_cny
 
 
 def test_output_price_is_charged() -> None:
-    """输出 token 按 max_tokens × 输出单价计（pro 输出 6.0/M）。"""
+    """输出 token 按 max_tokens × 输出单价计（pro 输出 16.2/M）。"""
     b = _budget()
     est = estimate_cost(b, "deepseek", "deepseek-v4-pro", 0, 1_000_000)
-    assert est.cost_cny == pytest.approx(6.0)
+    assert est.cost_cny == pytest.approx(16.2)
 
 
 def test_price_for_missing_key_raises() -> None:
@@ -61,12 +61,12 @@ def test_repo_default_prices_loaded() -> None:
         flash.input_cached_cny_per_1m,
         flash.input_miss_cny_per_1m,
         flash.output_cny_per_1m,
-    ) == (0.02, 1.0, 2.0)
+    ) == (0.024, 1.2, 4.8)
     assert (
         pro.input_cached_cny_per_1m,
         pro.input_miss_cny_per_1m,
         pro.output_cny_per_1m,
-    ) == (0.025, 3.0, 6.0)
+    ) == (0.18, 5.4, 16.2)
 
 
 def test_repo_default_limits() -> None:

@@ -265,6 +265,7 @@ migrate → collect → collect --classics → enrich → signals → relate →
 | `mode` | `fast`（缺 key 自动降级 `off`） | `off/fast/strong` 三档；值域含 `off/on/yes/no` 必须加引号 |
 | `budget.{daily,weekly,monthly,yearly}_limit_cny` | 2 / 10 / 40 / 200 ¥ | 四层金额闸门，调用前拦截、只降级不报错 |
 | `budget.max_calls_per_run` | 100 | 单次 run 调用次数上限 |
+| `budget.prices`（元/百万 token） | flash 0.024 / 1.2 / 4.8；pro 0.18 / 5.4 / 16.2 | 2026-11-12 定案 = **官方空闲价 × 1.2**（保守，不低于真实空闲账单）；改价先改 `docs/成本预算.md` §1，再改 YAML + `tests/test_budget.py` |
 | `llm.max_tokens_fast` / `max_tokens_strong` | 8000 / 16000 | 推理会吃满输出 token，调低会让答案被截断（实测踩过两次） |
 | `collect.arxiv_max_results` | 600 | 单日实测 465 条，留余量 |
 | `collect.arxiv_read_timeout_s` | 60 | 全局 http 20s 不够，整日 ReadTimeout 后单独抬高 |
