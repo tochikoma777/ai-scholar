@@ -1,0 +1,197 @@
+{
+  "date": "2026-11-14",
+  "schema_version": 1,
+  "total_papers": 9592,
+  "new_today": 605,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2611.16956",
+      "title": "Lara Mini Base: Language Diversity as a Resource, Not a Trade-off",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "model-architecture",
+        "training-alignment"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.16206",
+      "title": "Turning Multi-Agent Communication into Token-Level Credit with On Policy Self Distillation",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.15717",
+      "title": "Outside the Purview of the Reward: Capability Drift in Multilingual Post-Training",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "model-architecture",
+        "training-alignment"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.15126",
+      "title": "Recompute or Restore? Host-Tier KV for Multi-Model Agent Workflows on a Static-Graph NPU Serving Stack",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "model-architecture",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.14604",
+      "title": "KernelMosaic: An Open Dataset and Agentic Framework for CUDA Kernel Generation",
+      "score": 3.0,
+      "groups": [
+        "ai-infra",
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.16718",
+      "title": "MusicRWKV: A Multimodal RWKV Framework for Music Representation Learning",
+      "score": 2.2,
+      "groups": [
+        "model-architecture",
+        "training-alignment",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.16487",
+      "title": "HeMeR: Heterogeneous Memory Reconciliation for Embodied Agents via Structured KV Reuse",
+      "score": 2.2,
+      "groups": [
+        "llm-inference",
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.16246",
+      "title": "What Can a VLA Learn from the Agent That Calls It? Task-Level Experience Distillation for Embodied Navigation",
+      "score": 2.2,
+      "groups": [
+        "llm-inference",
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.16217",
+      "title": "WorldDraft: If Code Builds the World, Can Video Models Just Render It?",
+      "score": 2.2,
+      "groups": [
+        "training-alignment",
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.16069",
+      "title": "\"It's Just a Small Weapon\": What Rewarding Misbehavior During RL Does to Character-Trained Models",
+      "score": 2.2,
+      "groups": [
+        "training-alignment",
+        "agent",
+        "ai-safety"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    }
+  ],
+  "deep_analyzed": [],
+  "new_graded": [
+    {
+      "id": "arXiv:2611.00963",
+      "title": "4K Image Super-Resolution on Mobile NPUs: Mobile AI 2026 Challenge Report",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3,
+      "selection_reason": null,
+      "grade_reason": "被引 4 ≥ 3"
+    },
+    {
+      "id": "arXiv:2611.00974",
+      "title": "Efficient Image Denoising on Smartphone GPUs: Mobile AI 2026 Challenge Report",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3,
+      "selection_reason": null,
+      "grade_reason": "被引 3 ≥ 3"
+    },
+    {
+      "id": "arXiv:2611.00616",
+      "title": "Enhancing Language Model Reasoning with Structured Multi-Level Modeling",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3,
+      "selection_reason": null,
+      "grade_reason": "被引 19 ≥ 3"
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "8481ae11f277",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1703,
+      "new": 605,
+      "degraded": [
+        "RuntimeError: arXiv HTTP 429（day=2026-11-14）（2026-11-14 · https://export.arxiv.org/api/query · read_timeout=60.0s）"
+      ]
+    },
+    {
+      "run_id": "5ceb8eec278a",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {
+    "arxiv_partial": "RuntimeError: arXiv HTTP 429（day=2026-11-14）（2026-11-14 · https://export.arxiv.org/api/query · read_timeout=60.0s）"
+  },
+  "cost_cny": 0.0925,
+  "cost_anomalies": []
+}
