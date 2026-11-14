@@ -1,0 +1,44 @@
+{
+  "date": "2026-11-15",
+  "schema_version": 1,
+  "total_papers": 9593,
+  "new_today": 1,
+  "watchlist_hits": [],
+  "deep_analyzed": [],
+  "new_graded": [
+    {
+      "id": "arXiv:2611.15025",
+      "title": "Federated Class Incremental Learning: A Pseudo Feature Based Approach Without Exemplars",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3,
+      "selection_reason": null,
+      "grade_reason": "被引 5 ≥ 3"
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "82a22b27786b",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1486,
+      "new": 1,
+      "degraded": []
+    },
+    {
+      "run_id": "871211c6ca9f",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.0865,
+  "cost_anomalies": []
+}
