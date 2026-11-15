@@ -1,0 +1,75 @@
+{
+  "date": "2026-11-16",
+  "schema_version": 1,
+  "total_papers": 9593,
+  "new_today": 0,
+  "watchlist_hits": [],
+  "deep_analyzed": [
+    {
+      "id": "arXiv:2610.36848",
+      "title": "Evolving Agent Teams",
+      "score": 0.0,
+      "groups": [],
+      "tier": null,
+      "selection_reason": {
+        "channel": "A1_watchlist",
+        "groups": [
+          "llm-inference",
+          "ai-infra",
+          "model-architecture",
+          "agent"
+        ],
+        "score": 4.0,
+        "tier": null,
+        "model": "deepseek-flash",
+        "fulltext": true
+      },
+      "grade_reason": null
+    }
+  ],
+  "new_graded": [
+    {
+      "id": "arXiv:2611.15961",
+      "title": "Is Spoken Hungarian Low-resource?: A Quantitative Survey of Hungarian Speech Data Sets",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3,
+      "selection_reason": null,
+      "grade_reason": "被引 4 ≥ 3"
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [
+    {
+      "id": "p-4e6ee9017da9",
+      "claim": "方法「reinforcement learning」在 2026-12-16 前被 ≥ 40 篇新增论文提及（最近 90 天 33 篇）",
+      "status": "open",
+      "due_at": "2026-12-16",
+      "observed": null,
+      "threshold": 40
+    }
+  ],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "ec472b5a6261",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1051,
+      "new": 0,
+      "degraded": []
+    },
+    {
+      "run_id": "7c8c4728d62b",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.096,
+  "cost_anomalies": []
+}
