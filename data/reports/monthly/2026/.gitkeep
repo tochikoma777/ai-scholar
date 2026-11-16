@@ -1,0 +1,5 @@
+# 月报真源目录占位（L10 预建，2026-11-16）
+# 用途：recap.yml 每月 1 号 UTC 16:35 跑 report --monthly --previous，
+#       产物落本目录 monthly-YYYY-MM.{md,json}。
+# 首次预期产物：2026-12-01 生成 monthly-2026-11。
+# 保留此文件以便 git 跟踪空目录，防止遗忘落点。

@@ -8,7 +8,7 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 > ★ 全程中文回复（技术术语 / 代码 / 路径除外）。
 > ★ **每次 clear / init 后第一件事**：读 `docs/经验固化.md`（尤其「输出规范类 O1」：
 >   两张进度表 + 待决策子格式），再读 `docs/handoff/` 下**阶段号最大**的 `L*-开工.md`
->   （当前 `L9-开工.md`；已完成阶段的文件是归档，不作开工入口）。**未读即开工或输出 = 违规。**
+>   （当前 `L10-开工.md`；已完成阶段的文件是归档，不作开工入口）。**未读即开工或输出 = 违规。**
 >   ★ 这一行由 `tests/test_docs_consistency.py::test_current_handoff_pointer_is_latest` 机械校验
 >   —— 指向过期 handoff 会让下一个 Agent 在**已归档**的范围里开工（2026-10-26 已两次踩中）。
 > ★ **阶段收尾硬门禁（宣布“已完成”前逐项打勾）**：
@@ -20,7 +20,12 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 ---
 
-## ★ 当前阶段：L9（运营期：观察 + 按需维护）—— 进行中（默认不新增功能，开工入口 `docs/handoff/L9-开工.md`）
+## ★ 当前阶段：L10（结项验收）—— 进行中（不新增功能，开工入口 `docs/handoff/L10-开工.md`）
+
+> ★ **L10 于 2026-11-16 启用**（负责人授权）：L9 观察期 2026-10-28~11-11 期满、无 P0/P1；
+> L9 运营验证全部达标（daily 14/14 success、站点 200、成本稳态 ≈¥0.14/天、recap 周报已产出）。
+> 验收范围与逐项证据见 `docs/handoff/L10-开工.md` 与任务卡 `docs/任务卡/L10-结项验收.md`。
+> ★ 结项 tag 用 **`l10a`**（`l10` 已被 2026-10-23 历史提交占用，见 handoff §4）。
 
 > ★ **L9 默认不新增功能**：先把"每天自动跑"看稳，新需求先出任务卡（候选见 L9 handoff §6，
 > 需负责人定案）。日常巡检 5 分钟一套命令见 handoff §3。
@@ -35,13 +40,10 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 > ★ **daily 已接入 `site`**（L8-C 推翻 2026-10-25「不接入」的旧决定）：
 > 站点要读 db 元数据，而 db 只存在于 actions-cache ⇒ 必须在 daily job 内构建。
 > ★ 前置审计教训（E7）：能力已实现≠已接线 —— 各阶段 DoD 必须回答「产出凭什么被下一阶段拿到」。
-> ★ **L10 草稿已就位但尚未启用**：`docs/handoff/L10-草稿.md`（结项验收）观察期到
-> **2026-11-11**，届时由负责人**再决定是否启动**（≠ 到期自动启用，2026-11-05 指令）。
-> 在此之前**不** `git mv` 改名、**不**新建 `L10-开工.md`、**不**标 L9「已完成」、**不**打 tag。
-> **在未启用前它不是开工入口**，开工仍看 `L9-开工.md`（机械校验按 `L*-开工.md` 取最大阶段号，
-> 草稿不匹配该模式）。
-> ★ 观察期怎么"看"：`L10-草稿.md` §5 有每周巡检命令 + 记录表；启用当天照 §6 逐步执行
-> （先 `git mv` 改名再改本指针，顺序反了门禁必红）。
+> ★ **L10 已启用（2026-11-16）**：`docs/handoff/L10-开工.md`（结项验收）是唯一开工入口。
+> L9 运营期观察已满（2026-10-28~11-11），负责人授权启用；`git mv` 已完成、本指针已同步为 L10、
+> `L9-开工.md` 已标「已归档」、机械门禁 `test_current_handoff_pointer_is_latest` 校验通过。
+> ★ 结项 tag 用 **`l10a`** 而非 `l10`（后者被 2026-10-23 历史提交 `adcd992` 占用）。
 > ★ 2026-11-05 会话收尾（历史）：CODEBUDDY 自审 4 项 + L9-E 日配额削峰 + 11/2 费用归因，
 > 已推送 `6ffa3b4`。详见 `L9-开工.md` §6.7。
 > ★ **当前指针（2026-11-12）**：已推送 `9aa98da`（通道配额轮转 / 模型名 `deepseek-flash` /
