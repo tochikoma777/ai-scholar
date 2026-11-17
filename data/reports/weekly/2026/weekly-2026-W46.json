@@ -1,0 +1,175 @@
+{
+  "period": "week",
+  "slug": "weekly-2026-W46",
+  "start": "2026-11-09",
+  "end": "2026-11-15",
+  "days_covered": 7,
+  "days_expected": 7,
+  "missing_days": [],
+  "new_papers": 2333,
+  "runs_total": 14,
+  "top_hits": [
+    {
+      "id": "arXiv:2603.27343",
+      "title": "WMIP: A Working-Memory-Inspired Programmable Probe of Cumulative State Tracking in Large Language Models",
+      "days": 1,
+      "groups": [
+        "agent"
+      ]
+    },
+    {
+      "id": "arXiv:2608.22237",
+      "title": "Read Less, Solve More: Token-Efficient Sparse Reading of External Content for AI Agents",
+      "days": 1,
+      "groups": [
+        "agent"
+      ]
+    },
+    {
+      "id": "arXiv:2611.08286",
+      "title": "Interactive Visual Gym: Evaluating Visual Interaction Models with Simulated Users in Interactive Worlds",
+      "days": 1,
+      "groups": [
+        "training-alignment"
+      ]
+    },
+    {
+      "id": "arXiv:2611.08914",
+      "title": "HomeLoop: A Simulation Framework and Benchmark for Robot-IoT Coordination in Everyday Domestic Assistance and Safety",
+      "days": 1,
+      "groups": [
+        "eval-benchmark",
+        "multimodal"
+      ]
+    },
+    {
+      "id": "arXiv:2611.09036",
+      "title": "ToolDex: An Ego-Exo Human Demonstration Dataset for Creative Physical Tool Use",
+      "days": 1,
+      "groups": [
+        "eval-benchmark",
+        "multimodal"
+      ]
+    },
+    {
+      "id": "arXiv:2611.09154",
+      "title": "Learning When to Think: Dual-Reference Offline Optimization for Adaptive VLM Reasoning",
+      "days": 1,
+      "groups": [
+        "eval-benchmark",
+        "multimodal"
+      ]
+    },
+    {
+      "id": "arXiv:2611.09240",
+      "title": "MM-DyGraph: A Dataset, Benchmark, and Model for Multimodal Dynamic Graphs",
+      "days": 1,
+      "groups": [
+        "eval-benchmark",
+        "multimodal"
+      ]
+    },
+    {
+      "id": "arXiv:2611.09326",
+      "title": "ABHBench: Evaluating Moral Decision-Making of Foundation Models from an Agentic Perspective",
+      "days": 1,
+      "groups": [
+        "eval-benchmark",
+        "multimodal"
+      ]
+    },
+    {
+      "id": "arXiv:2611.09327",
+      "title": "Robust Deep Prototype Classifiers via Lipschitz Training",
+      "days": 1,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ]
+    },
+    {
+      "id": "arXiv:2611.09496",
+      "title": "Mosaic:montage-agnostic self-distilled graph learning for subject-independent ieeg seizure detection",
+      "days": 1,
+      "groups": [
+        "efficient-inference",
+        "eval-benchmark"
+      ]
+    }
+  ],
+  "graded_total": 14,
+  "graded_by_tier": {
+    "Tier 3": 14
+  },
+  "deep_analyzed_total": 5,
+  "deep_analyses": [
+    {
+      "id": "arXiv:2611.07541",
+      "title": "CST-Bench: Benchmarking Counterfactual Spatial Transition Reasoning with Causal Transition On-Policy Self-Distillation",
+      "date": "2026-11-09",
+      "reason": null
+    },
+    {
+      "id": "arXiv:2611.07392",
+      "title": "WeLM-Image: A Unified Image Generation Model towards Visual Intelligence",
+      "date": "2026-11-10",
+      "reason": null
+    },
+    {
+      "id": "arXiv:2611.12426",
+      "title": "dNaViT: Discrete Codes are General-Purpose Visual Representations",
+      "date": "2026-11-11",
+      "reason": null
+    },
+    {
+      "id": "arXiv:2611.11533",
+      "title": "Ostinato: Fast CPU-GPU MoE Inference for Local Agents via Resident Experts in Every Forward Pass",
+      "date": "2026-11-12",
+      "reason": {
+        "channel": "A1_watchlist",
+        "groups": [
+          "llm-inference",
+          "ai-infra",
+          "model-architecture",
+          "agent"
+        ],
+        "score": 4.0,
+        "tier": null,
+        "model": "deepseek-v4-flash",
+        "fulltext": true
+      }
+    },
+    {
+      "id": "arXiv:2610.40305",
+      "title": "Rimuru: Unified Memory Management for Modern LLM Serving via Elastic Expert Offloading",
+      "date": "2026-11-13",
+      "reason": {
+        "channel": "A1_watchlist",
+        "groups": [
+          "llm-inference",
+          "ai-infra",
+          "model-architecture",
+          "training-alignment"
+        ],
+        "score": 4.0,
+        "tier": null,
+        "model": "deepseek-flash",
+        "fulltext": true
+      }
+    }
+  ],
+  "cost_total": 0.81,
+  "cost_days": 7,
+  "cost_peak_day": "2026-11-10",
+  "cost_peak_cny": 0.1778,
+  "anomaly_days": [
+    "2026-11-09",
+    "2026-11-10"
+  ],
+  "predictions_hit": 0,
+  "predictions_miss": 0,
+  "degraded_days": {
+    "arxiv_partial": 1
+  },
+  "notes": []
+}
