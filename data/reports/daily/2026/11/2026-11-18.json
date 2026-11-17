@@ -1,0 +1,196 @@
+{
+  "date": "2026-11-18",
+  "schema_version": 1,
+  "total_papers": 10675,
+  "new_today": 763,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2611.20409",
+      "title": "Integrated GPU Core for Mamba-3",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "ai-infra",
+        "model-architecture"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.20289",
+      "title": "Benchmarking LLM Inference on Desktop-Scale NVIDIA Grace Blackwell Clusters",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "ai-infra",
+        "model-architecture"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.20095",
+      "title": "High-Throughput Serving of Nemotron 3.5 Transcribe with Regime-Aware Megakernels and Kernel Fusion",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "ai-infra",
+        "model-architecture"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.19800",
+      "title": "Multi-Branch Transformer",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "model-architecture",
+        "training-alignment"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.19700",
+      "title": "Where Should LLM Agents Adapt at Test Time? In Context, in Weights, or Both",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.18908",
+      "title": "MemeEconomy: Do LLM Agents Trade Ethics for Survival?",
+      "score": 2.4,
+      "groups": [
+        "training-alignment",
+        "agent",
+        "multimodal",
+        "ai-safety"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.21607",
+      "title": "ScaleVLA: Scaling Vision-Language-Action Models to 552 Billion Parameters",
+      "score": 2.2,
+      "groups": [
+        "training-alignment",
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.19202",
+      "title": "Omni-Workspace: Benchmarking Omni-Modal AI Assistants on Multimodal Workspace Tasks",
+      "score": 2.2,
+      "groups": [
+        "ai-infra",
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.21605",
+      "title": "ViRA: Toward Ultra-High-Resolution Visual Agents via Cross-Input Relative Policy Optimization",
+      "score": 2.0,
+      "groups": [
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.21441",
+      "title": "Learning to Reason with Predictive Gains for Generative Recommendation",
+      "score": 2.0,
+      "groups": [
+        "model-architecture",
+        "training-alignment"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    }
+  ],
+  "deep_analyzed": [
+    {
+      "id": "arXiv:2610.35303",
+      "title": "InterQ-RL: Interaction-Aware Correction of Execution Mismatch in Quantized Agentic RL",
+      "score": 0.0,
+      "groups": [],
+      "tier": null,
+      "selection_reason": {
+        "channel": "A1_watchlist",
+        "groups": [
+          "llm-inference",
+          "model-architecture",
+          "training-alignment",
+          "agent"
+        ],
+        "score": 4.0,
+        "tier": null,
+        "model": "deepseek-flash",
+        "fulltext": true
+      },
+      "grade_reason": null
+    }
+  ],
+  "new_graded": [
+    {
+      "id": "arXiv:2611.06637",
+      "title": "Human Motion Prediction via Continual Prior Compensation",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3,
+      "selection_reason": null,
+      "grade_reason": "被引 9 ≥ 3"
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "84bf68a6b5ec",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1477,
+      "new": 763,
+      "degraded": []
+    },
+    {
+      "run_id": "70107b4df2ce",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.1023,
+  "cost_anomalies": []
+}
