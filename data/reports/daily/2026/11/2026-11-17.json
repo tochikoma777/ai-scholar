@@ -1,0 +1,196 @@
+{
+  "date": "2026-11-17",
+  "schema_version": 1,
+  "total_papers": 9912,
+  "new_today": 319,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2611.18397",
+      "title": "Gamer: A Generalist Vision-Language-Action Foundation Model for Long-Horizon Real-Time Game Agent",
+      "score": 4.2,
+      "groups": [
+        "llm-inference",
+        "ai-infra",
+        "training-alignment",
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.18494",
+      "title": "ARCHER: From Rationale Imitation to Executable Reasoning in Small Language Models",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.18562",
+      "title": "Training Reasoning Models in Simulation to Natively Use Real Robots",
+      "score": 2.2,
+      "groups": [
+        "training-alignment",
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.18417",
+      "title": "CoPre-MoE: Consolidating and Preserving MoE for Multimodal Continual Instruction Tuning",
+      "score": 2.2,
+      "groups": [
+        "model-architecture",
+        "training-alignment",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.18346",
+      "title": "VLAN: Vision-Language Accessible Navigation",
+      "score": 2.2,
+      "groups": [
+        "training-alignment",
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.18482",
+      "title": "MMFlash: Faster Speculative Decoding for Vision-Language Models",
+      "score": 2.2,
+      "groups": [
+        "llm-inference",
+        "model-architecture",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.18531",
+      "title": "Alignment by Socialization: Learning Tradeoffs Under Selection",
+      "score": 2.0,
+      "groups": [
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.18504",
+      "title": "Agentic AI for Discovering Fault-Tolerant Quantum Circuits",
+      "score": 2.0,
+      "groups": [
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.18459",
+      "title": "Callo: Serving Cache-Miss Requests with Speculative Decoding on Invalidated KV under Prefill-Decode Disaggregation",
+      "score": 2.0,
+      "groups": [
+        "llm-inference",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.18321",
+      "title": "Causal AI-Driven Secure mmWave Beam Alignment with Defensive Variational Autoencoders",
+      "score": 2.0,
+      "groups": [
+        "llm-inference",
+        "training-alignment"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    }
+  ],
+  "deep_analyzed": [
+    {
+      "id": "arXiv:2611.18397",
+      "title": "Gamer: A Generalist Vision-Language-Action Foundation Model for Long-Horizon Real-Time Game Agent",
+      "score": 0.0,
+      "groups": [],
+      "tier": null,
+      "selection_reason": {
+        "channel": "A1_watchlist",
+        "groups": [
+          "llm-inference",
+          "ai-infra",
+          "training-alignment",
+          "agent",
+          "multimodal"
+        ],
+        "score": 4.2,
+        "tier": null,
+        "model": "deepseek-flash",
+        "fulltext": true
+      },
+      "grade_reason": null
+    }
+  ],
+  "new_graded": [
+    {
+      "id": "arXiv:2611.17952",
+      "title": "Domain Adaptation Based Pipeline for Character Classification and Handwritten Text Recognition",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3,
+      "selection_reason": null,
+      "grade_reason": "被引 3 ≥ 3"
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "01248e84dc89",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1007,
+      "new": 319,
+      "degraded": []
+    },
+    {
+      "run_id": "f47795342390",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.1048,
+  "cost_anomalies": []
+}
