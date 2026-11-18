@@ -1,0 +1,207 @@
+{
+  "date": "2026-11-19",
+  "schema_version": 1,
+  "total_papers": 10786,
+  "new_today": 111,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2611.22115",
+      "title": "TeleChat to Xing4: Advancing Frontier Agentic Models on Domestic Chips and Frameworks",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.23034",
+      "title": "M3OPD-Reasoner: An Open Recipe for Post-Training Multimodal Reasoning with Multi-Teacher On-Policy Distillation",
+      "score": 2.2,
+      "groups": [
+        "llm-inference",
+        "training-alignment",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.21950",
+      "title": "DiscoveryAgent: A Framework for Scientist-centric Agentic AI",
+      "score": 2.2,
+      "groups": [
+        "ai-infra",
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.22275",
+      "title": "Heave-Ho: Decentralized Long-Horizon Multi-Humanoid Collaboration",
+      "score": 2.0,
+      "groups": [
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.21882",
+      "title": "WM-Quant: Rollout-Aware Post-Training Quantization for JEPA-Style World Models",
+      "score": 2.0,
+      "groups": [
+        "llm-inference",
+        "training-alignment"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.21832",
+      "title": "Auditors Struggle to Catch Sabotage In End-to-End Transcripts of AI Safety Research",
+      "score": 2.0,
+      "groups": [
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.21799",
+      "title": "Chain-of-Thought Controllability Can Reduce Chain-of-Thought Monitorability",
+      "score": 2.0,
+      "groups": [
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.21791",
+      "title": "Regularized Score Centering",
+      "score": 2.0,
+      "groups": [
+        "model-architecture",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.23140",
+      "title": "GameRealm: Grounding Visual Learning in Interactive Games",
+      "score": 1.2,
+      "groups": [
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.21839",
+      "title": "VisHead-Spec: Head-Routed Visual Attention for Multimodal Speculative Decoding",
+      "score": 1.2,
+      "groups": [
+        "llm-inference",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    }
+  ],
+  "deep_analyzed": [
+    {
+      "id": "arXiv:2611.22115",
+      "title": "TeleChat to Xing4: Advancing Frontier Agentic Models on Domestic Chips and Frameworks",
+      "score": 0.0,
+      "groups": [],
+      "tier": null,
+      "selection_reason": {
+        "channel": "A2_heat",
+        "groups": [],
+        "score": 0.0,
+        "tier": null,
+        "model": "deepseek-flash",
+        "fulltext": true
+      },
+      "grade_reason": null
+    }
+  ],
+  "new_graded": [
+    {
+      "id": "arXiv:2611.06062",
+      "title": "Adapting Qwen3 to Tajik from 0.6B to 8B: Lower Text Loss Did Not Mean Better Understanding",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3,
+      "selection_reason": null,
+      "grade_reason": "被引 3 ≥ 3"
+    },
+    {
+      "id": "arXiv:2611.05572",
+      "title": "Just the Facts: How Dialogues with AI Reduce Conspiracy Beliefs",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3,
+      "selection_reason": null,
+      "grade_reason": "被引 21 ≥ 3"
+    },
+    {
+      "id": "arXiv:2611.21932",
+      "title": "V2V Communications Using Blockchain-Enabled 6G Technology and Federated Learning",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3,
+      "selection_reason": null,
+      "grade_reason": "被引 5 ≥ 3"
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "1a0e863164eb",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1261,
+      "new": 111,
+      "degraded": [
+        "RuntimeError: arXiv HTTP 429（day=2026-11-17）（2026-11-17 · https://export.arxiv.org/api/query · read_timeout=60.0s）"
+      ]
+    },
+    {
+      "run_id": "90e019f6160d",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {
+    "arxiv_partial": "RuntimeError: arXiv HTTP 429（day=2026-11-17）（2026-11-17 · https://export.arxiv.org/api/query · read_timeout=60.0s）"
+  },
+  "cost_cny": 0.1419,
+  "cost_anomalies": []
+}
