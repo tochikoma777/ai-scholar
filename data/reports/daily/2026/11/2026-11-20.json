@@ -1,0 +1,195 @@
+{
+  "date": "2026-11-20",
+  "schema_version": 1,
+  "total_papers": 11506,
+  "new_today": 720,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2611.23388",
+      "title": "QDA: Closed-Loop LLM Quantization Design with Agents",
+      "score": 4.0,
+      "groups": [
+        "llm-inference",
+        "model-architecture",
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.22215",
+      "title": "Communicate the Change: Efficient Expert Parallelism via Activation Compression",
+      "score": 4.0,
+      "groups": [
+        "llm-inference",
+        "ai-infra",
+        "model-architecture",
+        "training-alignment"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.14848",
+      "title": "Tideway: Phase-Aware Tiered Memory Management for MoE Inference on Consumer Devices",
+      "score": 4.0,
+      "groups": [
+        "llm-inference",
+        "ai-infra",
+        "model-architecture",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.24496",
+      "title": "Harvesting Expert-Parallel Bubbles for Fine-Tuning",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "ai-infra",
+        "model-architecture"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.24059",
+      "title": "Replay, Don't Resample: Off-Policy Consolidation of Long-Horizon RL Experts",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.23695",
+      "title": "MoMoVL: Modality-Aware Adaptive Compression for On-Device Sparsely-Activated Vision-Language Models",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "model-architecture",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.24552",
+      "title": "NaviGATE: Noise-Aware Dual-View Generation for Multimodal Knowledge Graph Reasoning",
+      "score": 2.2,
+      "groups": [
+        "llm-inference",
+        "training-alignment",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.24115",
+      "title": "Embodied Graph: A Relational World Model for Long-Horizon Tasks",
+      "score": 2.2,
+      "groups": [
+        "model-architecture",
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.23917",
+      "title": "Vanguard: Knowing When to Trust the Draft in Speculative Vision-Language Agents",
+      "score": 2.2,
+      "groups": [
+        "llm-inference",
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.22880",
+      "title": "Learning Agent-Centric Vision-Language-Action World Models for Autonomous Driving",
+      "score": 2.2,
+      "groups": [
+        "training-alignment",
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    }
+  ],
+  "deep_analyzed": [
+    {
+      "id": "arXiv:1810.04805",
+      "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+      "score": 0.0,
+      "groups": [],
+      "tier": null,
+      "selection_reason": {
+        "channel": "B_tier1",
+        "groups": [],
+        "score": 0.0,
+        "tier": 1,
+        "model": "deepseek-flash",
+        "fulltext": true
+      },
+      "grade_reason": null
+    }
+  ],
+  "new_graded": [
+    {
+      "id": "arXiv:2607.21179",
+      "title": "Out of Sight, Still in Mind: Token Compression for Omni-LLMs",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3,
+      "selection_reason": null,
+      "grade_reason": "被引 3 ≥ 3"
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "6aedbcb1542c",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1682,
+      "new": 720,
+      "degraded": []
+    },
+    {
+      "run_id": "957feec323f6",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.1401,
+  "cost_anomalies": []
+}
