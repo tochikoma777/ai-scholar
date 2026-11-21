@@ -1,0 +1,62 @@
+{
+  "date": "2026-11-22",
+  "schema_version": 1,
+  "total_papers": 11982,
+  "new_today": 2,
+  "watchlist_hits": [],
+  "deep_analyzed": [],
+  "new_graded": [
+    {
+      "id": "arXiv:2611.09376",
+      "title": "Can LLMs Debug Robots by Editing Their Weights?",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3,
+      "selection_reason": null,
+      "grade_reason": "被引 3 ≥ 3"
+    },
+    {
+      "id": "arXiv:2611.09382",
+      "title": "Exploring Weight-Space Programming: Capabilities, Generalization, and Limitations",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3,
+      "selection_reason": null,
+      "grade_reason": "被引 6 ≥ 3"
+    },
+    {
+      "id": "arXiv:2611.09371",
+      "title": "Mitigating Covariate Shift in Behavioral Cloning via Robust Stationary Distribution Correction",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3,
+      "selection_reason": null,
+      "grade_reason": "被引 23 ≥ 3"
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "e3fe08a8dc0a",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1783,
+      "new": 2,
+      "degraded": []
+    },
+    {
+      "run_id": "9fa7027f5912",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.0828,
+  "cost_anomalies": []
+}
