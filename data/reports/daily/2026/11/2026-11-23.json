@@ -1,0 +1,56 @@
+{
+  "date": "2026-11-23",
+  "schema_version": 1,
+  "total_papers": 11982,
+  "new_today": 0,
+  "watchlist_hits": [],
+  "deep_analyzed": [
+    {
+      "id": "arXiv:2611.26358",
+      "title": "Beam Model Technical Report",
+      "score": 0.0,
+      "groups": [],
+      "tier": null,
+      "selection_reason": {
+        "channel": "A1_watchlist",
+        "groups": [
+          "llm-inference",
+          "model-architecture",
+          "training-alignment",
+          "agent"
+        ],
+        "score": 4.0,
+        "tier": null,
+        "model": "deepseek-flash",
+        "fulltext": true
+      },
+      "grade_reason": null
+    }
+  ],
+  "new_graded": [],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "56ff09d9d5ab",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1367,
+      "new": 0,
+      "degraded": []
+    },
+    {
+      "run_id": "a186f762f1fa",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.0894,
+  "cost_anomalies": []
+}
