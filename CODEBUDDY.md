@@ -26,6 +26,9 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 > L9 运营验证全部达标（daily 14/14 success、站点 200、成本稳态 ≈¥0.14/天、recap 周报已产出）。
 > 验收范围与逐项证据见 `docs/handoff/L10-开工.md` 与任务卡 `docs/任务卡/L10-结项验收.md`。
 > ★ 结项 tag 用 **`l10a`**（`l10` 已被 2026-10-23 历史提交占用，见 handoff §4）。
+> ★ **状态口径（2026-11-17 复核）**：tag `l10a` 已推送、任务卡 E-1 ✅、A~F 六组判据全通过、
+> README 路线图记「全部完成」。标题「进行中」指**终态维护**（持续巡检、不新增功能）：
+> 无后续阶段，故不走 docs 门禁的「已完成 ⇒ 下一阶段 handoff」分支。
 
 > ★ **L9 默认不新增功能**：先把"每天自动跑"看稳，新需求先出任务卡（候选见 L9 handoff §6，
 > 需负责人定案）。日常巡检 5 分钟一套命令见 handoff §3。
@@ -410,7 +413,8 @@ vault 由本地 `export` 写入。任何"让 Actions 写 private vault"的设计
    只进 `90-元数据/生成报告.md`。这里没有单独的导出内容 hash。
 8. ❌ **Tier 当排序权重用 / 以为深度分析对"所有论文"开放** —— 正确口径（**2026-10-29 负责人定案**）：
    **自动跑的深度分析只做「watchlist 命中」或「Tier 1」两类论文**，这是**有意收窄**，不是漏接。
-   - 候选池 = `_watched(...) or tier == 1`（`pipeline/deep_analysis.py:202-207`），
+   - 候选池 = `_watched(...) or tier == 1`（`pipeline/deep_analysis.py:99 _watched`，
+     条件在 `pipeline/deep_analysis.py:257 _select` 的候选池构造中，第 302 行），
      通道 A/B 都从这个池子里取 ⇒ 非命中且未定级的论文**不进**当日 Top N。
    - Tier 1 是**入场资格**，不是"分数加成"；不要为"多分析几篇"放宽池子（会直接抬高 strong 档成本）。
    - 正文抓取跟随深度分析触发，不按 Tier 限流。
