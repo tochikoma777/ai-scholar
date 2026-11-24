@@ -1,0 +1,211 @@
+{
+  "period": "week",
+  "slug": "weekly-2026-W47",
+  "start": "2026-11-16",
+  "end": "2026-11-22",
+  "days_covered": 7,
+  "days_expected": 7,
+  "missing_days": [],
+  "new_papers": 2389,
+  "runs_total": 14,
+  "top_hits": [
+    {
+      "id": "arXiv:2611.14848",
+      "title": "Tideway: Phase-Aware Tiered Memory Management for MoE Inference on Consumer Devices",
+      "days": 1,
+      "groups": [
+        "agent",
+        "ai-infra",
+        "llm-inference",
+        "model-architecture"
+      ]
+    },
+    {
+      "id": "arXiv:2611.18321",
+      "title": "Causal AI-Driven Secure mmWave Beam Alignment with Defensive Variational Autoencoders",
+      "days": 1,
+      "groups": [
+        "llm-inference",
+        "training-alignment"
+      ]
+    },
+    {
+      "id": "arXiv:2611.18346",
+      "title": "VLAN: Vision-Language Accessible Navigation",
+      "days": 1,
+      "groups": [
+        "agent",
+        "multimodal",
+        "training-alignment"
+      ]
+    },
+    {
+      "id": "arXiv:2611.18397",
+      "title": "Gamer: A Generalist Vision-Language-Action Foundation Model for Long-Horizon Real-Time Game Agent",
+      "days": 1,
+      "groups": [
+        "agent",
+        "ai-infra",
+        "llm-inference",
+        "multimodal",
+        "training-alignment"
+      ]
+    },
+    {
+      "id": "arXiv:2611.18417",
+      "title": "CoPre-MoE: Consolidating and Preserving MoE for Multimodal Continual Instruction Tuning",
+      "days": 1,
+      "groups": [
+        "model-architecture",
+        "multimodal",
+        "training-alignment"
+      ]
+    },
+    {
+      "id": "arXiv:2611.18459",
+      "title": "Callo: Serving Cache-Miss Requests with Speculative Decoding on Invalidated KV under Prefill-Decode Disaggregation",
+      "days": 1,
+      "groups": [
+        "agent",
+        "llm-inference"
+      ]
+    },
+    {
+      "id": "arXiv:2611.18482",
+      "title": "MMFlash: Faster Speculative Decoding for Vision-Language Models",
+      "days": 1,
+      "groups": [
+        "llm-inference",
+        "model-architecture",
+        "multimodal"
+      ]
+    },
+    {
+      "id": "arXiv:2611.18494",
+      "title": "ARCHER: From Rationale Imitation to Executable Reasoning in Small Language Models",
+      "days": 1,
+      "groups": [
+        "agent",
+        "llm-inference",
+        "training-alignment"
+      ]
+    },
+    {
+      "id": "arXiv:2611.18504",
+      "title": "Agentic AI for Discovering Fault-Tolerant Quantum Circuits",
+      "days": 1,
+      "groups": [
+        "agent",
+        "training-alignment"
+      ]
+    },
+    {
+      "id": "arXiv:2611.18531",
+      "title": "Alignment by Socialization: Learning Tradeoffs Under Selection",
+      "days": 1,
+      "groups": [
+        "agent",
+        "training-alignment"
+      ]
+    }
+  ],
+  "graded_total": 12,
+  "graded_by_tier": {
+    "Tier 3": 12
+  },
+  "deep_analyzed_total": 5,
+  "deep_analyses": [
+    {
+      "id": "arXiv:2610.36848",
+      "title": "Evolving Agent Teams",
+      "date": "2026-11-16",
+      "reason": {
+        "channel": "A1_watchlist",
+        "groups": [
+          "llm-inference",
+          "ai-infra",
+          "model-architecture",
+          "agent"
+        ],
+        "score": 4.0,
+        "tier": null,
+        "model": "deepseek-flash",
+        "fulltext": true
+      }
+    },
+    {
+      "id": "arXiv:2611.18397",
+      "title": "Gamer: A Generalist Vision-Language-Action Foundation Model for Long-Horizon Real-Time Game Agent",
+      "date": "2026-11-17",
+      "reason": {
+        "channel": "A1_watchlist",
+        "groups": [
+          "llm-inference",
+          "ai-infra",
+          "training-alignment",
+          "agent",
+          "multimodal"
+        ],
+        "score": 4.2,
+        "tier": null,
+        "model": "deepseek-flash",
+        "fulltext": true
+      }
+    },
+    {
+      "id": "arXiv:2610.35303",
+      "title": "InterQ-RL: Interaction-Aware Correction of Execution Mismatch in Quantized Agentic RL",
+      "date": "2026-11-18",
+      "reason": {
+        "channel": "A1_watchlist",
+        "groups": [
+          "llm-inference",
+          "model-architecture",
+          "training-alignment",
+          "agent"
+        ],
+        "score": 4.0,
+        "tier": null,
+        "model": "deepseek-flash",
+        "fulltext": true
+      }
+    },
+    {
+      "id": "arXiv:2611.22115",
+      "title": "TeleChat to Xing4: Advancing Frontier Agentic Models on Domestic Chips and Frameworks",
+      "date": "2026-11-19",
+      "reason": {
+        "channel": "A2_heat",
+        "groups": [],
+        "score": 0.0,
+        "tier": null,
+        "model": "deepseek-flash",
+        "fulltext": true
+      }
+    },
+    {
+      "id": "arXiv:1810.04805",
+      "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+      "date": "2026-11-20",
+      "reason": {
+        "channel": "B_tier1",
+        "groups": [],
+        "score": 0.0,
+        "tier": 1,
+        "model": "deepseek-flash",
+        "fulltext": true
+      }
+    }
+  ],
+  "cost_total": 0.7498,
+  "cost_days": 7,
+  "cost_peak_day": "2026-11-19",
+  "cost_peak_cny": 0.1419,
+  "anomaly_days": [],
+  "predictions_hit": 0,
+  "predictions_miss": 0,
+  "degraded_days": {
+    "arxiv_partial": 1
+  },
+  "notes": []
+}
