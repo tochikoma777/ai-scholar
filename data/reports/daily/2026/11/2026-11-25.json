@@ -1,0 +1,225 @@
+{
+  "date": "2026-11-25",
+  "schema_version": 1,
+  "total_papers": 13218,
+  "new_today": 698,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2611.31129",
+      "title": "FATCAT: Fault Injection Attacks Targeting Chip-level Alignment",
+      "score": 3.2,
+      "groups": [
+        "llm-inference",
+        "ai-infra",
+        "training-alignment",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.30662",
+      "title": "WeMM-Ecom: Advancing Multimodal Content Understanding for WeChat E-Commerce",
+      "score": 3.2,
+      "groups": [
+        "llm-inference",
+        "model-architecture",
+        "training-alignment",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.30542",
+      "title": "GC-MoE K3: A Green-Context Role Graph for Latent Mixture-of-Experts Decode",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "ai-infra",
+        "model-architecture"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.30090",
+      "title": "Post-Training Agents for Long-Document Reasoning",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.29897",
+      "title": "Motion Mamba 2.0: Autoregressive Diffusion Mamba for Long-Horizon Humanoid Control",
+      "score": 3.0,
+      "groups": [
+        "ai-infra",
+        "model-architecture",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.31117",
+      "title": "Self-Upgrading Embodied Agents",
+      "score": 2.2,
+      "groups": [
+        "training-alignment",
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.31002",
+      "title": "RoboUniverse-10K: Toward the Scaling Era of Agentic Robotics via Real-to-Sim Environments",
+      "score": 2.2,
+      "groups": [
+        "training-alignment",
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.30287",
+      "title": "MMMem: Self-Improving Agents with Task-Aware Multimodal Experience Consolidation",
+      "score": 2.2,
+      "groups": [
+        "training-alignment",
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.30171",
+      "title": "Audio-Visual Rearrangement",
+      "score": 2.2,
+      "groups": [
+        "training-alignment",
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.29969",
+      "title": "CARE-3D: Reinforcement Learning for Evidence Grounded Agentic Reasoning in Situated 3D Scenes",
+      "score": 2.2,
+      "groups": [
+        "training-alignment",
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    }
+  ],
+  "deep_analyzed": [],
+  "new_graded": [],
+  "predictions_verified": [
+    {
+      "id": "p-765998044b73",
+      "claim": "方法「benchmark」在 2026-11-25 前被 ≥ 15 篇新增论文提及（最近 90 天 12 篇）",
+      "status": "hit",
+      "due_at": "2026-11-25",
+      "observed": 235,
+      "threshold": 15
+    },
+    {
+      "id": "p-3b612337e3a1",
+      "claim": "方法「vision-language-action」在 2026-11-25 前被 ≥ 8 篇新增论文提及（最近 90 天 6 篇）",
+      "status": "hit",
+      "due_at": "2026-11-25",
+      "observed": 31,
+      "threshold": 8
+    },
+    {
+      "id": "p-da1e99797eae",
+      "claim": "方法「agent」在 2026-11-25 前被 ≥ 8 篇新增论文提及（最近 90 天 6 篇）",
+      "status": "hit",
+      "due_at": "2026-11-25",
+      "observed": 153,
+      "threshold": 8
+    }
+  ],
+  "predictions_due": [],
+  "predictions_new": [
+    {
+      "id": "p-62e80708a1c2",
+      "claim": "方向 cs.LG 在 2026-12-25 前新增论文 ≥ 3544 篇（最近 30 天观测 3221 篇）",
+      "status": "open",
+      "due_at": "2026-12-25",
+      "observed": null,
+      "threshold": 3544
+    },
+    {
+      "id": "p-23862f9d0a4b",
+      "claim": "方向 cs.AI 在 2026-12-25 前新增论文 ≥ 2577 篇（最近 30 天观测 2342 篇）",
+      "status": "open",
+      "due_at": "2026-12-25",
+      "observed": null,
+      "threshold": 2577
+    },
+    {
+      "id": "p-38509815f6b0",
+      "claim": "方向 cs.CL 在 2026-12-25 前新增论文 ≥ 1680 篇（最近 30 天观测 1527 篇）",
+      "status": "open",
+      "due_at": "2026-12-25",
+      "observed": null,
+      "threshold": 1680
+    },
+    {
+      "id": "p-5ff7bfca49f9",
+      "claim": "方向 cs.CV 在 2026-12-25 前新增论文 ≥ 1065 篇（最近 30 天观测 968 篇）",
+      "status": "open",
+      "due_at": "2026-12-25",
+      "observed": null,
+      "threshold": 1065
+    }
+  ],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "281c2baa8706",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1785,
+      "new": 698,
+      "degraded": []
+    },
+    {
+      "run_id": "1c336e1a9444",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.0,
+  "cost_anomalies": []
+}
