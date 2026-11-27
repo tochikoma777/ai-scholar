@@ -3,16 +3,18 @@ name: recap
 # ★ L9-D：周报 / 月报自动生成（零 LLM、零网络；只读 public 真源 data/reports/*.json）。
 #
 # 触发（UTC，对应北京时间次日）：
-#   - 每周一 00:35（UTC 周一 16:35）→ 生成**上一周**周报
-#   - 每月 1 号 00:35              → 生成**上个月**月报
+#   - 每周一 23:00（北京周二 07:00）→ 生成**上一周**周报
+#   - 每月 1 号 23:00（北京 2 号 07:00）→ 生成**上个月**月报
+# ★ 2026-11-27 随 daily cron 前移到 UTC 10:30 顺延：原 16:35 会在 daily
+#   跑完（实测 UTC 18:30–21:00）之前触发，周报会读到未更新的日报真源。
 # ★ 为什么是"上一周期"：自然周/月**第一天生成当期只会得到空表**（W44 在周一才刚开始）。
 #
 # ★ 与 daily 共用同一个 concurrency 组：两个 workflow 都会 push 到 main，
 #   分组不同就会互相覆盖 public 真源（G5 教训）。
 on:
   schedule:
-    - cron: "35 16 * * 1"   # 周一 → weekly --previous
-    - cron: "35 16 1 * *"   # 每月 1 号 → monthly --previous
+    - cron: "0 23 * * 1"   # 周一 → weekly --previous
+    - cron: "0 23 1 * *"   # 每月 1 号 → monthly --previous
   workflow_dispatch:
     inputs:
       period:
@@ -56,7 +58,7 @@ jobs:
 
       # ★ 两个 cron 走同一套步骤：用 event.schedule 区分（手动触发用 inputs.period）
       - name: Weekly recap
-        if: github.event.schedule == '35 16 * * 1' || inputs.period == 'weekly'
+        if: github.event.schedule == '0 23 * * 1' || inputs.period == 'weekly'
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.previous }}" = "false" ]; then
             uv run ai-scholar report --weekly
@@ -65,7 +67,7 @@ jobs:
           fi
 
       - name: Monthly recap
-        if: github.event.schedule == '35 16 1 * *' || inputs.period == 'monthly'
+        if: github.event.schedule == '0 23 1 * *' || inputs.period == 'monthly'
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.previous }}" = "false" ]; then
             uv run ai-scholar report --monthly

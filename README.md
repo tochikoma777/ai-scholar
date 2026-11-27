@@ -174,8 +174,9 @@ uv run ai-scholar site --days 30    # 趋势区展示最近 30 天
 
 ## 自动化与成本
 
-`daily.yml` 每天 UTC 16:30（北京 00:30）跑完整链路，末尾把 public 真源提交回仓库，
-并构建站点发布到 GitHub Pages。`recap.yml` 每周一和每月 1 号重算周报、月报，零 LLM、不读 db。
+`daily.yml` 每天 UTC 10:30（北京 18:30）触发，经 GitHub 排队延迟后实际跑在 UTC 18:30–21:00
+（空闲价窗口，避开 DeepSeek 高峰），末尾把 public 真源提交回仓库并发布 Pages。
+`recap.yml` 每周一和每月 1 号 UTC 23:00 重算周报、月报（晚于当天 daily 完成），零 LLM、不读 db。
 两条链共用并发组，避免同时 push 互相覆盖。
 
 | 档位 | 行为 | 成本 |

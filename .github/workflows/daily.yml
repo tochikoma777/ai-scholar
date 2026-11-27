@@ -1,10 +1,13 @@
 name: daily
 
-# ★ L2-B：每日自动化。每天北京时间凌晨跑一次（UTC 16:30 = 北京时间次日 00:30）。
+# ★ L2-B：每日自动化。UTC 10:30（北京 18:30）触发；GitHub 排队延迟实测 8–10.5h，
+#   实际跑在 UTC 18:30–21:00（北京次日 02:30–05:00）—— 全程落在 DeepSeek 空闲价窗口。
+#   为什么不留在 UTC 16:30：那会被排队延迟推进 UTC 00:45–04:15 的高峰窗口，
+#   近三次触发两次被 peak-guard 降级 off（LLM 零调用）。2026-11-27 负责人定案改点。
 # 编排：collect → enrich → signals → relate → report，然后 commit 真源回 public。
 on:
   schedule:
-    - cron: "30 16 * * *"
+    - cron: "30 10 * * *"
   workflow_dispatch:
 
 # ★ 同一时间只允许一个 daily 在跑（手动触发 / 重试叠加时会撞车）：
@@ -86,9 +89,10 @@ jobs:
 
       # ★ 2026-11-11 成本守卫：DeepSeek 高峰 = 北京工作日 9:00-12:00 / 14:00-18:00
       #   （UTC 01:00-04:00 / 06:00-10:00，空闲价 = 高峰价一半）。
-      #   cron 是 UTC 16:30（北京 00:30，本已在空闲），但 GitHub 排队延迟 4-8h，
-      #   实测曾落到北京 08:22（距高峰 38 分钟）⇒ 落进高峰就降级 off，
-      #   enhance / grade / analyze 零调用，其余零 LLM 步骤照跑，次日空闲补跑。
+      #   cron 原 UTC 16:30 被排队延迟推进高峰窗口（11-24 03:01 / 11-25 01:00 /
+      #   11-27 00:45:59 三次降级 off）；2026-11-27 改 UTC 10:30，延迟后落 UTC
+      #   18:30–21:00（空闲），guard 仍保留作最后一道防线：命中就降级 off，
+      #   enhance / grade / analyze 零调用，其余零 LLM 步骤照跑。
       - name: Peak-hour guard
         run: uv run python -m ai_scholar.utils.peak_hours
 

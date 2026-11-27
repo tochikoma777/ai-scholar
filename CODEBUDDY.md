@@ -124,7 +124,8 @@ cli.py (typer)
 横切层：config.py（YAML + ${ENV} + watchlist 合并） · utils/http.py（唯一网络出口）
 ```
 
-**自动化编排**（`.github/workflows/daily.yml`，每天 UTC 16:30 / 北京 00:30）：
+**自动化编排**（`.github/workflows/daily.yml`，UTC 10:30 / 北京 18:30 触发，
+延迟后实际跑 UTC 18:30–21:00 / 北京次日 02:30–05:00）：
 
 ```
 migrate → collect → collect --classics → enrich → signals → relate → enhance → grade
@@ -133,7 +134,7 @@ migrate → collect → collect --classics → enrich → signals → relate →
 ```
 
 > ★ **还有第二条自动化链**（易漏看，两个 workflow 共 push 同一分支）：
-> `recap.yml`（周一 / 每月 1 号 UTC 16:35，见下方 bullet）跑
+> `recap.yml`（周一 / 每月 1 号 UTC 23:00，见下方 bullet）跑
 > `report --weekly|--monthly --previous` → 只 commit `data/reports/{weekly,monthly}`。
 > 它是 daily 之外的**独立触发**，不在上面的箭头链里。
 
@@ -149,7 +150,7 @@ migrate → collect → collect --classics → enrich → signals → relate →
   本地补跑 `collect` 再 `export` 即可（不是 bug）。
 - ★ `daily.yml` 与 `recap.yml` **共用** `concurrency: ai-scholar-daily`：两个 workflow 都 push
   同一分支，分组不同就会互相覆盖 public 真源。本地要与 bot 双写 ⇒ **push 前先 rebase**。
-- ★ `recap.yml`（L9-D）：每周一 / 每月 1 号 UTC 16:35 跑 `report --weekly|--monthly --previous`，
+- ★ `recap.yml`（L9-D）：每周一 / 每月 1 号 UTC 23:00 跑 `report --weekly|--monthly --previous`，
   只 commit `data/reports/{weekly,monthly}`；**故意不注入 LLM 凭据**（顺带验证 off 档）。
 
 **站点发布**（L8-C）：`daily` job 内 `ai-scholar site --out _site` → `upload-pages-artifact`
