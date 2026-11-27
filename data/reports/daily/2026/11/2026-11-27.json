@@ -1,0 +1,165 @@
+{
+  "date": "2026-11-27",
+  "schema_version": 1,
+  "total_papers": 14195,
+  "new_today": 473,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2611.34776",
+      "title": "DFly2: Turbocharging Long-Context Speculative Decoding by Sharing the Target's Sparsity",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "model-architecture",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.34703",
+      "title": "Maco-RL: Scaling Agent Capabilities with Mixed-Task Reinforcement Learning",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.34529",
+      "title": "AliceAI-Foundation-80B-A3B-Base",
+      "score": 3.0,
+      "groups": [
+        "model-architecture",
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.34278",
+      "title": "Latent-in-the-Middle: On the Security of Cross-Model Latent Communication in Multi-Agent Systems",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.33741",
+      "title": "FlashProve-Next: Verifiable Inference for Production LLM APIs",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "ai-infra",
+        "model-architecture"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.33700",
+      "title": "Sports Agent: A Self-Evolving System for Conversational Data Analytics",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "training-alignment",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.33268",
+      "title": "JetDiffusion: Pushing the Speed Limits of Video Generation with NVFP4 Sparse Attention",
+      "score": 3.0,
+      "groups": [
+        "llm-inference",
+        "ai-infra",
+        "model-architecture"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.34675",
+      "title": "RoboEvo$^2$: Recursive Robot Self-Improvement via Harness-Policy Co-Evolution",
+      "score": 2.2,
+      "groups": [
+        "llm-inference",
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.34397",
+      "title": "Strong Starts, Simple Recipes: Unified Multi-Teacher On-Policy Distillation from Multimodal Specialists",
+      "score": 2.2,
+      "groups": [
+        "llm-inference",
+        "training-alignment",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.34292",
+      "title": "WebVibe: Multimodal Interactive Website Generation via Reverse Synthesis and Visual Self-Distillation",
+      "score": 2.2,
+      "groups": [
+        "llm-inference",
+        "agent",
+        "multimodal"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    }
+  ],
+  "deep_analyzed": [],
+  "new_graded": [],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "4150a8a6419b",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1913,
+      "new": 473,
+      "degraded": []
+    },
+    {
+      "run_id": "87cd633a569c",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.0,
+  "cost_anomalies": []
+}
