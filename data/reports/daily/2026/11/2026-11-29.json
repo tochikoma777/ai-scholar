@@ -1,0 +1,132 @@
+{
+  "date": "2026-11-29",
+  "schema_version": 1,
+  "total_papers": 14208,
+  "new_today": 13,
+  "watchlist_hits": [
+    {
+      "id": "arXiv:2611.30483",
+      "title": "When an AI agent makes a mistake in a database, what decides the damage?",
+      "score": 2.0,
+      "groups": [
+        "model-architecture",
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.34232",
+      "title": "OS-Omni: Benchmarking Generalist Computer-Using Agents on Long-Horizon Workflows Across Platforms",
+      "score": 1.0,
+      "groups": [
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.34064",
+      "title": "SPARC: Geometry-Guided Attention Pruning for Long-Horizon Camera-Controlled Video Generation",
+      "score": 1.0,
+      "groups": [
+        "llm-inference"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.30723",
+      "title": "BiSAT: Bidirectionally Aligned Semantic-Acoustic Tokenization for Speech Language Models",
+      "score": 1.0,
+      "groups": [
+        "training-alignment"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    },
+    {
+      "id": "arXiv:2611.27112",
+      "title": "Markdown Is Not a Firewall: four coding agents, one rules file, four boundaries",
+      "score": 1.0,
+      "groups": [
+        "agent"
+      ],
+      "tier": null,
+      "selection_reason": null,
+      "grade_reason": null
+    }
+  ],
+  "deep_analyzed": [
+    {
+      "id": "arXiv:2611.22215",
+      "title": "Communicate the Change: Efficient Expert Parallelism via Activation Compression",
+      "score": 0.0,
+      "groups": [],
+      "tier": null,
+      "selection_reason": {
+        "channel": "A1_watchlist",
+        "groups": [
+          "llm-inference",
+          "ai-infra",
+          "model-architecture",
+          "training-alignment"
+        ],
+        "score": 4.0,
+        "tier": null,
+        "model": "deepseek-flash",
+        "fulltext": true
+      },
+      "grade_reason": null
+    }
+  ],
+  "new_graded": [
+    {
+      "id": "arXiv:2611.10363",
+      "title": "LSRP*: Scalable and Anytime Planning for Multi-Agent Path Finding with Asynchronous Actions",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3,
+      "selection_reason": null,
+      "grade_reason": "被引 4 ≥ 3"
+    },
+    {
+      "id": "arXiv:2611.01729",
+      "title": "ODE Policy: Robot Learning via Action Dynamics, Not Actions",
+      "score": 0.0,
+      "groups": [],
+      "tier": 3,
+      "selection_reason": null,
+      "grade_reason": "被引 4 ≥ 3"
+    }
+  ],
+  "predictions_verified": [],
+  "predictions_due": [],
+  "predictions_new": [],
+  "opinions_total": 0,
+  "runs": [
+    {
+      "run_id": "9e665d0ccffe",
+      "mode": "fast",
+      "source": null,
+      "fetched": 1486,
+      "new": 13,
+      "degraded": []
+    },
+    {
+      "run_id": "8b3ecf5d8993",
+      "mode": "fast",
+      "source": null,
+      "fetched": 49,
+      "new": 0,
+      "degraded": []
+    }
+  ],
+  "degraded": {},
+  "cost_cny": 0.1071,
+  "cost_anomalies": []
+}
